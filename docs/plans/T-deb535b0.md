@@ -1,16 +1,17 @@
 # T-deb535b0: Hiển thị hạn mức subscription của từng phòng
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | Đọc usage phòng thủ, hàm thuần (màu theo mức, đếm ngược, số liệu cũ) và dữ liệu demo | coder | `src/usage.ts`, `src/usage.test.ts`, `src/api.ts` | - | xong (claude) |
-| W2 | Bố cục: vị trí bảng hạn mức trên tường phòng | coder | `src/scene/layout.ts`, `src/scene/layout.test.ts`, `src/scene/actors.test.ts` | - | xong (codex) |
-| W3 | Vẽ thanh hạn mức pixel trên canvas, màu USAGE, glyph % và ? | coder | `src/scene/usage-board.ts`, `src/scene/palette.ts`, `src/scene/font.ts`, `src/scene/font.test.ts`, `src/scene/furniture.ts`, `src/scene/index.ts` | W1, W2 | xong (claude) |
-| W4 | Thẻ trạng thái: từng cửa sổ hạn mức, giờ reset, gói, nguồn, lỗi, số liệu cũ | coder | `src/main.ts`, `src/style.css` | W1, W3 | xong (codex) |
-| W5 | CI chạy npm test, README mô tả usage và thanh hạn mức | coder | `.github/workflows/ci.yml`, `README.md` | - | xong (cursor) |
+| W1 | Đọc usage phòng thủ, hàm thuần (màu theo mức, đếm ngược, số liệu cũ) và dữ liệu demo | coder | `src/usage.ts`, `src/usage.test.ts`, `src/api.ts` | - | chưa chạy |
+| W2 | Bố cục: vị trí bảng hạn mức trên tường phòng | coder | `src/scene/layout.ts`, `src/scene/layout.test.ts`, `src/scene/actors.test.ts` | - | chưa chạy |
+| W3 | Vẽ thanh hạn mức pixel trên canvas, màu USAGE, glyph % và ? | coder | `src/scene/usage-board.ts`, `src/scene/palette.ts`, `src/scene/font.ts`, `src/scene/font.test.ts`, `src/scene/furniture.ts`, `src/scene/index.ts` | W1, W2 | chưa chạy |
+| W4 | Thẻ trạng thái: từng cửa sổ hạn mức, giờ reset, gói, nguồn, lỗi, số liệu cũ | coder | `src/main.ts`, `src/style.css` | W1, W3 | chưa chạy |
+| W5 | CI chạy npm test, README mô tả usage và thanh hạn mức | coder | `.github/workflows/ci.yml`, `README.md` | - | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
