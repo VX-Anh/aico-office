@@ -19,6 +19,10 @@ Lần vẽ đầu (mở trang, đổi nguồn dữ liệu, phòng online lại) 
 
 Biển tên phòng ghi thêm `+N` khi số agent con vượt `slots`. Dấu `!` đỏ cạnh biển tên: lần chạy gần nhất bị lỗi (không phải hết hạn mức).
 
+Thanh hạn mức pixel nằm trên tường phòng (cạnh đồng hồ, không che bàn hay nhân vật). Mỗi cửa sổ một hàng, tối đa hai: cửa sổ ngắn `5H` và tuần `WK`, kèm phần trăm. Màu theo mức đã dùng: xanh dưới 60%, vàng từ 60% tới dưới 80%, đỏ từ 80%. Phòng không công bố hạn mức hiện `?` thay cho thanh.
+
+Thẻ trạng thái dưới canvas ghi từng cửa sổ: phần trăm, giờ reset (đếm ngược kiểu `1H05`, `47M`), gói và nguồn số liệu. Có lỗi đọc thì ghi lỗi. `checked_at` cũ hơn 15 phút thì ghi "số liệu cũ".
+
 ## Chạy
 
 ```bash
@@ -27,22 +31,30 @@ npm run dev        # http://localhost:5173
 npm test           # vitest: hàm thuần, kịch bản actors, mọi file art/
 ```
 
-Không nhập gì thì chạy **chế độ demo** với dữ liệu giả (kịch bản 48 giây: phòng có 0/1/2 agent, agent đi vào/ra, phòng hết hạn mức, phòng mất kết nối). Để xem agent thật, nhập địa chỉ aico (mặc định `http://localhost:8000`) và API token (`deploy/secrets/aico_api_token` của aico). Token lưu trong localStorage của trình duyệt.
+Không nhập gì thì chạy **chế độ demo** với dữ liệu giả (kịch bản 48 giây: phòng có 0/1/2 agent, agent đi vào/ra, codex lên 100% rồi `limited`, phòng mất kết nối). Để xem agent thật, nhập địa chỉ aico (mặc định `http://localhost:8000`) và API token (`deploy/secrets/aico_api_token` của aico). Token lưu trong localStorage của trình duyệt.
 
 aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc định đã có `http://localhost:5173`).
 
 ## Dữ liệu
 
-`GET /workers` của aico trả mỗi phòng: `state`, `roles`, `slots` (số agent con tối đa chạy song song), `agents` (danh sách agent con đang chạy: `id`, `role`, `ticket_id`, `mode`, `started_at`), `runs_today`, `tokens_today`, tổng lượt và token, `last_error`, `limit` (`message`, `resets_at`).
+`GET /workers` của aico trả mỗi phòng: `state`, `roles`, `slots` (số agent con tối đa chạy song song), `agents` (danh sách agent con đang chạy: `id`, `role`, `ticket_id`, `mode`, `started_at`), `runs_today`, `tokens_today`, tổng lượt và token, `last_error`, `limit` (`message`, `resets_at`), và `usage`.
 
 `current` (agent đầu tiên) đã deprecated; GUI chỉ dùng khi aico bản cũ chưa trả `agents`.
 
-Hạn mức: các CLI không công bố phần hạn mức còn lại, nên GUI chỉ biết khi một lần chạy báo hết hạn mức (và giờ mở lại nếu thông báo có ghi). Số lượt và token là do worker tự đếm.
+`usage` có thể `null` (worker chưa đọc xong hoặc aico bản cũ). Khi có, gồm `checked_at` (lúc đọc), `source` (nguồn số liệu), `plan` (gói), `windows` (mỗi cửa sổ: `name`, `window_minutes`, `used_percent`, `resets_at`), `note` và `error`. `plan`, `note` và `error` có thể vắng.
+
+- Claude: cửa sổ `session` (5 giờ) và `week (...)`.
+- Codex: cửa sổ `5h` và `week`, có `plan`.
+- Cursor: `windows` rỗng, có `plan` (ví dụ `Pro`) và `note`.
+
+Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
 ## Cấu trúc
 
 ```text
 src/api.ts                 gọi aico, kiểu dữ liệu, dữ liệu demo
+src/usage.ts               đọc usage phòng thủ, mức màu, đếm ngược, số liệu cũ (hàm thuần)
+src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ
 src/main.ts                vòng lặp animation, polling, thẻ trạng thái
 src/scene/index.ts         ghép cảnh: drawScene, sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
@@ -50,11 +62,13 @@ src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo t
 src/scene/actors.ts        nhân vật đi vào/ra theo thay đổi của agents[]
 src/scene/tiles.ts         sàn gỗ, sàn phòng nghỉ, tường, vách, ô cửa
 src/scene/furniture.ts     bàn, máy tính, ghế, kệ sách, đồng hồ, sofa, bàn trà, quầy bếp, biển tên
+src/scene/usage-board.ts   thanh hạn mức pixel trên tường (5H/WK, phần trăm, ?)
 src/scene/characters.ts    sprite nhân vật từ công thức Pixelbolt: chọn tư thế, chồng lớp thân → tóc → phụ kiện, thay màu theo agent
 src/scene/pixelbolt.ts     bộ đọc công thức Pixelbolt tối giản (palette, frames grid/from, animations), cache bitmap
 src/scene/legacy-characters.ts  sprite lưới ký tự cũ, dùng khi công thức thiếu tư thế
 src/scene/palette.ts       màu provider, vai trò (áo, màu phụ kiện) và bảng màu chung
 src/scene/font.ts          chữ pixel 3x5
+src/scene/font.test.ts     test glyph % và ?
 src/scene/pixel.ts         hàm vẽ pixel, lưới ký tự, cache bitmap
 src/scene/pathing.test.ts  test pathBetween, positionAt, alongRoute, reverseFrom
 src/scene/layout.test.ts   test computeLayout, assignSeats (giữ ghế theo id, overflow)
