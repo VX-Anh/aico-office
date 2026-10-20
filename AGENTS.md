@@ -40,9 +40,11 @@ bằng chế độ demo (kịch bản 48 giây có đủ trạng thái phòng).
 - Màu đặt trong `src/scene/palette.ts`, không rải mã màu khắp nơi.
 - Chú thích và chữ trên giao diện bằng tiếng Việt, ngắn, giải thích lý do thay vì kể lại code.
 - Dữ liệu `/workers` có thể thiếu trường (aico bản cũ): đọc phòng thủ, không để lỗi làm đứng vòng
-  lặp vẽ. Đọc phòng thủ nghĩa là dữ liệu sai kiểu (vd `rows` không phải mảng chuỗi, `ops` rỗng,
-  lưới vượt kích thước) thì từ chối (trả null, warn một lần) để fallback chạy, không chuẩn hoá
-  thành giá trị rỗng "hợp lệ". Áp dụng cho cả `/workers` và công thức Pixelbolt.
+  lặp vẽ. Đọc phòng thủ nghĩa là dữ liệu sai kiểu (vd `rows` không phải mảng chuỗi, `ops` rỗng
+  mà không có `from` hợp lệ, lưới vượt kích thước) thì từ chối (trả null, warn một lần) để
+  fallback chạy, không chuẩn hoá thành giá trị rỗng "hợp lệ". `ops: []` kèm `from` trỏ tới frame
+  có thật là kế thừa đúng, giữ nguyên; `from` không tồn tại hoặc tạo vòng lặp thì từ chối. Áp dụng
+  cho cả `/workers` và công thức Pixelbolt.
 - Sửa `actors.ts`, `pathing.ts` hoặc `layout.ts` thì thêm hoặc cập nhật kịch bản trong
   `actors.test.ts`. Bất biến: chỉ chuyển `seated` khi điểm cuối path bằng toạ độ ghế theo layout
   hiện tại.

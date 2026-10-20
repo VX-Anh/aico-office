@@ -61,6 +61,12 @@ describe("gộp ops của frame", () => {
     expect(warn).toHaveBeenCalled();
   });
 
+  it("từ chối ops rỗng kèm from không tồn tại", () => {
+    const r = normalize(raw([{ name: "a", from: "missing", ops: [] }]));
+    expect(resolveFrame(r, "a")).toBeNull();
+    expect(animFrames(r, "walk_down")).toBeNull();
+  });
+
   it("từ chối vòng lặp from qua ops", () => {
     const r = normalize(
       raw([
