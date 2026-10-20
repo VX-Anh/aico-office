@@ -100,3 +100,12 @@ main { max-width: 1152px; margin: 0 auto; padding: 16px; }
 .agent-row { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
 .agent-role { color: var(--muted); }
 .agent-row .value { margin-left: auto; }
+
+.usage { margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
+.usage-title { margin: 0 0 4px; font-size: 13px; }
+.usage-window { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }
+.usage-window .swatch { border-radius: 0; }
+.usage .row { flex-wrap: wrap; }
+.usage .value { margin-left: auto; }
+.usage-note, .usage-stale { margin: 4px 0 0; color: var(--muted); }
+.usage-stale { color: var(--working); }

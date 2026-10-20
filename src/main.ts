@@ -1,5 +1,6 @@
 import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
-import { ROLE_STYLES, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
+import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
+import { isStale, parseUsage, shortCountdown, usageLevel } from "./usage";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -37,14 +38,6 @@ function fmtElapsed(iso: string, now: number): string {
   if (s < 60) return `${s} giây`;
   if (s < 3600) return `${Math.floor(s / 60)} phút ${s % 60} giây`;
   return `${Math.floor(s / 3600)} giờ ${Math.floor((s % 3600) / 60)} phút`;
-}
-
-function fmtCountdown(iso: string, now: number): string {
-  const s = Math.max(0, Math.round((Date.parse(iso) - now) / 1000));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return h > 0 ? `${h}g ${m}p` : `${m}p ${String(sec).padStart(2, "0")}s`;
 }
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -90,10 +83,34 @@ function renderCards(now: number): void {
       if (w.state === "limited" && w.limit) {
         const box = el("div", "limit");
         box.append(
-          el("strong", "", w.limit.resets_at ? `Mở lại sau ${fmtCountdown(w.limit.resets_at, now)}` : "Chưa rõ giờ mở lại"),
+          el("strong", "", w.limit.resets_at ? `Mở lại sau ${shortCountdown(w.limit.resets_at, now)}` : "Chưa rõ giờ mở lại"),
           el("p", "", w.limit.message),
           el("p", "", "Hạn mức chung cho cả phòng"),
         );
+        card.append(box);
+      }
+      const usage = parseUsage(w.usage, w.name);
+      if (usage) {
+        const box = el("section", "usage");
+        box.append(el("h3", "usage-title", "Hạn mức"));
+        for (const window of usage.windows) {
+          const item = el("div", "usage-window");
+          const dot = el("span", "swatch");
+          dot.style.background = USAGE[usageLevel(window.used_percent)];
+          item.append(
+            dot,
+            el("span", "", `${window.name}: ${window.used_percent}% · reset sau ${shortCountdown(window.resets_at, now)}`),
+          );
+          box.append(item);
+        }
+        if (usage.plan) box.append(row("Gói", usage.plan));
+        if (usage.source) box.append(row("Nguồn số liệu", usage.source));
+        if (usage.note) box.append(el("p", "usage-note", usage.note));
+        if (usage.error) box.append(el("p", "error", `Lỗi hạn mức: ${usage.error}`));
+        if (isStale(usage.checked_at, now)) {
+          const minutes = Math.floor((now - Date.parse(usage.checked_at)) / 60_000);
+          box.append(el("p", "usage-stale", `số liệu cũ (${minutes} phút trước)`));
+        }
         card.append(box);
       }
       const total = (w.runs_ok ?? 0) + (w.runs_failed ?? 0);
