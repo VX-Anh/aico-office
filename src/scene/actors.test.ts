@@ -63,11 +63,45 @@ function scenario(slots = 1) {
     slots(value: number) { slots = value; tick(); },
     frontSlots(value: number) { frontSlots = value; tick(); },
     crew: () => crew,
+    layout: () => layout,
   };
 }
 
 describe("actors khi dữ liệu đổi giữa đường", () => {
   beforeEach(() => resetActors());
+
+  for (const phase of ["in", "seated", "out"] as const) {
+    for (const state of ["working", "limited", "offline"] as const) {
+      it(`phòng trước rộng ra, đổi slots và ${state} khi đang ${phase}`, () => {
+        const s = scenario();
+        s.present(true);
+        if (phase !== "in") s.seated();
+        if (phase === "out") s.present(false);
+        const before = s.layout().rooms[1];
+        s.frontSlots(4);
+        const after = s.layout().rooms[1];
+        expect(after.door.cx).toBeGreaterThan(before.door.cx);
+        expect(after.desks[0].seat.x).toBeGreaterThan(before.desks[0].seat.x);
+        s.slots(4);
+        s.state(state);
+        if (state === "offline") {
+          expect(s.crew().walkers).toEqual([]);
+          expect(s.crew().rooms[1].seats.every((a) => a === null)).toBe(true);
+        } else if (state === "limited" || phase === "out") {
+          s.exit();
+        } else {
+          s.seated();
+        }
+        s.frontSlots(1);
+        s.slots(1);
+        s.present(true);
+        s.state("working");
+        s.seated();
+        s.present(false);
+        s.exit();
+      });
+    }
+  }
 
   for (const phase of ["in", "out"] as const) {
     it(`mất rồi xuất hiện lại nhiều lần khi đang ${phase}`, () => {

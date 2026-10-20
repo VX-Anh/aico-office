@@ -10,7 +10,7 @@ const ROOM_FLOOR_H = 60;
 const ROOM_H = ROOM_WALL_H + ROOM_FLOOR_H;
 const DESK_W = 40; // mỗi bàn chiếm 40px ngang
 const ROOM_PAD = 8;
-const ROOM_MIN_W = 92; // đủ treo biển tên 12 ký tự + "+N", đèn và dấu "!"
+const ROOM_MIN_W = 138; // kệ tới x+30, cách 3px, bảng 60px, cách 3px, biển 5 ký tự 23px, cách đồng hồ 3px + lề 16px
 const DOOR_W = 14;
 export const LOUNGE_WALL_H = 20;
 const LOUNGE_FLOOR_H = 58;
@@ -42,6 +42,7 @@ export interface RoomBox extends Rect {
   desks: Desk[];
   shelf: Pt;
   clock: Pt;
+  usageBoard: Rect;
   plateY: number;
 }
 
@@ -105,6 +106,7 @@ function roomBox(worker: WorkerStatus, index: number, x: number): RoomBox {
     desks,
     shelf: { x: x + 8, y: y + 13 },
     clock: { x: x + w - 16, y: y + 14 },
+    usageBoard: { x: x + 33, y: y + 13, w: 60, h: 15 },
     plateY: y + 2,
   };
 }

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkerAgent, WorkerStatus } from "../api";
-import { assignSeats, computeLayout, resetSeats } from "./layout";
+import type { Rect } from "./pixel";
+import { textWidth } from "./font";
+import { ROOM_WALL_H, WALL, assignSeats, computeLayout, resetSeats } from "./layout";
 
 function agent(id: string): WorkerAgent {
   return { id, role: "coder", ticket_id: null, mode: "write", started_at: "2026-01-01T00:00:00Z" };
@@ -60,6 +62,38 @@ describe("assignSeats", () => {
 
 describe("computeLayout", () => {
   const w = (name: string, extra: Partial<WorkerStatus>): WorkerStatus => ({ name, state: "idle", roles: [], ...extra });
+
+  for (const slots of [0, 1, 2, 3, 4]) {
+    it(`bảng hạn mức nằm riêng trên tường khi slots = ${slots}`, () => {
+      const { rooms } = computeLayout([w("front", { slots: 2 }), w("codex", { slots })]);
+      const r = rooms[1];
+      const board = r.usageBoard;
+      expect(board).toBeDefined();
+      expect(board.w).toBeGreaterThanOrEqual(60);
+      expect(board.h).toBe(15);
+      expect(board.x).toBe(r.shelf.x + 22 + 3);
+      expect(board.y).toBeGreaterThanOrEqual(r.y + 13);
+      expect(board.x + board.w).toBeLessThanOrEqual(r.x + r.w);
+      expect(board.y + board.h).toBeLessThanOrEqual(r.y + ROOM_WALL_H);
+      const countdownW = textWidth("71H05") + 4;
+      const obstacles: Rect[] = [
+        { ...r.shelf, w: 22, h: 13 },
+        { ...r.clock, w: 9, h: 9 },
+        // Kể cả dây treo phía trên biển đếm ngược.
+        { x: r.clock.x - 3 - countdownW, y: r.clock.y, w: countdownW, h: 11 },
+        { x: r.x, y: r.plateY, w: r.w, h: 9 },
+        { x: r.door.x, y: r.y + r.h, w: r.door.w, h: WALL },
+        ...r.desks,
+        ...r.desks.map((d) => ({ x: d.x + d.w / 2 - 7, y: d.y - 5, w: 14, h: 13 })),
+        ...(r.sideDoor ? [r.sideDoor] : []),
+      ];
+      for (const o of obstacles) {
+        expect(board.x < o.x + o.w && board.x + board.w > o.x &&
+          board.y < o.y + o.h && board.y + board.h > o.y).toBe(false);
+      }
+      expect(board.x + board.w + 3).toBeLessThanOrEqual(r.clock.x - 3 - countdownW);
+    });
+  }
 
   it("mỗi phòng có đúng slots bàn, ghế nằm trong phòng và trên lối đi", () => {
     const layout = computeLayout([w("claude", { slots: 3 }), w("codex", { slots: 1 }), w("cursor", { slots: 0 })]);
