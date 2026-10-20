@@ -3,7 +3,7 @@
 
 export interface UsageWindow {
   name: string;
-  window_minutes: number | null;
+  window_minutes: number;
   used_percent: number;
   resets_at: string | null;
 }
@@ -77,19 +77,15 @@ function parseWindow(raw: unknown): UsageWindow | string {
   if (typeof used_percent !== "number" || !Number.isFinite(used_percent) || used_percent < 0) {
     return "used_percent phải là số hữu hạn không âm";
   }
-  if (
-    window_minutes !== undefined &&
-    window_minutes !== null &&
-    (typeof window_minutes !== "number" || !Number.isFinite(window_minutes) || window_minutes <= 0)
-  ) {
-    return "window_minutes phải là số dương";
+  if (typeof window_minutes !== "number" || !Number.isFinite(window_minutes) || window_minutes <= 0) {
+    return "window_minutes phải là số hữu hạn dương";
   }
-  if (resets_at !== undefined && resets_at !== null && !isIso(resets_at)) return "resets_at phải là giờ ISO hoặc null";
+  if (resets_at !== null && !isIso(resets_at)) return "resets_at phải là giờ ISO hoặc null";
   return {
     name,
-    window_minutes: typeof window_minutes === "number" ? window_minutes : null,
+    window_minutes,
     used_percent,
-    resets_at: typeof resets_at === "string" ? resets_at : null,
+    resets_at,
   };
 }
 
@@ -121,21 +117,19 @@ export function parseUsage(raw: unknown, who = "usage"): WorkerUsage | null {
   };
 }
 
-// Aico bản nào cũng có `window_minutes` thì dựa vào đó; thiếu thì đoán theo tên ("week ...").
+// Chỉ phân loại theo thời lượng đã được kiểm tra, không đoán từ tên cửa sổ.
 function isLong(w: UsageWindow): boolean {
-  if (w.window_minutes !== null) return w.window_minutes >= DAY_MINUTES;
-  return /week|wk/i.test(w.name);
+  return w.window_minutes >= DAY_MINUTES;
 }
 
 function shortLabel(w: UsageWindow): string {
-  if (w.window_minutes === null) return "5H";
   return `${Math.max(1, Math.round(w.window_minutes / 60))}H`;
 }
 
 // Tối đa 2 cửa sổ (bảng trên tường chỉ có 2 hàng): ngắn nhất dưới 1 ngày, rồi dài nhất từ 1 ngày.
 export function usageWindows(u: WorkerUsage | null): LabeledWindow[] {
   if (!u) return [];
-  const minutes = (w: UsageWindow) => w.window_minutes ?? (isLong(w) ? 7 * DAY_MINUTES : 300);
+  const minutes = (w: UsageWindow) => w.window_minutes;
   const short = u.windows.filter((w) => !isLong(w)).sort((a, b) => minutes(a) - minutes(b))[0];
   const long = u.windows.filter(isLong).sort((a, b) => minutes(b) - minutes(a))[0];
   const out: LabeledWindow[] = [];

@@ -62,12 +62,12 @@ describe("parseUsage: dữ liệu đúng", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("plan/note/error/source/resets_at/window_minutes là null hoặc vắng đều hợp lệ", () => {
+  it("trường chuỗi tuỳ chọn được null hoặc vắng, resets_at được null", () => {
     const u = parseUsage(
-      { checked_at: CODEX.checked_at, plan: null, note: null, error: null, source: null, windows: [{ name: "5h", used_percent: 0, resets_at: null }] },
+      { checked_at: CODEX.checked_at, plan: null, note: null, error: null, source: null, windows: [{ name: "5h", window_minutes: 300, used_percent: 0, resets_at: null }] },
       who(),
     );
-    expect(u?.windows).toEqual([{ name: "5h", window_minutes: null, used_percent: 0, resets_at: null }]);
+    expect(u?.windows).toEqual([{ name: "5h", window_minutes: 300, used_percent: 0, resets_at: null }]);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -85,7 +85,18 @@ describe("parseUsage: dữ liệu đúng", () => {
 
 describe("parseUsage: dữ liệu hỏng trả null và warn một lần", () => {
   const win = CODEX.windows[0];
+  const { window_minutes: _minutes, ...missingMinutes } = win;
+  const { resets_at: _reset, ...missingReset } = win;
   const broken: [string, unknown][] = [
+    ["thiếu window_minutes", { ...CODEX, windows: [missingMinutes] }],
+    ["thiếu resets_at", { ...CODEX, windows: [missingReset] }],
+    ["thiếu cả thời lượng và giờ reset", { ...CODEX, windows: [{ name: "session", used_percent: 28 }] }],
+    ["window_minutes null", { ...CODEX, windows: [{ ...win, window_minutes: null }] }],
+    ["window_minutes undefined", { ...CODEX, windows: [{ ...win, window_minutes: undefined }] }],
+    ["window_minutes bằng 0", { ...CODEX, windows: [{ ...win, window_minutes: 0 }] }],
+    ["window_minutes NaN", { ...CODEX, windows: [{ ...win, window_minutes: NaN }] }],
+    ["window_minutes Infinity", { ...CODEX, windows: [{ ...win, window_minutes: Infinity }] }],
+    ["resets_at undefined", { ...CODEX, windows: [{ ...win, resets_at: undefined }] }],
     ["raw là số", 42],
     ["raw là chuỗi", "plus"],
     ["raw là mảng", [CODEX]],
@@ -159,12 +170,12 @@ describe("usageWindows", () => {
     expect(usageWindows(u).map((w) => [w.label, w.name])).toEqual([["5H", "session"], ["WK", "week (opus)"]]);
   });
 
-  it("thiếu window_minutes thì đoán theo tên", () => {
+  it("chọn theo thời lượng dù tên cửa sổ gợi ý khác", () => {
     const u = parseUsage(
-      { ...CODEX, windows: [{ name: "week", used_percent: 1 }, { name: "session", used_percent: 2 }] },
+      { ...CODEX, windows: [{ name: "session", window_minutes: 10080, used_percent: 1, resets_at: null }, { name: "week", window_minutes: 300, used_percent: 2, resets_at: null }] },
       who(),
     );
-    expect(usageWindows(u).map((w) => [w.label, w.name])).toEqual([["5H", "session"], ["WK", "week"]]);
+    expect(usageWindows(u).map((w) => [w.label, w.name])).toEqual([["5H", "week"], ["WK", "session"]]);
   });
 
   it("chỉ có cửa sổ tuần, rỗng, hoặc null", () => {
