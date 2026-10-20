@@ -93,33 +93,38 @@ const DEMO_ROLES: { role: string; mode: AgentMode }[] = [
   { role: "designer", mode: "write" },
 ];
 
-// Dữ liệu giả: mỗi phòng đổi trạng thái theo chu kỳ 6 giây để thấy đủ các animation.
-// Trong một chu kỳ "working": 2 giây đầu 1 agent con, 2 giây giữa 2 agent, 2 giây cuối agent đầu xong.
+const DEMO_CYCLE = 48_000;
+
+// Dữ liệu giả: kịch bản 48 giây, mỗi pha ít nhất 8 giây để kịp thấy nhân vật đi vào/ra.
+// claude (3 chỗ): 0 → 1 → 2 → 1 → 0 agent con; codex (2 chỗ): rảnh ↔ 1 agent, lệch pha với claude;
+// cursor (2 chỗ): hết hạn mức 24 giây (ngủ trên sofa) → mất kết nối 12 giây (tắt đèn) → rảnh.
 export function demoWorkers(now: number): WorkerStatus[] {
   const names = ["claude", "codex", "cursor"];
   const slots = [3, 2, 2];
-  const states: WorkerState[] = ["working", "idle", "working", "limited", "idle", "offline"];
-  const cycle = Math.floor(now / 6000);
-  const cycleStart = cycle * 6000;
-  const phase = Math.floor((now - cycleStart) / 2000); // 0, 1, 2
+  const cycle = Math.floor(now / DEMO_CYCLE);
+  const cycleStart = cycle * DEMO_CYCLE;
+  const s = (now - cycleStart) / 1000;
+  // id ổn định suốt thời gian agent chạy, đổi theo chu kỳ để mỗi vòng là agent mới
+  const agent = (i: number, k: number, from: number): WorkerAgent => {
+    const { role, mode } = DEMO_ROLES[(cycle + i * 2 + k) % DEMO_ROLES.length];
+    return {
+      id: `${names[i]}-${cycle}-${k}`,
+      role,
+      ticket_id: `T-demo${i}${k}`,
+      mode,
+      started_at: new Date(cycleStart + from * 1000).toISOString(),
+    };
+  };
+  const running: WorkerAgent[][] = [
+    [...(s >= 8 && s < 40 ? [agent(0, 0, 8)] : []), ...(s >= 16 && s < 32 ? [agent(0, 1, 16)] : [])],
+    s >= 28 && s < 44 ? [agent(1, 0, 28)] : [],
+    [],
+  ];
+  const cursorState: WorkerState = s < 24 ? "limited" : s < 36 ? "offline" : "idle";
   return names.map((name, i) => {
-    const state = states[(cycle + i * 2) % states.length];
-    const resets = new Date(now + (47 - i * 13) * 60_000).toISOString();
-    const agents: WorkerAgent[] = [];
-    if (state === "working") {
-      for (let k = 0; k < 2; k++) {
-        const running = k === 0 ? phase < 2 : phase > 0;
-        if (!running) continue;
-        const { role, mode } = DEMO_ROLES[(i * 2 + k + cycle) % DEMO_ROLES.length];
-        agents.push({
-          id: `${name}-${k}`,
-          role,
-          ticket_id: `T-demo${i}${k}`,
-          mode,
-          started_at: new Date(cycleStart + k * 2000).toISOString(),
-        });
-      }
-    }
+    const agents = running[i];
+    const state: WorkerState = i === 2 ? cursorState : agents.length ? "working" : "idle";
+    const resets = new Date(cycleStart + 47 * 60_000).toISOString();
     return {
       name,
       kind: name,
