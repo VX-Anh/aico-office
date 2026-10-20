@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "name": "acc_tech_lead",
+  "width": 16,
+  "height": 22,
+  "palette": {
+    "a": "#d6454f",
+    "o": "#21181f"
+  },
+  "frames": [
+    {
+      "name": "front",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 6,
+          "y": 12,
+          "rows": [
+            "oaao",
+            ".aa.",
+            ".aa.",
+            ".oo."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "side",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 10,
+          "y": 13,
+          "rows": [
+            "oa",
+            "oa"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 4,
+          "y": 13,
+          "rows": [
+            "ao",
+            "ao"
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "walk_down": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "walk_left": {
+      "frames": [
+        "left",
+        "left"
+      ]
+    },
+    "walk_right": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "sit_side": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    }
+  }
+}

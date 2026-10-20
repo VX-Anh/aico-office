@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "name": "acc_reviewer",
+  "width": 16,
+  "height": 22,
+  "palette": {
+    "a": "#21181f",
+    "o": "#21181f"
+  },
+  "frames": [
+    {
+      "name": "front",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 4,
+          "y": 6,
+          "rows": [
+            "aaa..aaa",
+            "o.oaao.o",
+            "o.o..o.o",
+            "ooo..ooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "side",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 7,
+          "y": 6,
+          "rows": [
+            "...aaa",
+            "aaao.o",
+            "...o.o",
+            "...ooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 3,
+          "y": 6,
+          "rows": [
+            "aaa...",
+            "o.oaaa",
+            "o.o...",
+            "ooo..."
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "walk_down": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "walk_left": {
+      "frames": [
+        "left",
+        "left"
+      ]
+    },
+    "walk_right": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "sit_side": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "lie": {
+      "frames": [
+        "front"
+      ]
+    }
+  }
+}

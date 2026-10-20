@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "name": "acc_coder",
+  "width": 16,
+  "height": 22,
+  "palette": {
+    "a": "#2b2f38",
+    "o": "#21181f",
+    "m": "#5c6370"
+  },
+  "frames": [
+    {
+      "name": "front",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 1,
+          "y": 2,
+          "rows": [
+            "...oaaaaaao...",
+            "..o........o..",
+            "..a........a..",
+            "..a........a..",
+            "..a........a..",
+            "oao........oao",
+            "omo........omo",
+            "omo........omo",
+            "ooo........ooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "side",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 5,
+          "y": 2,
+          "rows": [
+            "oaaaao",
+            ".oa...",
+            "..a...",
+            "..a...",
+            "..a...",
+            ".ooo..",
+            ".omo..",
+            ".omo..",
+            ".ooo.."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left",
+      "duration": 120,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 5,
+          "y": 2,
+          "rows": [
+            "oaaaao",
+            "...ao.",
+            "...a..",
+            "...a..",
+            "...a..",
+            "..ooo.",
+            "..omo.",
+            "..omo.",
+            "..ooo."
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "walk_down": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "walk_left": {
+      "frames": [
+        "left",
+        "left"
+      ]
+    },
+    "walk_right": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "sit_side": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "walk_up": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "sit_back": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "lie": {
+      "frames": [
+        "front"
+      ]
+    }
+  }
+}
