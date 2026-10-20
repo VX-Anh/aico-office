@@ -1,0 +1,2 @@
+# Mọi file text dùng LF (agent chạy trên Linux); tránh diff cả file vì CRLF
+* text=auto eol=lf
