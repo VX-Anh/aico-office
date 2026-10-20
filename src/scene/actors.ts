@@ -139,7 +139,11 @@ export function syncActors(layout: Layout, t: number): Crew {
         active.set(key, a);
       }
       a.agent = agent;
-      if (a.phase === "in") rebase(a, layout, t);
+      if (a.phase === "seated") {
+        // Ghế dịch theo bố cục: giữ actor ngồi đúng ghế và đồng bộ đích path với hình vẽ.
+        a.path = [{ ...room.desks[k].seat }];
+        a.route = routeKey(routeOf(a, layout));
+      } else if (a.phase === "in") rebase(a, layout, t);
       if (a.phase === "in" && positionAt(a.path, a.startT, t, SPEED).done) a.phase = "seated";
       crew.seats[k] = a;
     });

@@ -49,6 +49,13 @@ describe("parseUsage: dữ liệu đúng", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("giữ ngày nhuận, phần giây và múi giờ ISO hợp lệ", () => {
+    for (const value of ["2024-02-29T23:59:59Z", "2026-10-20T15:40:00.123Z", "2026-10-20T15:40:00+07:00", "2026-10-20T15:40:00-05:30"]) {
+      expect(parseUsage({ ...CODEX, checked_at: value, windows: [{ ...CODEX.windows[0], resets_at: value }] }, who())).not.toBeNull();
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("windows: [] hợp lệ, không chuẩn hoá thành null", () => {
     const u = parseUsage({ checked_at: CURSOR.checked_at, windows: [] }, who());
     expect(u).toEqual({ checked_at: CURSOR.checked_at, source: null, plan: null, windows: [], note: null, error: null });
@@ -113,6 +120,14 @@ describe("parseUsage: dữ liệu hỏng trả null và warn một lần", () =>
     ["error là boolean", { ...CLAUDE, error: true }],
     ["source là mảng", { ...CLAUDE, source: ["claude"] }],
   ];
+  for (const value of [
+    "0", "10/20/2026", "2026-02-30T15:40:00Z", "2025-02-29T15:40:00Z",
+    "2026-04-31T15:40:00Z", "2026-00-20T15:40:00Z", "2026-10-20T24:00:00Z",
+    "2026-10-20T15:60:00Z", "2026-10-20T15:40:00+24:00",
+  ]) {
+    broken.push([`checked_at không hợp lệ: ${value}`, { ...CODEX, checked_at: value }]);
+    broken.push([`resets_at không hợp lệ: ${value}`, { ...CODEX, windows: [{ ...win, resets_at: value }] }]);
+  }
   for (const [label, raw] of broken) {
     it(label, () => {
       const name = who();

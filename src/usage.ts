@@ -48,7 +48,20 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function isIso(v: unknown): v is string {
-  return typeof v === "string" && !Number.isNaN(Date.parse(v));
+  if (typeof v !== "string") return false;
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/.exec(v);
+  if (!parts) return false;
+  const [, year, month, day, hour, minute, second, , offsetHour, offsetMinute] = parts;
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  // Date.parse tự dời ngày như 30/2 sang tháng sau, nên kiểm lịch trước khi đọc timestamp.
+  return m >= 1 && m <= 12 && d >= 1 && d <= days[m - 1] &&
+    Number(hour) < 24 && Number(minute) < 60 && Number(second) < 60 &&
+    (offsetHour === undefined || (Number(offsetHour) < 24 && Number(offsetMinute) < 60)) &&
+    Number.isFinite(Date.parse(v));
 }
 
 // Trường chuỗi tuỳ chọn: vắng hoặc null là hợp lệ, có mặt mà sai kiểu thì báo sai (undefined).
