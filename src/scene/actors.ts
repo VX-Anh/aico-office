@@ -19,6 +19,7 @@ export interface Actor {
   phase: "seated" | "in" | "out";
   path: Pt[];
   startT: number;
+  route: string; // khoá tuyến phòng nghỉ ↔ ghế lúc lập path; đổi bố cục thì tính lại
 }
 
 export interface RoomCrew {
@@ -43,6 +44,28 @@ export function resetActors(): void {
   resetSeats();
 }
 
+// Tuyến chuẩn phòng nghỉ → ghế theo bố cục hiện tại (ghế đã mất thì lấy ghế cuối còn lại).
+function routeOf(a: Actor, layout: Layout): Pt[] | null {
+  const room = layout.rooms.findIndex((r) => r.worker.name === a.room);
+  const desks = layout.rooms[room]?.desks.length ?? 0;
+  if (!desks) return null;
+  return pathBetween(layout, "lounge", { room, seat: Math.min(a.seat, desks - 1) });
+}
+
+const routeKey = (route: Pt[] | null): string => (route ? route.map((p) => `${p.x},${p.y}`).join(" ") : "");
+
+// Bố cục đổi (slots, số phòng, độ rộng phòng nghỉ) khi đang đi: lập lại path từ vị trí hiện tại theo tuyến mới.
+function rebase(a: Actor, layout: Layout, t: number): void {
+  const route = routeOf(a, layout);
+  const key = routeKey(route);
+  if (!route || key === a.route) return;
+  const p = positionAt(a.path, a.startT, t, SPEED);
+  a.route = key;
+  if (p.done && a.phase === "out") return; // đã tới phòng nghỉ, đang mờ dần
+  a.path = alongRoute(route, p, a.phase === "in");
+  a.startT = t;
+}
+
 // Đổi hướng giữa đường: đi tiếp trên tuyến phòng nghỉ ↔ ghế từ vị trí hiện tại.
 function turn(a: Actor, layout: Layout, room: number, t: number, toSeat: boolean): Pt[] {
   const p = positionAt(a.path, a.startT, t, SPEED);
@@ -58,6 +81,7 @@ function sendOut(a: Actor, layout: Layout, t: number): void {
   else return; // ghế không còn (slots giảm): biến mất luôn
   a.phase = "out";
   a.startT = t;
+  a.route = routeKey(routeOf(a, layout));
   leaving.push(a);
 }
 
@@ -95,6 +119,7 @@ export function syncActors(layout: Layout, t: number): Crew {
           back.path = turn(back, layout, room.index, t, true);
           back.phase = "in";
           back.startT = t;
+          back.route = routeKey(routeOf(back, layout));
           a = back;
         } else {
           a = {
@@ -106,11 +131,14 @@ export function syncActors(layout: Layout, t: number): Crew {
             phase: first ? "seated" : "in",
             path: first ? [] : pathBetween(layout, "lounge", { room: room.index, seat: k }),
             startT: t,
+            route: "",
           };
+          a.route = routeKey(routeOf(a, layout));
         }
         active.set(key, a);
       }
       a.agent = agent;
+      if (a.phase === "in") rebase(a, layout, t);
       if (a.phase === "in" && positionAt(a.path, a.startT, t, SPEED).done) a.phase = "seated";
       crew.seats[k] = a;
     });
@@ -123,6 +151,7 @@ export function syncActors(layout: Layout, t: number): Crew {
     const room = layout.rooms.find((r) => r.worker.name === a.room);
     if (room && room.worker.state !== "offline") sendOut(a, layout, t);
   }
+  for (const a of leaving) rebase(a, layout, t);
   leaving = leaving.filter((a) => t - (a.startT + (pathLength(a.path) / SPEED) * 1000) < FADE_MS);
 
   const walkers = [...[...active.values()].filter((a) => a.phase === "in"), ...leaving];
