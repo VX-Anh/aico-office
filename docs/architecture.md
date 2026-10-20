@@ -1,6 +1,7 @@
 # Kiến trúc
 
-Ứng dụng web tĩnh (Vite + TypeScript, không thư viện runtime) vẽ văn phòng pixel trên một canvas. Dữ liệu lấy từ `GET /workers` của aico hoặc kịch bản demo.
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-cff2d329). Agent đọc file này
+trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
@@ -18,16 +19,12 @@ flowchart TD
   ACT -->|agentLook| CHAR
   IDX --> TILES["tiles.ts<br/>sàn, tường, cửa"]
   IDX --> FURN["furniture.ts<br/>bàn, ghế, sofa, biển tên"]
-  IDX -->|drawWalker, drawSeatedBack,<br/>drawSofaSitter, drawSleeper, drawZ, residentLook| CHAR["characters.ts<br/>chọn tư thế, chồng lớp thân→tóc→phụ kiện,<br/>thay khoá màu theo Look"]
+  IDX -->|drawWalker, drawSeatedBack,<br/>drawSofaSitter, drawSleeper, residentLook| CHAR["characters.ts<br/>chọn tư thế, chồng lớp thân→tóc→phụ kiện,<br/>thay khoá màu theo Look"]
 
-  ART[("art/characters/**/*.pixel.json<br/>body, hair/style0-3, acc/role")] -->|import.meta.glob eager lúc build| CHAR
+  ART[("art/characters/*.pixel.json<br/>body, hair/style0-3, acc/role")] -->|import.meta.glob lúc build| CHAR
   CHAR -->|công thức + bộ màu| PB["pixelbolt.ts<br/>đọc palette, frames grid/from, animations"]
   CHAR -->|tư thế thiếu trong công thức| LEG["legacy-characters.ts<br/>sprite lưới ký tự cũ"]
   CHAR --> PAL["palette.ts<br/>màu provider, vai trò + accent, da, tóc"]
-  LEG --> PAL
-  IDX -->|paletteOf, LAMP| PAL
-  TILES --> PAL
-  FURN --> PAL
   PB --> PIX["pixel.ts<br/>drawGrid, cached bitmap, shade"]
   LEG --> PIX
   CHAR --> PIX
@@ -37,16 +34,3 @@ flowchart TD
   FURN --> FONT
   PIX -->|canvas offscreen| CANVAS[["canvas #office<br/>image-rendering: pixelated"]]
 ```
-
-## Sprite nhân vật
-
-`characters.ts` nạp mọi công thức trong `art/characters/` lúc build, khoá theo đường dẫn tương đối (`body`, `hair/style0`, `acc/coder`). Frame dạng `ops` của Pixelbolt được gộp thành lưới 16×22 trước khi đưa cho `pixelbolt.ts`.
-
-Mỗi lần vẽ một tư thế (`walk_down`, `walk_up`, `walk_left`, `walk_right`, `sit_back`, `sit_side`, `lie`):
-
-1. Nếu `body` có animation đó: vẽ chồng `body` → `hair/style{look.style}` → `acc/{look.role}` (lớp nào thiếu animation thì bỏ qua) với bộ màu dựng từ `Look`:
-   `h`/`H` tóc, `s`/`S` da, `t`/`T` áo, `o` viền, `a` là `accent` của vai trò.
-2. Nếu thiếu `walk_left` nhưng có `walk_right`: lật ngang `walk_right`.
-3. Còn lại: dùng `legacySprite` trong `legacy-characters.ts`.
-
-Sofa quay trái lật ngang sprite `sit_side`. Bitmap được cache hai tầng: từng lớp trong `pixelbolt.ts` (công thức, animation, frame, bộ màu) và sprite đã ghép trong `characters.ts` (tư thế, frame, kiểu tóc, màu tóc, áo, vai trò, lật).
