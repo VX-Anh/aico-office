@@ -22,8 +22,9 @@ Biển tên phòng ghi thêm `+N` khi số agent con vượt `slots`. Dấu `!` 
 ## Chạy
 
 ```bash
-npm install
+npm ci
 npm run dev        # http://localhost:5173
+npm test           # vitest: hàm thuần, kịch bản actors, mọi file art/
 ```
 
 Không nhập gì thì chạy **chế độ demo** với dữ liệu giả (kịch bản 48 giây: phòng có 0/1/2 agent, agent đi vào/ra, phòng hết hạn mức, phòng mất kết nối). Để xem agent thật, nhập địa chỉ aico (mặc định `http://localhost:8000`) và API token (`deploy/secrets/aico_api_token` của aico). Token lưu trong localStorage của trình duyệt.
@@ -55,6 +56,12 @@ src/scene/legacy-characters.ts  sprite lưới ký tự cũ, dùng khi công th�
 src/scene/palette.ts       màu provider, vai trò (áo, màu phụ kiện) và bảng màu chung
 src/scene/font.ts          chữ pixel 3x5
 src/scene/pixel.ts         hàm vẽ pixel, lưới ký tự, cache bitmap
+src/scene/pathing.test.ts  test pathBetween, positionAt, alongRoute, reverseFrom
+src/scene/layout.test.ts   test computeLayout, assignSeats (giữ ghế theo id, overflow)
+src/scene/actors.test.ts   kịch bản dữ liệu đổi khi nhân vật đang đi (bất biến seated)
+src/scene/pixelbolt.test.ts   bộ đọc công thức: từ chối frame hỏng để fallback chạy
+src/scene/characters.test.ts  gộp ops của frame; kiểm mọi file art/characters (thay pixel_validate)
+vitest.config.ts           cấu hình vitest (môi trường Node, chỉ src/**/*.test.ts)
 art/characters/body.pixel.json      thân nhân vật (đủ 7 tư thế)
 art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái, 2 dài, 3 búi
 art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer)
@@ -73,7 +80,7 @@ Sprite nhân vật là công thức Pixelbolt (`.pixel.json`) trong `art/charact
 - **Kiểu tóc mới**: thêm `hair/style4.pixel.json` rồi tăng số kiểu (`% 4`) trong `agentLook`/`residentLook` và chỗ chọn lớp tóc trong `characters.ts`.
 - **Vai trò mới**: thêm mục vào `ROLE_STYLES` (áo, `accent`) và file `acc/<role>.pixel.json`.
 - **Thiếu tư thế**: nếu `body.pixel.json` thiếu animation nào thì tư thế đó vẽ bằng sprite cũ trong `legacy-characters.ts`; thiếu `walk_left` thì lật ngang `walk_right`. Công thức hỏng (op lạ, kích thước lệch) chỉ `console.warn` một lần.
-- Tự kiểm bằng `pixel_validate`/`pixel_inspect`, rồi `npm run dev` xem chế độ demo.
+- Tự kiểm bằng `pixel_validate`/`pixel_inspect`; không có tool thì `npm test` (`characters.test.ts` kiểm mọi file trong `art/characters/`). Sau đó `npm run dev` xem chế độ demo.
 
 ## Kế hoạch
 
