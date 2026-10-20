@@ -129,7 +129,8 @@ export function syncActors(layout: Layout, t: number): Crew {
             seat: k,
             look: agentLook(agent),
             phase: first ? "seated" : "in",
-            path: first ? [] : pathBetween(layout, "lounge", { room: room.index, seat: k }),
+            // Ngồi ngay vẫn có đích path tại ghế, giữ cùng bất biến với actor đi vào.
+            path: first ? [{ ...room.desks[k].seat }] : pathBetween(layout, "lounge", { room: room.index, seat: k }),
             startT: t,
             route: "",
           };
