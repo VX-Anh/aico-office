@@ -9,11 +9,26 @@ export interface WorkerLimit {
   detected_at: string;
 }
 
+export type AgentMode = "read" | "write" | "review";
+
+// Một agent con đang chạy trong phòng (mỗi agent làm một việc cho một ticket).
+export interface WorkerAgent {
+  id: string;
+  role: string | null;
+  ticket_id: string | null;
+  mode: AgentMode | string;
+  started_at: string;
+}
+
+// Mỗi phần tử của GET /workers là một phòng (một provider), chứa tối đa `slots` agent con song song.
 export interface WorkerStatus {
   name: string;
   kind?: string;
   state: WorkerState;
   roles: string[];
+  slots?: number;
+  agents?: WorkerAgent[];
+  /** @deprecated giữ tương thích, aico sẽ bỏ: dùng `agents` */
   current?: { ticket_id: string | null; role: string | null; mode: string; started_at: string } | null;
   runs_ok?: number;
   runs_failed?: number;
@@ -62,22 +77,57 @@ export async function fetchWorkers(config: ApiConfig): Promise<WorkerStatus[]> {
   return (await resp.json()) as WorkerStatus[];
 }
 
-// Dữ liệu giả: mỗi agent đổi trạng thái theo chu kỳ để thấy đủ các animation.
+// Agent con và số chỗ của phòng. aico bản cũ chỉ có `current` thì dựng lại từ đó.
+// `slots` giữ đúng như aico trả (agent vượt chỗ hiện `+N`); chỉ suy ra khi aico không trả `slots`.
+export function roomAgents(w: WorkerStatus): { agents: WorkerAgent[]; slots: number } {
+  const agents =
+    w.agents ?? (w.current ? [{ id: `${w.name}-current`, ...w.current }] : []);
+  const slots = typeof w.slots === "number" ? Math.max(0, Math.floor(w.slots)) : Math.max(1, agents.length);
+  return { agents, slots };
+}
+
+const DEMO_ROLES: { role: string; mode: AgentMode }[] = [
+  { role: "tech_lead", mode: "read" },
+  { role: "coder", mode: "write" },
+  { role: "reviewer", mode: "review" },
+  { role: "designer", mode: "write" },
+];
+
+// Dữ liệu giả: mỗi phòng đổi trạng thái theo chu kỳ 6 giây để thấy đủ các animation.
+// Trong một chu kỳ "working": 2 giây đầu 1 agent con, 2 giây giữa 2 agent, 2 giây cuối agent đầu xong.
 export function demoWorkers(now: number): WorkerStatus[] {
   const names = ["claude", "codex", "cursor"];
+  const slots = [3, 2, 2];
   const states: WorkerState[] = ["working", "idle", "working", "limited", "idle", "offline"];
+  const cycle = Math.floor(now / 6000);
+  const cycleStart = cycle * 6000;
+  const phase = Math.floor((now - cycleStart) / 2000); // 0, 1, 2
   return names.map((name, i) => {
-    const state = states[(Math.floor(now / 6000) + i * 2) % states.length];
+    const state = states[(cycle + i * 2) % states.length];
     const resets = new Date(now + (47 - i * 13) * 60_000).toISOString();
+    const agents: WorkerAgent[] = [];
+    if (state === "working") {
+      for (let k = 0; k < 2; k++) {
+        const running = k === 0 ? phase < 2 : phase > 0;
+        if (!running) continue;
+        const { role, mode } = DEMO_ROLES[(i * 2 + k + cycle) % DEMO_ROLES.length];
+        agents.push({
+          id: `${name}-${k}`,
+          role,
+          ticket_id: `T-demo${i}${k}`,
+          mode,
+          started_at: new Date(cycleStart + k * 2000).toISOString(),
+        });
+      }
+    }
     return {
       name,
       kind: name,
       state,
-      roles: i === 0 ? ["tech_lead"] : [],
-      current:
-        state === "working"
-          ? { ticket_id: `T-demo${i}`, role: "tech_lead", mode: "read", started_at: new Date(now - 20_000).toISOString() }
-          : null,
+      roles: i === 0 ? ["tech_lead", "coder", "reviewer"] : ["coder", "reviewer", "designer"],
+      slots: slots[i],
+      agents,
+      current: agents[0] ?? null,
       runs_ok: 12 + i * 3,
       runs_failed: i,
       runs_today: 5 + i,

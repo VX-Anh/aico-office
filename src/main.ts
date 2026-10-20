@@ -1,5 +1,5 @@
-import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, saveConfig } from "./api";
-import { H, W, drawScene } from "./scene";
+import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
+import { ROLE_STYLES, drawScene, roleStyle, sceneSize } from "./scene";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -14,8 +14,7 @@ const canvas = document.querySelector<HTMLCanvasElement>("#office")!;
 const cards = document.querySelector<HTMLDivElement>("#cards")!;
 const status = document.querySelector<HTMLSpanElement>("#conn")!;
 const form = document.querySelector<HTMLFormElement>("#settings")!;
-canvas.width = W;
-canvas.height = H;
+const legend = document.querySelector<HTMLDivElement>("#legend")!;
 const ctx = canvas.getContext("2d")!;
 
 let config: ApiConfig | null = loadConfig();
@@ -31,6 +30,13 @@ function fmtAgo(iso: string | null | undefined, now: number): string {
   if (s < 60) return `${s} giây trước`;
   if (s < 3600) return `${Math.round(s / 60)} phút trước`;
   return `${Math.round(s / 3600)} giờ trước`;
+}
+
+function fmtElapsed(iso: string, now: number): string {
+  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (s < 60) return `${s} giây`;
+  if (s < 3600) return `${Math.floor(s / 60)} phút ${s % 60} giây`;
+  return `${Math.floor(s / 3600)} giờ ${Math.floor((s % 3600) / 60)} phút`;
 }
 
 function fmtCountdown(iso: string, now: number): string {
@@ -59,19 +65,34 @@ function renderCards(now: number): void {
     ...workers.map((w) => {
       const card = el("article", `card state-${w.state}`);
       const head = el("header", "card-head");
-      head.append(el("h2", "name", w.name), el("span", "badge", STATE_LABEL[w.state]));
+      head.append(el("h2", "name", `Phòng ${w.name}`), el("span", "badge", STATE_LABEL[w.state]));
       card.append(head);
       card.append(el("p", "roles", w.roles.length ? `Vai trò: ${w.roles.join(", ")}` : "Chưa giao vai trò"));
 
-      if (w.state === "working" && w.current) {
-        const elapsed = fmtAgo(w.current.started_at, now).replace(" trước", "");
-        card.append(row("Việc", `${w.current.ticket_id ?? "?"} · ${w.current.role ?? "?"} · ${elapsed}`));
+      const { agents, slots } = roomAgents(w);
+      card.append(row("Agent con", `${agents.length}/${slots}`));
+      if (agents.length) {
+        const list = el("ul", "agents");
+        for (const a of agents) {
+          const style = roleStyle(a.role);
+          const item = el("li", "agent-row");
+          const dot = el("span", "swatch");
+          dot.style.background = style.shirt;
+          item.append(
+            dot,
+            el("span", "agent-role", style.label),
+            el("span", "value", `${a.ticket_id ?? "?"} · ${a.mode} · ${fmtElapsed(a.started_at, now)}`),
+          );
+          list.append(item);
+        }
+        card.append(list);
       }
       if (w.state === "limited" && w.limit) {
         const box = el("div", "limit");
         box.append(
           el("strong", "", w.limit.resets_at ? `Mở lại sau ${fmtCountdown(w.limit.resets_at, now)}` : "Chưa rõ giờ mở lại"),
           el("p", "", w.limit.message),
+          el("p", "", "Hạn mức chung cho cả phòng"),
         );
         card.append(box);
       }
@@ -82,7 +103,7 @@ function renderCards(now: number): void {
         row("Lần cuối", `${fmtAgo(w.last_run_at, now)}${w.last_duration_seconds ? ` · ${w.last_duration_seconds}s` : ""}`),
       );
       if (w.last_error && w.state !== "limited") card.append(el("p", "error", w.last_error));
-      if (w.state === "offline") card.append(el("p", "error", `Không gọi được worker${w.error ? ` (${w.error})` : ""}`));
+      if (w.state === "offline") card.append(el("p", "error", `Không gọi được phòng${w.error ? ` (${w.error})` : ""}`));
       return card;
     }),
   );
@@ -121,7 +142,26 @@ form.querySelector<HTMLButtonElement>("#demo")!.addEventListener("click", () => 
 });
 if (config) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = config.baseUrl;
 
+function renderLegend(): void {
+  legend.replaceChildren(
+    ...Object.values(ROLE_STYLES).map((style) => {
+      const item = el("span", "legend-item");
+      const dot = el("span", "swatch");
+      dot.style.background = style.shirt;
+      item.append(dot, document.createTextNode(`${style.label} (${style.accessory})`));
+      return item;
+    }),
+  );
+}
+
 function frame(t: number): void {
+  // demo tính lại mỗi frame: polling 3 giây lệch nhịp với pha 2 giây sẽ bỏ sót pha có 2 agent con
+  if (!config) workers = demoWorkers(Date.now());
+  const size = sceneSize(workers);
+  if (canvas.width !== size.width || canvas.height !== size.height) {
+    canvas.width = size.width;
+    canvas.height = size.height;
+  }
   drawScene(ctx, workers, t);
   requestAnimationFrame(frame);
 }
@@ -130,4 +170,5 @@ void poll();
 setInterval(() => void poll(), POLL_MS);
 setInterval(() => renderCards(Date.now()), 1000);
 renderCards(Date.now());
+renderLegend();
 requestAnimationFrame(frame);
