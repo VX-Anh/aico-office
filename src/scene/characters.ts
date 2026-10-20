@@ -52,20 +52,40 @@ interface RawRecipe extends Omit<Recipe, "frames"> {
   frames: RawFrame[] | Record<string, RawFrame>;
 }
 
+// Lý do op không hợp lệ, null nếu hợp lệ: chỉ op grid, rows là mảng chuỗi đều dài, nằm gọn trong khung.
+function opError(o: unknown, w: number, h: number): string | null {
+  if (!o || typeof o !== "object") return "op không phải object";
+  const { op = "grid", x = 0, y = 0, rows } = o as { op?: unknown; x?: unknown; y?: unknown; rows?: unknown };
+  if (op !== "grid") return `op lạ ${String(op)}`;
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return "x/y phải là số nguyên";
+  if (!Array.isArray(rows) || rows.length === 0 || rows.some((r) => typeof r !== "string")) return "rows phải là mảng chuỗi";
+  const rw = (rows[0] as string).length;
+  if (rw === 0 || rows.some((r: string) => r.length !== rw)) return "các hàng dài không đều";
+  const ox = x as number;
+  const oy = y as number;
+  if (ox < 0 || oy < 0 || ox + rw > w || oy + rows.length > h) return `lưới ${rw}x${rows.length} tại (${ox},${oy}) vượt khung ${w}x${h}`;
+  return null;
+}
+
 // Gộp các op grid của frame thành một lưới đủ khung để bộ đọc chỉ cần xử lý rows/from.
-// Op khác grid được giữ tên để bộ đọc warn và bỏ frame.
+// Op hỏng (op lạ, rows sai kiểu, vượt khung, ops rỗng mà không có from) được đánh dấu bằng op lạ
+// để bộ đọc warn và bỏ frame, tư thế đó sẽ dùng sprite cũ.
 function flattenFrame(f: RawFrame, w: number, h: number): RecipeFrame {
-  if (!f.ops) return f;
+  if (f.ops === undefined) return f;
   const out: RecipeFrame = { name: f.name, from: f.from, palette: f.palette };
-  const bad = f.ops.find((o) => (o.op ?? "grid") !== "grid");
-  if (bad) return { ...out, op: bad.op };
+  if (!Array.isArray(f.ops)) return { ...out, op: "invalid: ops phải là mảng" };
+  if (f.ops.length === 0 && f.from === undefined) return { ...out, op: "invalid: ops rỗng" };
+  for (const o of f.ops) {
+    const err = opError(o, w, h);
+    if (err) return { ...out, op: `invalid: ${err}` };
+  }
   const grid = Array.from({ length: h }, () => Array<string>(w).fill("."));
   for (const o of f.ops) {
-    (o.rows ?? []).forEach((row, dy) => {
-      const y = (o.y ?? 0) + dy;
+    const ox = o.x ?? 0;
+    const oy = o.y ?? 0;
+    o.rows!.forEach((row, dy) => {
       for (let dx = 0; dx < row.length; dx++) {
-        const x = (o.x ?? 0) + dx;
-        if (y >= 0 && y < h && x >= 0 && x < w && row[dx] !== "." && row[dx] !== " ") grid[y][x] = row[dx];
+        if (row[dx] !== "." && row[dx] !== " ") grid[oy + dy][ox + dx] = row[dx];
       }
     });
   }
