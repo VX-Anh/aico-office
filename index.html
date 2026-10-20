@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AICO Office</title>
+  </head>
+  <body>
+    <header class="top">
+      <h1>AICO Office</h1>
+      <span id="conn" class="conn">…</span>
+      <form id="settings" autocomplete="off">
+        <input name="baseUrl" placeholder="http://localhost:8000" aria-label="Địa chỉ aico" autocomplete="off" />
+        <input name="token" type="password" placeholder="API token" aria-label="API token" autocomplete="new-password" />
+        <button type="submit">Kết nối</button>
+        <button type="button" id="demo">Demo</button>
+      </form>
+    </header>
+    <main>
+      <canvas id="office" aria-label="Văn phòng agent"></canvas>
+      <section id="cards" class="cards"></section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

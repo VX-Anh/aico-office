@@ -1,0 +1,81 @@
+:root {
+  --bg: #1b1e25;
+  --panel: #252a33;
+  --text: #e6e9ef;
+  --muted: #9aa3b2;
+  --idle: #4fae60;
+  --working: #f5c26b;
+  --limited: #e06c75;
+  --offline: #5c6370;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--panel);
+}
+.top h1 { margin: 0; font-size: 18px; letter-spacing: 1px; }
+.conn { font-size: 13px; color: var(--muted); }
+.conn.ok { color: var(--idle); }
+.conn.bad { color: var(--limited); }
+.conn.demo { color: var(--working); }
+#settings { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+#settings input, #settings button {
+  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 4px;
+  border: 1px solid #3a4150; background: #1b1e25; color: var(--text);
+}
+#settings button { cursor: pointer; background: #343b48; }
+
+main { max-width: 1152px; margin: 0 auto; padding: 16px; }
+#office {
+  display: block;
+  width: 100%;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  border: 2px solid #11141a;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.card {
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 12px 14px;
+  border-top: 4px solid var(--offline);
+}
+.card.state-idle { border-top-color: var(--idle); }
+.card.state-working { border-top-color: var(--working); }
+.card.state-limited { border-top-color: var(--limited); }
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.name { margin: 0; font-size: 16px; text-transform: capitalize; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #1b1e25; }
+.state-idle .badge { color: var(--idle); }
+.state-working .badge { color: var(--working); }
+.state-limited .badge { color: var(--limited); }
+.state-offline .badge { color: var(--muted); }
+.roles { margin: 6px 0 10px; font-size: 13px; color: var(--muted); }
+.row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 3px 0; }
+.label { color: var(--muted); }
+.value { text-align: right; }
+.limit {
+  margin: 8px 0;
+  padding: 8px;
+  border-radius: 4px;
+  background: rgba(224, 108, 117, 0.12);
+  font-size: 13px;
+}
+.limit p { margin: 4px 0 0; color: var(--muted); }
+.error { margin: 8px 0 0; font-size: 12px; color: var(--limited); word-break: break-word; }
