@@ -1,0 +1,675 @@
+{
+  "version": 1,
+  "name": "character_body",
+  "width": 16,
+  "height": 22,
+  "palette": {
+    "o": "#21181f",
+    "h": "#7a3e22",
+    "H": "#582d18",
+    "s": "#f2c9a0",
+    "S": "#d9a77a",
+    "t": "#4f7fbf",
+    "T": "#395d8c",
+    "a": "#d6454f",
+    "e": "#2b1d14",
+    "p": "#3d4a6b",
+    "b": "#2a2230",
+    "w": "#f4efe4"
+  },
+  "frames": [
+    {
+      "name": "down_0",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...osssssssso...",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..ossessssesso..",
+            "..ossessssesso..",
+            "..oSssssssssSo..",
+            "...oSSssssSSo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..otottttttoto..",
+            "..osoTTTTTToso..",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....oppooppo....",
+            "....obboobbo....",
+            "....ooo..ooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "down_1",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...osssssssso...",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..ossessssesso..",
+            "..ossessssesso..",
+            "..oSssssssssSo..",
+            "...oSSssssSSo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..osottttttoto..",
+            "...ooTTTTTToso..",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....obbooppo....",
+            "....ooo.obbo....",
+            ".........ooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "down_3",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...osssssssso...",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..ossessssesso..",
+            "..ossessssesso..",
+            "..oSssssssssSo..",
+            "...oSSssssSSo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..otottttttoso..",
+            "..osoTTTTTToo...",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....oppoobbo....",
+            "....obbo.ooo....",
+            "....ooo........."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "up_0",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..oHhhhhhhhhHo..",
+            "...oHHHHHHHHo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..otottttttoto..",
+            "..osoTTTTTToso..",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....oppooppo....",
+            "....obboobbo....",
+            "....ooo..ooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "up_1",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..oHhhhhhhhhHo..",
+            "...oHHHHHHHHo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..otottttttoso..",
+            "..osoTTTTTToo...",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....oppoobbo....",
+            "....obbo.ooo....",
+            "....ooo........."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "up_3",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..oHhhhhhhhhHo..",
+            "...oHHHHHHHHo...",
+            "....oooooooo....",
+            "....otttttto....",
+            "...otttttttto...",
+            "..otottttttoto..",
+            "..osottttttoto..",
+            "...ooTTTTTToso..",
+            "...ooppppppoo...",
+            "....oppooppo....",
+            "....obbooppo....",
+            "....ooo.obbo....",
+            ".........ooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "right_0",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhsso..",
+            "..ohhhhhhsssso..",
+            "..ohhhhhssssso..",
+            "..ohhhhsssseso..",
+            "..ohhhhsssseso..",
+            "..oHhhhsssssso..",
+            "...oHHHSsssSo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "....otTtttto....",
+            "....otsTttto....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            ".....obbbbbo....",
+            ".....ooooooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "right_1",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhsso..",
+            "..ohhhhhhsssso..",
+            "..ohhhhhssssso..",
+            "..ohhhhsssseso..",
+            "..ohhhhsssseso..",
+            "..oHhhhsssssso..",
+            "...oHHHSsssSo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "...otTttttto....",
+            "...osoTtttto....",
+            ".....oppppo.....",
+            "....oppooppo....",
+            "...oppo..oppo...",
+            "..obbo....obbo..",
+            "..ooo......ooo.."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "right_3",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhsso..",
+            "..ohhhhhhsssso..",
+            "..ohhhhhssssso..",
+            "..ohhhhsssseso..",
+            "..ohhhhsssseso..",
+            "..oHhhhsssssso..",
+            "...oHHHSsssSo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "....ottttTto....",
+            "....ottttTso....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            "....oppoppo.....",
+            "....obbobbo.....",
+            "....ooooooo....."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left_0",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..osshhhhhhhho..",
+            "..osssshhhhhho..",
+            "..ossssshhhhho..",
+            "..osesssshhhho..",
+            "..osesssshhhho..",
+            "..osssssshhhHo..",
+            "...oSsssSHHHo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "....ottttTto....",
+            "....otttTsto....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            "....obbbbbo.....",
+            "....ooooooo....."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left_1",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..osshhhhhhhho..",
+            "..osssshhhhhho..",
+            "..ossssshhhhho..",
+            "..osesssshhhho..",
+            "..osesssshhhho..",
+            "..osssssshhhHo..",
+            "...oSsssSHHHo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "....otttttTto...",
+            "....ottttToso...",
+            ".....oppppo.....",
+            "....oppooppo....",
+            "...oppo..oppo...",
+            "..obbo....obbo..",
+            "..ooo......ooo.."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left_3",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..osshhhhhhhho..",
+            "..osssshhhhhho..",
+            "..ossssshhhhho..",
+            "..osesssshhhho..",
+            "..osesssshhhho..",
+            "..osssssshhhHo..",
+            "...oSsssSHHHo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....otttttto....",
+            "....otTtttto....",
+            "....osTtttto....",
+            ".....oppppo.....",
+            ".....oppppo.....",
+            ".....oppoppo....",
+            ".....obbobbo....",
+            ".....ooooooo...."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sit_back_0",
+      "duration": 240,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "osohhhhhhhhhho..",
+            "osoHhhhhhhhhHoso",
+            "otooHHHHHHHHooso",
+            "oto.oooooooo.oto",
+            "ottottttttttotto",
+            "otttttttttttttto",
+            "otTttttttttttTto",
+            ".oTTTTTTTTTTTTo.",
+            "..oooooooooooo..",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sit_back_1",
+      "duration": 240,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhho..",
+            "..ohhhhhhhhhhoso",
+            "osoHhhhhhhhhHoso",
+            "osooHHHHHHHHooto",
+            "oto.oooooooo.oto",
+            "ottottttttttotto",
+            "otttttttttttttto",
+            "otTttttttttttTto",
+            ".oTTTTTTTTTTTTo.",
+            "..oooooooooooo..",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sit_side_0",
+      "duration": 700,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhsso..",
+            "..ohhhhhhsssso..",
+            "..ohhhhhssssso..",
+            "..ohhhhsssseso..",
+            "..ohhhhsssseso..",
+            "..oHhhhsssssso..",
+            "...oHHHSsssSo...",
+            "....oooooooo....",
+            ".....otttto.....",
+            "....otttttto....",
+            "....ottttTso....",
+            "....otttoowwo...",
+            "....opppppppo...",
+            "....opppppppo...",
+            "....oooooobpo...",
+            "..........obo...",
+            "..........ooo...",
+            "................"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sit_side_1",
+      "duration": 700,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...ohhhhhhhho...",
+            "..ohhhhhhhhsso..",
+            "..ohhhhhhsssso..",
+            "..ohhhhhssssso..",
+            "..ohhhhsssseso..",
+            "..ohhhhssssowwo.",
+            "..oHhhhssssowwo.",
+            "...oHHHSssosoo..",
+            "....oooooooto...",
+            ".....otttto.....",
+            "....otttttto....",
+            "....ottttTto....",
+            "....otttttto....",
+            "....opppppppo...",
+            "....opppppppo...",
+            "....oooooobpo...",
+            "..........obo...",
+            "..........ooo...",
+            "................"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lie_0",
+      "duration": 1000,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 0,
+          "y": 0,
+          "rows": [
+            "................",
+            "................",
+            "....oooooooo....",
+            "...osssssssso...",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..osssssssssso..",
+            "..oseesssseeso..",
+            "..oSssssssssSo..",
+            "...oSSssssSSo...",
+            "....oooooooo....",
+            "...otttttttto...",
+            "..owwwwwwwwwwo..",
+            "..otTttttttTto..",
+            "..otttttttttto..",
+            "..otttttttttto..",
+            "..oTttttttttTo..",
+            "..oTTTTTTTTTTo..",
+            "...oooooooooo...",
+            "................",
+            "................"
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "walk_down": {
+      "frames": [
+        "down_0",
+        "down_1",
+        "down_0",
+        "down_3"
+      ],
+      "loop": true
+    },
+    "walk_up": {
+      "frames": [
+        "up_0",
+        "up_1",
+        "up_0",
+        "up_3"
+      ],
+      "loop": true
+    },
+    "walk_left": {
+      "frames": [
+        "left_0",
+        "left_1",
+        "left_0",
+        "left_3"
+      ],
+      "loop": true
+    },
+    "walk_right": {
+      "frames": [
+        "right_0",
+        "right_1",
+        "right_0",
+        "right_3"
+      ],
+      "loop": true
+    },
+    "sit_back": {
+      "frames": [
+        "sit_back_0",
+        "sit_back_1"
+      ],
+      "loop": true
+    },
+    "sit_side": {
+      "frames": [
+        "sit_side_0",
+        "sit_side_1"
+      ],
+      "loop": true
+    },
+    "lie": {
+      "frames": [
+        "lie_0"
+      ],
+      "loop": true
+    }
+  }
+}
