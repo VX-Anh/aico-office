@@ -1,6 +1,6 @@
 # T-deb535b0: Hiển thị hạn mức subscription của từng phòng
 
-Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 3. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
