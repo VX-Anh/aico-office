@@ -2,6 +2,7 @@
 // Phòng làm việc: bàn gỗ, máy tính kiểu cũ, bàn phím, ghế đẩu, kệ sách, đồng hồ, cây leo, biển tên.
 // Phòng nghỉ: tranh có khung, cây lớn, sofa đỏ đậm, bàn trà có cốc, quầy bếp.
 
+import { shortCountdown } from "../usage";
 import { glyph, text, textWidth } from "./font";
 import type { Desk, LoungeBox, Sofa, SofaSet } from "./layout";
 import { C, CODE_COLORS } from "./palette";
@@ -100,10 +101,9 @@ export function drawClock(ctx: Ctx, x: number, y: number, now: number): void {
 }
 
 // Biển nhỏ đếm ngược giờ mở lại cho phòng hết hạn mức (ví dụ 47M, 1H05).
+// Cùng định dạng với thẻ trạng thái (shortCountdown).
 export function countdownLabel(resetsAt: string | null | undefined, now: number): string {
-  if (!resetsAt) return "?";
-  const m = Math.max(0, Math.ceil((Date.parse(resetsAt) - now) / 60000));
-  return m < 60 ? `${m}M` : `${Math.floor(m / 60)}H${String(m % 60).padStart(2, "0")}`;
+  return shortCountdown(resetsAt, now);
 }
 
 export function drawCountdown(ctx: Ctx, right: number, y: number, label: string, t: number): void {

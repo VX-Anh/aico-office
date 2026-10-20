@@ -2,6 +2,7 @@
 // phía dưới là phòng nghỉ chung nối bằng ô cửa. Agent con ngồi bàn trong phòng provider của nó.
 
 import type { WorkerStatus } from "../api";
+import { parseUsage } from "../usage";
 import { type Crew, actorPose, syncActors } from "./actors";
 import { drawSeatedBack, drawSleeper, drawSofaSitter, drawWalker, drawZ, residentLook } from "./characters";
 import {
@@ -24,15 +25,18 @@ import { type Layout, type RoomBox, computeLayout } from "./layout";
 import { LAMP, paletteOf } from "./palette";
 import { type Ctx, hashPhase } from "./pixel";
 import { drawBackdrop, drawDarkness, drawDoors, drawLoungeShell, drawRoomShell, drawStorage } from "./tiles";
+import { drawUsageBoard } from "./usage-board";
 
 export { resetActors } from "./actors";
 export { sceneSize } from "./layout";
-export { ROLE_STYLES, roleStyle } from "./palette";
+export { ROLE_STYLES, USAGE, roleStyle } from "./palette";
 
 function drawRoomFurniture(ctx: Ctx, room: RoomBox, crew: Crew["rooms"][number], t: number, now: number): void {
   const { worker } = room;
   drawShelf(ctx, room.shelf.x, room.shelf.y);
   drawClock(ctx, room.clock.x, room.clock.y, now);
+  // phòng mất kết nối thì số liệu không còn đáng tin: không treo bảng
+  if (worker.state !== "offline") drawUsageBoard(ctx, room.usageBoard, parseUsage(worker.usage, worker.name), t);
   if (worker.state === "limited") drawCountdown(ctx, room.clock.x - 3, room.clock.y + 2, countdownLabel(worker.limit?.resets_at, now), t);
   drawVine(ctx, room.x, room.y + 1, t);
   drawPottedPlant(ctx, room.x + 3, room.floorY + 44, t);
