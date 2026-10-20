@@ -1,15 +1,16 @@
 # T-cff2d329: Sprite nhân vật bằng Pixelbolt và bộ đọc công thức
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | Vẽ công thức thân nhân vật và 4 lớp kiểu tóc bằng Pixelbolt | designer | `art/characters/body.pixel.json`, `art/characters/hair/` | - | xong (claude) |
-| W2 | Vẽ công thức phụ kiện theo vai trò (cà vạt, tai nghe, kính, mũ nồi) | designer | `art/characters/acc/` | - | xong (codex) |
-| W3 | Bộ đọc công thức Pixelbolt tối giản (src/scene/pixelbolt.ts) | coder | `src/scene/pixelbolt.ts` | - | xong (claude) |
-| W4 | Ghép nối: characters.ts dùng công thức, fallback sprite cũ, README và docs/architecture.md | coder | `src/scene/characters.ts`, `src/scene/legacy-characters.ts`, `src/scene/palette.ts`, `README.md`, `docs/architecture.md` | W1, W2, W3 | xong (claude) |
+| W1 | Vẽ công thức thân nhân vật và 4 lớp kiểu tóc bằng Pixelbolt | designer | `art/characters/body.pixel.json`, `art/characters/hair/` | - | chưa chạy |
+| W2 | Vẽ công thức phụ kiện theo vai trò (cà vạt, tai nghe, kính, mũ nồi) | designer | `art/characters/acc/` | - | chưa chạy |
+| W3 | Bộ đọc công thức Pixelbolt tối giản (src/scene/pixelbolt.ts) | coder | `src/scene/pixelbolt.ts` | - | chưa chạy |
+| W4 | Ghép nối: characters.ts dùng công thức, fallback sprite cũ, README và docs/architecture.md | coder | `src/scene/characters.ts`, `src/scene/legacy-characters.ts`, `src/scene/palette.ts`, `README.md`, `docs/architecture.md` | W1, W2, W3 | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
