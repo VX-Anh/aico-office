@@ -1,6 +1,6 @@
 import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
-import { isStale, parseUsage, shortCountdown, usageLevel } from "./usage";
+import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -99,7 +99,7 @@ function renderCards(now: number): void {
           dot.style.background = USAGE[usageLevel(window.used_percent)];
           item.append(
             dot,
-            el("span", "", `${window.name}: ${window.used_percent}% · reset sau ${shortCountdown(window.resets_at, now)}`),
+            el("span", "", `${window.name}: ${usagePercent(window.used_percent)}% · reset sau ${shortCountdown(window.resets_at, now)}`),
           );
           box.append(item);
         }
