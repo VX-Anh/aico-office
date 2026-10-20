@@ -24,18 +24,19 @@ export interface RoleStyle {
   shirt: string;
   shirtDark: string;
   accessory: string;
+  accent: string; // màu chính của phụ kiện (khoá "a" trong công thức Pixelbolt)
 }
 
 // Màu áo và phụ kiện theo vai trò của agent con.
 export const ROLE_STYLES: Record<string, RoleStyle> = {
-  tech_lead: { label: "Tech lead", shirt: "#4a7fd4", shirtDark: "#355fa8", accessory: "cà vạt" },
-  coder: { label: "Coder", shirt: "#4fae60", shirtDark: "#3a8a49", accessory: "tai nghe" },
-  reviewer: { label: "Reviewer", shirt: "#9b6bd6", shirtDark: "#7449b0", accessory: "kính" },
-  designer: { label: "Designer", shirt: "#e57fb0", shirtDark: "#b85a8a", accessory: "mũ nồi" },
+  tech_lead: { label: "Tech lead", shirt: "#4a7fd4", shirtDark: "#355fa8", accessory: "cà vạt", accent: "#d6454f" },
+  coder: { label: "Coder", shirt: "#4fae60", shirtDark: "#3a8a49", accessory: "tai nghe", accent: "#2b2f38" },
+  reviewer: { label: "Reviewer", shirt: "#9b6bd6", shirtDark: "#7449b0", accessory: "kính", accent: "#21181f" },
+  designer: { label: "Designer", shirt: "#e57fb0", shirtDark: "#b85a8a", accessory: "mũ nồi", accent: "#c0392b" },
 };
 
 export function roleStyle(role: string | null | undefined): RoleStyle {
-  return (role && ROLE_STYLES[role]) || { label: role || "?", shirt: FALLBACK.shirt, shirtDark: FALLBACK.shirtDark, accessory: "" };
+  return (role && ROLE_STYLES[role]) || { label: role || "?", shirt: FALLBACK.shirt, shirtDark: FALLBACK.shirtDark, accessory: "", accent: "" };
 }
 
 // Màu tóc của agent con chọn theo id (nhân vật thường trực dùng màu tóc provider).
