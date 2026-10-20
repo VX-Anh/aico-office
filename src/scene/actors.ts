@@ -4,7 +4,7 @@
 import type { WorkerAgent } from "../api";
 import { type Look, agentLook } from "./characters";
 import { type Layout, assignSeats, resetSeats } from "./layout";
-import { pathBetween, pathLength, positionAt, reverseFrom } from "./pathing";
+import { alongRoute, pathBetween, pathLength, positionAt, reverseFrom } from "./pathing";
 import type { Pt } from "./pixel";
 
 const SPEED = 48; // px/giây
@@ -43,10 +43,17 @@ export function resetActors(): void {
   resetSeats();
 }
 
+// Đổi hướng giữa đường: đi tiếp trên tuyến phòng nghỉ ↔ ghế từ vị trí hiện tại.
+function turn(a: Actor, layout: Layout, room: number, t: number, toSeat: boolean): Pt[] {
+  const p = positionAt(a.path, a.startT, t, SPEED);
+  if (!layout.rooms[room]?.desks[a.seat]) return reverseFrom(a.path, a.startT, t, SPEED);
+  return alongRoute(pathBetween(layout, "lounge", { room, seat: a.seat }), p, toSeat);
+}
+
 function sendOut(a: Actor, layout: Layout, t: number): void {
   const room = layout.rooms.findIndex((r) => r.worker.name === a.room);
   if (room < 0) return;
-  if (a.phase === "in") a.path = reverseFrom(a.path, a.startT, t, SPEED);
+  if (a.phase === "in") a.path = turn(a, layout, room, t, false);
   else if (layout.rooms[room].desks[a.seat]) a.path = pathBetween(layout, { room, seat: a.seat }, "lounge");
   else return; // ghế không còn (slots giảm): biến mất luôn
   a.phase = "out";
@@ -85,7 +92,7 @@ export function syncActors(layout: Layout, t: number): Crew {
         if (back) {
           // quay lại khi đang đi ra: đổi hướng về ghế
           leaving = leaving.filter((l) => l !== back);
-          back.path = reverseFrom(back.path, back.startT, t, SPEED);
+          back.path = turn(back, layout, room.index, t, true);
           back.phase = "in";
           back.startT = t;
           a = back;

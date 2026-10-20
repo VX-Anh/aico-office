@@ -67,6 +67,25 @@ export function positionAt(path: Pt[], startT: number, t: number, speed: number)
   return { x: last.x, y: last.y, dir, done: true, dist, segment: path.length };
 }
 
+// Đổi hướng giữa đường trên một tuyến cố định (ví dụ phòng nghỉ → ghế): chiếu vị trí hiện tại lên tuyến,
+// rồi đi tiếp về cuối tuyến (toEnd) hoặc về đầu tuyến. Đổi hướng bao nhiêu lần cũng vẫn tới đúng đích.
+export function alongRoute(route: Pt[], pos: Pt, toEnd: boolean): Pt[] {
+  if (route.length < 2) return compact([{ x: pos.x, y: pos.y }, ...route]);
+  let best = { seg: 1, p: route[0], d: Infinity };
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1];
+    const b = route[i];
+    const p = {
+      x: Math.min(Math.max(pos.x, Math.min(a.x, b.x)), Math.max(a.x, b.x)),
+      y: Math.min(Math.max(pos.y, Math.min(a.y, b.y)), Math.max(a.y, b.y)),
+    };
+    const d = Math.abs(p.x - pos.x) + Math.abs(p.y - pos.y);
+    if (d < best.d) best = { seg: i, p, d };
+  }
+  const rest = toEnd ? route.slice(best.seg) : route.slice(0, best.seg).reverse();
+  return compact([{ x: pos.x, y: pos.y }, best.p, ...rest]);
+}
+
 // Quay đầu giữa đường: đi ngược từ vị trí hiện tại về điểm xuất phát.
 export function reverseFrom(path: Pt[], startT: number, t: number, speed: number): Pt[] {
   const pos = positionAt(path, startT, t, speed);
