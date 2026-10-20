@@ -1,5 +1,5 @@
 import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
-import { ROLE_STYLES, drawScene, roleStyle, sceneSize } from "./scene";
+import { ROLE_STYLES, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -133,11 +133,15 @@ form.addEventListener("submit", (event) => {
   const token = String(data.get("token") ?? "").trim();
   config = baseUrl && token ? { baseUrl, token } : null;
   saveConfig(config);
+  // đổi nguồn dữ liệu: xoá cảnh cũ, agent của nguồn mới được đặt thẳng vào ghế
+  if (config) workers = [];
+  resetActors();
   void poll();
 });
 form.querySelector<HTMLButtonElement>("#demo")!.addEventListener("click", () => {
   config = null;
   saveConfig(null);
+  resetActors();
   void poll();
 });
 if (config) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = config.baseUrl;
@@ -155,14 +159,17 @@ function renderLegend(): void {
 }
 
 function frame(t: number): void {
-  // demo tính lại mỗi frame: polling 3 giây lệch nhịp với pha 2 giây sẽ bỏ sót pha có 2 agent con
+  // demo tính lại mỗi frame để nhân vật bắt đầu đi ngay khi kịch bản đổi pha, không trễ theo nhịp polling 3 giây
   if (!config) workers = demoWorkers(Date.now());
   const size = sceneSize(workers);
-  if (canvas.width !== size.width || canvas.height !== size.height) {
-    canvas.width = size.width;
-    canvas.height = size.height;
+  // vẽ với hệ số phóng nguyên: pixel đều nhau và vẫn sắc khi phóng to hoặc trên màn hình HiDPI
+  const k = Math.min(8, Math.max(1, Math.ceil((canvas.clientWidth * devicePixelRatio) / size.width)));
+  if (canvas.width !== size.width * k || canvas.height !== size.height * k) {
+    canvas.width = size.width * k;
+    canvas.height = size.height * k;
   }
-  drawScene(ctx, workers, t);
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  drawScene(ctx, workers, t, Date.now());
   requestAnimationFrame(frame);
 }
 
