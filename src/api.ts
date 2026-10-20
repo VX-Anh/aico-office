@@ -40,6 +40,8 @@ export interface WorkerStatus {
   last_duration_seconds?: number | null;
   last_error?: string | null;
   limit?: WorkerLimit | null;
+  /** Hạn mức subscription; null khi worker chưa đọc xong hoặc aico bản cũ. Đọc qua `parseUsage` (src/usage.ts). */
+  usage?: unknown;
   error?: string;
 }
 
@@ -96,14 +98,19 @@ const DEMO_ROLES: { role: string; mode: AgentMode }[] = [
 const DEMO_CYCLE = 48_000;
 
 // Dữ liệu giả: kịch bản 48 giây, mỗi pha ít nhất 8 giây để kịp thấy nhân vật đi vào/ra.
-// claude (3 chỗ): 0 → 1 → 2 → 1 → 0 agent con; codex (2 chỗ): rảnh ↔ 1 agent, lệch pha với claude;
-// cursor (2 chỗ): hết hạn mức 24 giây (ngủ trên sofa) → mất kết nối 12 giây (tắt đèn) → rảnh.
+// claude (3 chỗ): 0 → 1 → 2 → 1 → 0 agent con; hạn mức session 20 → 70% (xanh → vàng), tuần 84% (đỏ),
+//   40–48 giây số liệu cũ 20 phút kèm lỗi đọc CLI;
+// codex (2 chỗ): hạn mức 5h 40 → 100% trong 0–36 giây (đủ ba màu), 1 agent từ giây 28,
+//   chạm 100% thì hết hạn mức tới cuối chu kỳ và agent rời bàn;
+// cursor (2 chỗ): không công bố hạn mức (gói Pro); hết hạn mức 24 giây (ngủ trên sofa)
+//   → mất kết nối 12 giây (tắt đèn, chưa có usage) → rảnh.
 export function demoWorkers(now: number): WorkerStatus[] {
   const names = ["claude", "codex", "cursor"];
   const slots = [3, 2, 2];
   const cycle = Math.floor(now / DEMO_CYCLE);
   const cycleStart = cycle * DEMO_CYCLE;
   const s = (now - cycleStart) / 1000;
+  const iso = (ms: number) => new Date(ms).toISOString();
   // id ổn định suốt thời gian agent chạy, đổi theo chu kỳ để mỗi vòng là agent mới
   const agent = (i: number, k: number, from: number): WorkerAgent => {
     const { role, mode } = DEMO_ROLES[(cycle + i * 2 + k) % DEMO_ROLES.length];
@@ -112,19 +119,47 @@ export function demoWorkers(now: number): WorkerStatus[] {
       role,
       ticket_id: `T-demo${i}${k}`,
       mode,
-      started_at: new Date(cycleStart + from * 1000).toISOString(),
+      started_at: iso(cycleStart + from * 1000),
     };
   };
+  const codexLimited = s >= 36;
   const running: WorkerAgent[][] = [
     [...(s >= 8 && s < 40 ? [agent(0, 0, 8)] : []), ...(s >= 16 && s < 32 ? [agent(0, 1, 16)] : [])],
-    s >= 28 && s < 44 ? [agent(1, 0, 28)] : [],
+    s >= 28 && !codexLimited ? [agent(1, 0, 28)] : [],
     [],
   ];
   const cursorState: WorkerState = s < 24 ? "limited" : s < 36 ? "offline" : "idle";
+  const claudeStale = s >= 40;
+  const usages: unknown[] = [
+    {
+      checked_at: iso(claudeStale ? now - 20 * 60_000 : now),
+      source: "claude /usage",
+      plan: "max",
+      windows: [
+        { name: "session", window_minutes: 300, used_percent: 20 + (50 * s) / 48, resets_at: iso(cycleStart + 65 * 60_000) },
+        { name: "week (all models)", window_minutes: 10080, used_percent: 84, resets_at: iso(cycleStart + 3 * 86_400_000) },
+      ],
+      ...(claudeStale ? { error: "không đọc được hạn mức từ CLI" } : {}),
+    },
+    {
+      checked_at: iso(now),
+      source: "codex /status",
+      plan: "plus",
+      windows: [
+        { name: "5h", window_minutes: 300, used_percent: 40 + (60 * Math.min(s, 36)) / 36, resets_at: iso(cycleStart + DEMO_CYCLE) },
+        { name: "week", window_minutes: 10080, used_percent: 35, resets_at: iso(cycleStart + 5 * 86_400_000) },
+      ],
+    },
+    cursorState === "offline"
+      ? null
+      : { checked_at: iso(now), source: "cursor-agent", plan: "Pro", windows: [], note: "CLI không công bố hạn mức" },
+  ];
+  // codex hết hạn mức khi 5h chạm 100%, mở lại cuối chu kỳ; cursor mở lại sau 47 phút
+  const resets = [null, iso(cycleStart + DEMO_CYCLE), iso(cycleStart + 47 * 60_000)];
   return names.map((name, i) => {
     const agents = running[i];
-    const state: WorkerState = i === 2 ? cursorState : agents.length ? "working" : "idle";
-    const resets = new Date(cycleStart + 47 * 60_000).toISOString();
+    const state: WorkerState =
+      i === 2 ? cursorState : i === 1 && codexLimited ? "limited" : agents.length ? "working" : "idle";
     return {
       name,
       kind: name,
@@ -139,10 +174,11 @@ export function demoWorkers(now: number): WorkerStatus[] {
       tokens_today: 120_000 + i * 45_000,
       input_tokens: 900_000 + i * 100_000,
       output_tokens: 40_000 + i * 9_000,
-      last_run_at: new Date(now - 90_000).toISOString(),
+      last_run_at: iso(now - 90_000),
       last_duration_seconds: 30 + i * 12,
       last_error: state === "limited" ? "You've hit your session limit" : null,
-      limit: state === "limited" ? { message: "You've hit your session limit", resets_at: resets, detected_at: new Date(now).toISOString() } : null,
+      limit: state === "limited" ? { message: "You've hit your session limit", resets_at: resets[i], detected_at: iso(now) } : null,
+      usage: usages[i],
     };
   });
 }

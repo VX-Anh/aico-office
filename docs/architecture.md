@@ -1,43 +1,54 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-422fe82f). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-deb535b0). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data
-    API["src/api.ts<br/>gọi aico /workers, dữ liệu demo"]
+    API["src/api.ts<br/>gọi aico /workers, dữ liệu demo (có usage)"]
+    USG["src/usage.ts<br/>parseUsage (từ chối usage hỏng → null),<br/>usageWindows, usageLevel, shortCountdown, isStale (thuần)"]
   end
-  MAIN["src/main.ts<br/>vòng lặp animation, polling, thẻ trạng thái, chú thích"]
+  MAIN["src/main.ts<br/>vòng lặp animation, polling, thẻ trạng thái<br/>(cửa sổ hạn mức, reset, gói, nguồn, số liệu cũ), chú thích"]
   API --> MAIN
-  MAIN -->|drawScene, sceneSize, resetActors| IDX["src/scene/index.ts<br/>ghép cảnh"]
+  USG --> MAIN
+  MAIN -->|drawScene, sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh"]
 
-  IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi (thuần)"]
+  IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi, usageBoard (thuần)"]
+  IDX -->|parseUsage| USG
+  IDX --> BOARD["usage-board.ts<br/>thanh hạn mức 5H/WK, %, ? + gói"]
+  BOARD --> USG
+  BOARD --> PAL
+  BOARD --> FONT
+  BOARD --> PIX
   IDX --> ACT["actors.ts<br/>agent đi vào/ra, rebase/turn, actorPose<br/>bất biến: seated ⇔ cuối path = ghế hiện tại"]
   ACT --> LAYOUT
   ACT --> PATH["pathing.ts<br/>đường đi, vị trí theo thời gian (thuần)"]
   ACT -->|agentLook| CHAR
   IDX --> TILES["tiles.ts<br/>sàn, tường, cửa"]
-  IDX --> FURN["furniture.ts<br/>bàn, ghế, sofa, biển tên"]
+  IDX --> FURN["furniture.ts<br/>bàn, ghế, sofa, biển tên, biển đếm ngược"]
+  FURN -->|shortCountdown| USG
   IDX -->|drawWalker, drawSeatedBack,<br/>drawSofaSitter, drawSleeper, residentLook| CHAR["characters.ts<br/>chọn tư thế, chồng lớp thân→tóc→phụ kiện,<br/>thay khoá màu theo Look"]
 
   ART[("art/characters/*.pixel.json<br/>body, hair/style0-3, acc/role")] -->|import.meta.glob lúc build| CHAR
   CHAR -->|công thức + bộ màu| PB["pixelbolt.ts<br/>đọc palette, frames grid/from, animations<br/>từ chối frame hỏng → fallback"]
   CHAR -->|tư thế thiếu hoặc hỏng| LEG["legacy-characters.ts<br/>sprite lưới ký tự cũ"]
-  CHAR --> PAL["palette.ts<br/>màu provider, vai trò + accent, da, tóc"]
+  CHAR --> PAL["palette.ts<br/>màu provider, vai trò + accent, da, tóc, USAGE"]
   PB --> PIX["pixel.ts<br/>drawGrid, cached bitmap, shade"]
   LEG --> PIX
   CHAR --> PIX
-  CHAR --> FONT["font.ts<br/>chữ pixel (Z)"]
+  CHAR --> FONT["font.ts<br/>chữ pixel 3x5 (có % và ?)"]
   TILES --> PIX
   FURN --> PIX
   FURN --> FONT
   PIX -->|canvas offscreen| CANVAS[["canvas #office<br/>image-rendering: pixelated"]]
 
-  subgraph Tests["npm test (vitest) — cổng cùng npm run build"]
-    T_PATH["pathing.test.ts / layout.test.ts"]
+  subgraph Tests["npm test (vitest) — cổng cùng npm run build, chạy trong CI"]
+    T_PATH["pathing.test.ts / layout.test.ts<br/>usageBoard không chồng đồ vật"]
     T_ACT["actors.test.ts<br/>kịch bản dữ liệu đổi giữa chừng"]
     T_PB["pixelbolt.test.ts / characters.test.ts<br/>công thức hỏng + mọi file art/"]
+    T_USG["usage.test.ts<br/>ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ"]
+    T_FONT["font.test.ts<br/>glyph % và ?"]
   end
   T_PATH -.-> PATH
   T_PATH -.-> LAYOUT
@@ -45,4 +56,6 @@ flowchart TD
   T_PB -.-> PB
   T_PB -.-> CHAR
   T_PB -.-> ART
+  T_USG -.-> USG
+  T_FONT -.-> FONT
 ```

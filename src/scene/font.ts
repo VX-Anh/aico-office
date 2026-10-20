@@ -1,4 +1,4 @@
-// Chữ pixel 3x5 (A-Z, 0-9 và vài ký tự hay gặp trong tên phòng), không cần font.
+// Chữ pixel 3x5 (A-Z, 0-9 và vài ký tự hay gặp trong tên phòng, hạn mức), không cần font.
 
 import { type Ctx, rect } from "./pixel";
 
@@ -45,6 +45,8 @@ const GLYPHS: Record<string, string[]> = {
   " ": ["000", "000", "000", "000", "000"],
   "!": ["1", "1", "1", "0", "1"],
   "+": ["000", "010", "111", "010", "000"],
+  "%": ["101", "001", "010", "100", "101"],
+  "?": ["110", "001", "010", "000", "010"],
 };
 
 export function glyph(ctx: Ctx, ch: string, x: number, y: number, color: string): void {

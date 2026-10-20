@@ -54,6 +54,18 @@ export const LAMP: Record<WorkerStatus["state"], string> = {
   offline: "#5c6370",
 };
 
+// Bảng hạn mức trên tường: màu thanh theo mức dùng lại tông đèn trạng thái (xanh, vàng, đỏ).
+export const USAGE = {
+  ok: LAMP.idle,
+  warn: LAMP.working,
+  high: LAMP.limited,
+  track: "#151a24", // rãnh thanh chưa dùng
+  frame: "#21181f",
+  board: "#2b2f38",
+  text: "#efe6cf",
+  unknown: "#8a8f98", // dấu ? và gói của phòng không công bố hạn mức
+};
+
 // Bảng màu ấm, ít màu cho tường, sàn và đồ đạc.
 export const C = {
   wall: "#2a2030", // viền ngoài và vách ngăn

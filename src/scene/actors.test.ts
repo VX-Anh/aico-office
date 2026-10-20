@@ -9,11 +9,11 @@ const agent: WorkerAgent = {
 };
 
 // Thời gian do kịch bản điều khiển, không phụ thuộc timer hoặc tốc độ máy chạy test.
-function scenario(slots = 1) {
+function scenario(slots = 1, initialFrontSlots = 1) {
   let t = 0;
   let present = false;
   let state: WorkerState = "working";
-  let frontSlots = 1;
+  let frontSlots = initialFrontSlots;
   const layoutNow = () => computeLayout([
     { name: "front", state: "idle", roles: [], slots: frontSlots },
     { name: "codex", state, roles: [], slots, agents: present ? [agent] : [] },
@@ -63,11 +63,48 @@ function scenario(slots = 1) {
     slots(value: number) { slots = value; tick(); },
     frontSlots(value: number) { frontSlots = value; tick(); },
     crew: () => crew,
+    layout: () => layout,
   };
 }
 
 describe("actors khi dữ liệu đổi giữa đường", () => {
   beforeEach(() => resetActors());
+
+  for (const [from, to] of [[1, 4], [4, 1]]) {
+    for (const phase of ["in", "seated", "out"] as const) {
+      for (const state of ["working", "limited", "offline"] as const) {
+        it(`phòng trước ${from} → ${to}, đổi slots và ${state} khi đang ${phase}`, () => {
+          const s = scenario(1, from);
+          s.present(true);
+          if (phase !== "in") s.seated();
+          if (phase === "out") s.present(false);
+          const before = s.layout().rooms[1];
+          s.frontSlots(to);
+          const after = s.layout().rooms[1];
+          expect(Math.sign(after.door.cx - before.door.cx)).toBe(Math.sign(to - from));
+          expect(Math.sign(after.desks[0].seat.x - before.desks[0].seat.x)).toBe(Math.sign(to - from));
+          s.slots(4);
+          s.state(state);
+          if (state === "offline") {
+            expect(s.crew().walkers).toEqual([]);
+            expect(s.crew().rooms[1].seats.every((a) => a === null)).toBe(true);
+          } else if (state === "limited" || phase === "out") {
+            s.exit();
+          } else {
+            s.seated();
+          }
+          s.frontSlots(1);
+          s.slots(1);
+          s.present(true);
+          s.state("working");
+          s.seated();
+          s.present(false);
+          s.exit();
+        });
+      }
+    }
+
+  }
 
   for (const phase of ["in", "out"] as const) {
     it(`mất rồi xuất hiện lại nhiều lần khi đang ${phase}`, () => {
