@@ -155,6 +155,8 @@ function renderLegend(): void {
 }
 
 function frame(t: number): void {
+  // demo tính lại mỗi frame: polling 3 giây lệch nhịp với pha 2 giây sẽ bỏ sót pha có 2 agent con
+  if (!config) workers = demoWorkers(Date.now());
   const size = sceneSize(workers);
   if (canvas.width !== size.width || canvas.height !== size.height) {
     canvas.width = size.width;

@@ -78,10 +78,12 @@ export async function fetchWorkers(config: ApiConfig): Promise<WorkerStatus[]> {
 }
 
 // Agent con và số chỗ của phòng. aico bản cũ chỉ có `current` thì dựng lại từ đó.
+// `slots` giữ đúng như aico trả (agent vượt chỗ hiện `+N`); chỉ suy ra khi aico không trả `slots`.
 export function roomAgents(w: WorkerStatus): { agents: WorkerAgent[]; slots: number } {
   const agents =
     w.agents ?? (w.current ? [{ id: `${w.name}-current`, ...w.current }] : []);
-  return { agents, slots: Math.max(1, w.slots ?? 0, agents.length) };
+  const slots = typeof w.slots === "number" ? Math.max(0, Math.floor(w.slots)) : Math.max(1, agents.length);
+  return { agents, slots };
 }
 
 const DEMO_ROLES: { role: string; mode: AgentMode }[] = [

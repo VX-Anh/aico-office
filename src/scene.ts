@@ -133,12 +133,12 @@ interface RoomBox {
   worker: WorkerStatus;
 }
 
-// Mỗi phòng rộng theo số chỗ, xếp thành một hàng, giữa các phòng có vách GAP.
+// Mỗi phòng rộng theo số chỗ (phòng 0 chỗ vẫn rộng bằng 1 chỗ để treo biển), xếp thành một hàng, giữa các phòng có vách GAP.
 function layout(workers: WorkerStatus[]): { width: number; rooms: RoomBox[] } {
   const rooms: RoomBox[] = [];
   let x = GAP;
   for (const worker of workers) {
-    const w = roomAgents(worker).slots * SEAT_W + ROOM_PAD + PLANT_W;
+    const w = Math.max(1, roomAgents(worker).slots) * SEAT_W + ROOM_PAD + PLANT_W;
     rooms.push({ x, w, worker });
     x += w + GAP;
   }
