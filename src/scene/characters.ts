@@ -38,17 +38,17 @@ export function residentLook(p: Palette, index: number): Look {
   return { hair: p.hair, style: index % 4, shirt: p.shirt, shirtDark: p.shirtDark, role: null };
 }
 
-type Anim = "walk_down" | "walk_up" | "walk_left" | "walk_right" | "sit_back" | "sit_side" | "lie";
+export type Anim = "walk_down" | "walk_up" | "walk_left" | "walk_right" | "sit_back" | "sit_side" | "lie";
 
 // Frame Pixelbolt gốc: lưới nằm trong ops (op grid đặt tại x, y), có thể nhỏ hơn khung.
-interface RawFrame {
+export interface RawFrame {
   name?: string;
   from?: string;
   palette?: Colors;
   rows?: string[];
   ops?: { op?: string; x?: number; y?: number; rows?: string[] }[];
 }
-interface RawRecipe extends Omit<Recipe, "frames"> {
+export interface RawRecipe extends Omit<Recipe, "frames"> {
   frames: RawFrame[] | Record<string, RawFrame>;
 }
 
@@ -92,7 +92,8 @@ function flattenFrame(f: RawFrame, w: number, h: number): RecipeFrame {
   return { ...out, rows: grid.map((r) => r.join("")) };
 }
 
-function normalize(raw: RawRecipe): Recipe {
+// Xuất để test kiểm bước gộp ops.
+export function normalize(raw: RawRecipe): Recipe {
   const w = raw.width ?? W;
   const h = raw.height ?? H;
   const frames = Array.isArray(raw.frames)
@@ -119,7 +120,8 @@ const LEGACY: Record<Anim, { pose: Pose; view: View }> = {
   lie: { pose: "lie", view: "front" },
 };
 
-function has(id: string, anim: Anim): boolean {
+// Xuất để test kiểm fallback: false thì tư thế đó dùng sprite cũ.
+export function has(id: string, anim: Anim): boolean {
   const r = RECIPES[id];
   return !!r && !!animFrames(r, anim);
 }
