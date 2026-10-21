@@ -1,6 +1,6 @@
 # AICO Office
 
-Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Kèm thẻ hạn mức và thống kê theo phòng.
+Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Canvas phủ cả màn hình; thanh trên, thanh bên, ngăn chi tiết và feed nổi trên cảnh như kính, không che phòng.
 
 Repo này cũng là **repo pilot** của aico: tính năng mới được tạo thành issue (nhãn `ai-company`) để chính các agent làm qua luồng plan → code → review → merge.
 
@@ -13,7 +13,7 @@ Repo này cũng là **repo pilot** của aico: tính năng mới được tạo 
 | Hết hạn mức | Bàn trống, màn hình tắt; nhân vật của phòng nằm ngủ trên sofa phòng nghỉ, chữ Z bay lên; biển dưới đồng hồ phòng đếm ngược giờ mở lại (ví dụ `47M`, `1H05`) | lần chạy gần nhất báo hết hạn mức subscription (chung cả phòng) |
 | Mất kết nối | Phòng tắt đèn, biển tên xám, không có ai (kể cả trong phòng nghỉ) | aico không gọi được worker |
 
-Agent con phân biệt theo vai trò (xem chú thích dưới canvas): tech_lead áo xanh dương + cà vạt, coder áo xanh lá + tai nghe, reviewer áo tím + kính, designer áo hồng + mũ nồi; vai trò lạ áo xám. Kiểu tóc và màu tóc của agent con chọn theo `id` nên ổn định giữa các lần vẽ; nhân vật thường trực mang tóc và áo màu provider. Màu code trên màn hình theo `mode` (read xanh lá, write xanh dương, review tím). Chỗ ngồi giữ ổn định theo `id` agent.
+Agent con phân biệt theo vai trò (chú thích ở cuối thanh bên): tech_lead áo xanh dương + cà vạt, coder áo xanh lá + tai nghe, reviewer áo tím + kính, designer áo hồng + mũ nồi; vai trò lạ áo xám. Kiểu tóc và màu tóc của agent con chọn theo `id` nên ổn định giữa các lần vẽ; nhân vật thường trực mang tóc và áo màu provider. Màu code trên màn hình theo `mode` (read xanh lá, write xanh dương, review tím). Chỗ ngồi giữ ổn định theo `id` agent.
 
 Lần vẽ đầu (mở trang, đổi nguồn dữ liệu, phòng online lại) agent đang chạy được đặt thẳng vào ghế, không đi bộ.
 
@@ -21,7 +21,9 @@ Biển tên phòng ghi thêm `+N` khi số agent con vượt `slots`. Dấu `!` 
 
 Thanh hạn mức pixel nằm trên tường phòng (cạnh đồng hồ, không che bàn hay nhân vật). Mỗi cửa sổ một hàng, tối đa hai: cửa sổ ngắn `5H` và tuần `WK`, kèm phần trăm. Màu theo mức đã dùng: xanh dưới 60%, vàng từ 60% tới dưới 80%, đỏ từ 80%. Phòng không công bố hạn mức hiện `?` thay cho thanh.
 
-Thẻ trạng thái dưới canvas ghi từng cửa sổ: phần trăm, giờ reset (đếm ngược kiểu `1H05`, `47M`), gói và nguồn số liệu. Có lỗi đọc thì ghi lỗi. `checked_at` cũ hơn 15 phút thì ghi "số liệu cũ".
+Thanh trên ghi hạn mức từng phòng: ô chữ cái provider, hai dòng cửa sổ (phần trăm, mức màu, giờ reset kiểu `1H05` / `47M`). Phòng không công bố cửa sổ (Cursor) thì ghi gói; không có cả gói thì `?`.
+
+Bố cục: thanh trên 64px (logo, trạng thái kết nối, ô số agent / đang làm / cần bạn, hạn mức, nút cài đặt và Demo); thanh bên trái khoảng 304px (từng phòng rồi agent con, bấm để mở ngăn và căn cảnh vào nhân vật, thu gọn bằng phím **[**); ngăn chi tiết bên phải khoảng 380px (tab Agent và tab Cần bạn, đóng bằng nút X hoặc **Esc**); feed hoạt động dưới đáy (cao khoảng 200px, thu gọn bằng phím **]**). Cảnh được co theo hệ số pixel nguyên vào vùng trống giữa các panel. Màn hẹp hơn 900px: thanh bên thành ngăn kéo, ngăn chi tiết thành tấm từ dưới lên, feed một dòng.
 
 ## Chạy
 
@@ -51,9 +53,9 @@ Mỗi agent có thể có thêm `activity` (`kind`, `icon`, `text`, `detail`, `t
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
-Cột “Cần bạn” cạnh canvas liệt kê ticket chờ duyệt kế hoạch, chờ duyệt merge và `escalated`. Có liên kết MR/xem trước, ghi chú và các thao tác theo trạng thái; thao tác không thể hoàn tác cần xác nhận. Danh sách làm mới mỗi 3 giây, giữ ghi chú khi poll và giữ thẻ cũ khi tải lỗi; dấu `!` cạnh bộ đếm báo lỗi tải ticket. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+Ngăn chi tiết, tab “Cần bạn”, liệt kê ticket chờ duyệt kế hoạch, chờ duyệt merge và `escalated`. Có liên kết MR/xem trước, ghi chú và các thao tác theo trạng thái; thao tác không thể hoàn tác cần xác nhận. Danh sách làm mới mỗi 3 giây, giữ ghi chú khi poll và giữ thẻ cũ khi tải lỗi; dấu `!` cạnh bộ đếm báo lỗi tải ticket. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
 
-Thanh đầu trang đếm agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm bộ đếm hoặc phím **P** (khi không nhập chữ) để lần lượt tới thẻ cần xử lý. Ticket mới cần người hiện toast với nút “Xử lý”; đổi nguồn xoá thông báo và trạng thái cũ.
+Ô số trên thanh trên đếm agent đang chạy, agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm ô cần bạn, phím **P** hoặc nút “Xử lý” trên toast (khi không nhập chữ) để mở tab Cần bạn rồi tới thẻ. Ticket mới cần người hiện toast. Bấm agent trên thanh bên hoặc trên canvas thì mở tab Agent. Agent biến mất, hoặc phòng offline/hết hạn mức, thì đóng tab Agent và không tự mở lại. Đổi nguồn xoá lựa chọn, feed, cờ đóng ngăn và toast.
 
 ## Cấu trúc
 
@@ -80,8 +82,26 @@ src/latest.ts              chọn kết quả poll mới nhất khi request ch�
 src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
 src/time.ts                chuỗi "N giây/phút/giờ/ngày trước", tương lai → vừa xong (hàm thuần)
 src/time.test.ts           test biên giây/phút/giờ/ngày, tương lai, at hỏng, now NaN/0
-src/main.ts                vòng lặp animation, polling worker + ticket, bộ đếm, phím P, toast
-src/main.test.ts           test ghép nối Cần bạn, nguồn demo/thật, đổi trạng thái và lỗi tải
+src/ui/tokens.css          biến màu, kính, font Pixelify Sans, kích thước panel
+src/ui/viewport.ts         vùng trống (computeInsets) và căn cảnh (fitScene), hàm thuần
+src/ui/viewport.test.ts    test panel mở/đóng, màn hẹp, màn nhỏ, hệ số pixel
+src/ui/feed-model.ts       gom feed từ recent và ticket cần người, khử trùng (thuần)
+src/ui/feed-model.test.ts  test thứ tự, giới hạn dòng, ticket đổi loại, không lặp recent
+src/ui/selection.ts        khoá agent, resolveSelection, drawerView (thuần)
+src/ui/selection.test.ts   test agent biến mất, started_at đổi, tab Cần bạn
+src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent
+src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtAgo
+src/ui/topbar.ts           thanh trên: ô số, hạn mức, popover cài đặt, nút Demo
+src/ui/topbar.css          kiểu thanh trên
+src/ui/sidebar.ts          thanh bên: phòng → agent, phím [
+src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
+src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
+src/ui/drawer.ts           ngăn chi tiết: tab Agent / Cần bạn, Esc
+src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
+src/ui/feed.ts             feed hoạt động, phím ]
+src/ui/feed.css            kiểu feed
+src/main.ts                vòng lặp, poll, vùng trống, chọn agent, feed, phím P [ ] Esc
+src/main.test.ts           test ghép nối Cần bạn, chọn agent, đổi nguồn, lỗi poll
 src/scene/index.ts         ghép cảnh, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
 src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo thời gian (hàm thuần)
