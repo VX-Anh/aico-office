@@ -46,6 +46,41 @@ export const SKIN = "#f2c9a0";
 export const SKIN_SHADE = "#d9a77a";
 export const CODE_COLORS: Record<string, string> = { read: "#a6e3a1", write: "#7fd1ff", review: "#d6a6ff" };
 
+// Mặt kính máy tính: giữ màu cũ cho code, con trỏ và màn hình tắt.
+export const SCREEN = {
+  codeBg: "#123a5a",
+  cursorBg: "#1b2c3c",
+  offBg: "#0b0d11",
+  codeLine: "#7fd1ff",
+  codeAccent: "#f5c26b",
+  powerOff: "#5c6370",
+  powerOn: "#4fae60",
+  terminalBg: "#101e1b",
+  terminalLine: "#82d99a",
+  browserFrame: "#6787a5",
+  browserBar: "#c0d7e8",
+  browserPage: "#edf2ed",
+  browserContent: "#739ac1",
+  searchBg: "#203c50",
+  searchLine: "#52758b",
+  searchGlass: "#f5d18a",
+  paperBg: "#344654",
+  paper: "#f4efe4",
+  paperLine: "#89939c",
+};
+
+// Lớp chữ hoạt động và thanh tiến độ dùng chung tông với cảnh.
+export const BUBBLE = {
+  bg: "#f4efe4",
+  border: "#6787a5",
+  error: "#d6454f",
+  text: "#2a2f3a",
+  staleAlpha: 0.5,
+  bar: "#4fae60",
+  barTrack: "#2b2f38",
+  barText: "#f4efe4",
+};
+
 // Màu đèn trạng thái cạnh biển tên.
 export const LAMP: Record<WorkerStatus["state"], string> = {
   idle: "#4fae60",
