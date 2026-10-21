@@ -1,22 +1,29 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-87b2140f). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-626ddd48). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data
-    API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /tickets/{id}/escalation; dữ liệu demo (có usage)"]
+    API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /tickets/{id}/escalation, /tickets/{id}/decisions (needAction);<br/>dữ liệu demo worker (có usage)"]
     USG["src/usage.ts<br/>parseUsage (từ chối usage hỏng → null),<br/>usageWindows, usageLevel, shortCountdown, isStale (thuần)"]
-    TK["src/tickets.ts<br/>parseTickets, escalatedOnly, latestEscalationReason,<br/>mergeRequest, actionAvailability, needsConfirm,<br/>buildEscalationRequest, escalationError, demoTickets (thuần)"]
+    TK["src/tickets.ts<br/>parseTickets, needsYou/needKind (plan, merge, escalated),<br/>actionsFor, commentRequired, irreversible, previewLink,<br/>buildDecisionRequest/buildEscalationRequest, actionError,<br/>latestEscalationReason, reason cache, demoNeedTickets (thuần)"]
+    ATT["src/attention.ts<br/>tabTitle, nextAttention (phím P), isShortcut,<br/>reconcileToasts/dismissToast: gộp, tối đa 3, huỷ khi rời trạng thái (thuần)"]
   end
   API --> TK
-  MAIN["src/main.ts<br/>vòng lặp animation, polling (worker + ticket cùng chu kỳ),<br/>thẻ trạng thái, chú thích, nguồn ticket thật/demo"]
+  MAIN["src/main.ts<br/>vòng lặp animation, polling worker + ticket cùng POLL_MS,<br/>thanh trên: Đang làm X, Cần bạn N, tiêu đề tab, phím P;<br/>thẻ phòng, chú thích, nguồn ticket thật/demo"]
   API --> MAIN
   USG --> MAIN
-  MAIN -->|refresh mỗi POLL_MS, nguồn list/act| PANEL["src/escalation-panel.ts<br/>panel HTML phủ góc phải canvas, thu gọn được;<br/>ghi chú + Đẩy lại/Merge/Đóng/Đánh dấu lỗi,<br/>xác nhận trong panel, khoá nút khi gửi"]
-  PANEL --> TK
-  PANEL --> OVERLAY[["#escalations trong .stage<br/>(phủ trên canvas)"]]
+  ATT --> MAIN
+  MAIN -->|refresh, nguồn list/act, focus id| COL["src/needs-column.ts (+ .css)<br/>cột Cần bạn cạnh canvas, ẩn khi rỗng;<br/>thẻ theo id|kind: duyệt kế hoạch / duyệt merge / escalated,<br/>ghi chú bắt buộc, xác nhận trong thẻ, khoá khi gửi"]
+  COL -->|onItems| MAIN
+  COL --> TK
+  MAIN -->|update entries, reset| TOAST["src/toasts.ts (+ .css)<br/>toast góc dưới phải canvas, nút Xử lý/đóng"]
+  TOAST --> ATT
+  TOAST -->|onOpen id| MAIN
+  COL --> ASIDE[["aside#needs trong .workspace (grid, cột phải;<br/>< 900px xuống dưới canvas)"]]
+  TOAST --> STACK[["#toasts trong .stage"]]
   MAIN -->|drawScene, sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh"]
 
   IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi, usageBoard (thuần)"]
@@ -46,7 +53,7 @@ flowchart TD
   TILES --> PIX
   FURN --> PIX
   FURN --> FONT
-  PIX -->|canvas offscreen| CANVAS[["canvas #office<br/>image-rendering: pixelated"]]
+  PIX -->|canvas offscreen| CANVAS[["canvas #office trong .stage<br/>image-rendering: pixelated, không bị panel đè"]]
 
   subgraph Tests["npm test (vitest) — cổng cùng npm run build, chạy trong CI"]
     T_PATH["pathing.test.ts / layout.test.ts<br/>usageBoard không chồng đồ vật"]
@@ -54,7 +61,9 @@ flowchart TD
     T_PB["pixelbolt.test.ts / characters.test.ts<br/>công thức hỏng + mọi file art/"]
     T_USG["usage.test.ts<br/>ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ"]
     T_FONT["font.test.ts<br/>glyph % và ?"]
-    T_TK["tickets.test.ts<br/>lọc escalated, lý do mới nhất, nút bật/tắt,<br/>dựng request, lỗi 409/501, dữ liệu đổi giữa chừng"]
+    T_TK["tickets.test.ts<br/>phân loại cần người, hành động theo trạng thái,<br/>ghi chú bắt buộc, request decisions/escalation, lỗi 4xx/5xx,<br/>dữ liệu đổi giữa chừng"]
+    T_ATT["attention.test.ts<br/>tiêu đề tab, ticket kế tiếp (P), phím tắt,<br/>gộp/huỷ toast khi ticket rời trạng thái"]
+    T_LAT["latest.test.ts<br/>poll chồng nhau, đổi nguồn"]
   end
   T_PATH -.-> PATH
   T_PATH -.-> LAYOUT
@@ -65,4 +74,5 @@ flowchart TD
   T_USG -.-> USG
   T_FONT -.-> FONT
   T_TK -.-> TK
+  T_ATT -.-> ATT
 ```

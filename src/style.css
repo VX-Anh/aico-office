@@ -35,7 +35,7 @@ body { margin: 0; background: var(--bg); }
 }
 #settings button { cursor: pointer; background: #343b48; }
 
-main { max-width: 1152px; margin: 0 auto; padding: 16px; }
+main { max-width: 1528px; margin: 0 auto; padding: 16px; }
 #office {
   display: block;
   width: 100%;
@@ -110,39 +110,27 @@ main { max-width: 1152px; margin: 0 auto; padding: 16px; }
 .usage-note, .usage-stale { margin: 4px 0 0; color: var(--muted); }
 .usage-stale { color: var(--working); }
 
-.stage { position: relative; }
-#escalations {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  width: min(340px, calc(100% - 16px));
-  max-height: calc(100% - 16px);
-  overflow: auto;
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-#escalations button, #escalations textarea {
+#agents-count, .needs-summary { font-size: 13px; }
+.needs-summary { display: inline-flex; align-items: center; gap: 6px; }
+#needs-count {
   font: inherit;
-  color: var(--text);
+  color: var(--muted);
   background: var(--bg);
   border: 1px solid var(--muted);
   border-radius: 4px;
-  padding: 5px 7px;
+  padding: 6px 8px;
 }
-#escalations button { cursor: pointer; }
-#escalations button:disabled { opacity: 0.45; cursor: default; }
-#escalations .escalation-toggle { width: 100%; text-align: left; }
-.escalation-ticket { padding: 10px 0; border-top: 1px solid var(--muted); }
-.escalation-ticket h3 { margin: 4px 0; font-size: 14px; }
-.escalation-ticket p { margin: 6px 0; }
-.escalation-ticket a { color: var(--working); }
-#escalations textarea { display: block; width: 100%; margin: 8px 0; resize: vertical; }
-.escalation-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.escalation-confirm { margin-top: 8px; }
-.escalation-confirm span { display: block; margin-bottom: 4px; }
-.escalation-confirm button { margin-right: 4px; }
+#needs-count.hot { color: var(--working); border-color: var(--working); cursor: pointer; }
+#needs-count:disabled { opacity: 0.65; }
+#tickets-error { color: var(--limited); cursor: help; }
+
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.workspace.has-needs { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); }
+.stage { position: relative; min-width: 0; align-self: start; }
+/* Chiều cao canvas quyết định hàng; danh sách dài cuộn trong cột. */
+#needs { contain: size; min-height: 0; overflow: auto; }
+
+@media (max-width: 899px) {
+  .workspace.has-needs { grid-template-columns: minmax(0, 1fr); }
+  #needs { contain: none; max-height: 70vh; }
+}

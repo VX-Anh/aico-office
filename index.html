@@ -9,6 +9,11 @@
     <header class="top">
       <h1>AICO Office</h1>
       <span id="conn" class="conn">…</span>
+      <span id="agents-count">Đang làm: 0 agent</span>
+      <span class="needs-summary">
+        <button type="button" id="needs-count" disabled>Cần bạn: 0</button>
+        <span id="tickets-error" role="status" hidden>!</span>
+      </span>
       <form id="settings" autocomplete="off">
         <input name="baseUrl" placeholder="http://localhost:8000" aria-label="Địa chỉ aico" autocomplete="off" />
         <input name="token" type="password" placeholder="API token" aria-label="API token" autocomplete="new-password" />
@@ -17,9 +22,12 @@
       </form>
     </header>
     <main>
-      <div class="stage">
-        <canvas id="office" aria-label="Văn phòng agent"></canvas>
-        <section id="escalations" aria-label="Ticket cần xử lý"></section>
+      <div class="workspace">
+        <div class="stage">
+          <canvas id="office" aria-label="Văn phòng agent"></canvas>
+          <div id="toasts"></div>
+        </div>
+        <aside id="needs" aria-label="Cần bạn" hidden></aside>
       </div>
       <div id="legend" class="legend" aria-label="Chú thích vai trò agent con"></div>
       <section id="cards" class="cards"></section>
