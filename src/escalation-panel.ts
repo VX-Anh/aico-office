@@ -1,4 +1,5 @@
 import type { EscalationAction, Ticket } from "./api";
+import { createLatestGate } from "./latest";
 import { actionAvailability, ESCALATION_ACTIONS, mergeRequest, needsConfirm } from "./tickets";
 
 export interface EscalationItem {
@@ -30,7 +31,7 @@ interface TicketRow {
 export function createEscalationPanel(root: HTMLElement, initialSource: EscalationSource) {
   let source = initialSource;
   let generation = 0;
-  let revision = 0;
+  const gate = createLatestGate();
   let collapsed = false;
   try { collapsed = localStorage.getItem(STORAGE_KEY) === "collapsed"; } catch { /* Chỉ lưu trong phiên nếu bị chặn. */ }
   const toggle = node("button");
@@ -123,7 +124,7 @@ export function createEscalationPanel(root: HTMLElement, initialSource: Escalati
         if (generation !== rowGeneration) return;
         confirming = null;
         // Bỏ kết quả list bắt đầu trước lúc action hoàn tất.
-        revision++;
+        gate.invalidate();
         await refresh();
       } catch (exc) {
         if (generation === rowGeneration && rows.get(id) === row) {
@@ -158,12 +159,11 @@ export function createEscalationPanel(root: HTMLElement, initialSource: Escalati
   function itemFor(id: string): EscalationItem | undefined { return items.get(id); }
 
   async function refresh(): Promise<void> {
-    const requestGeneration = generation;
-    const requestRevision = ++revision;
+    const request = gate.start();
     const requestSource = source;
     try {
       const next = await requestSource.list();
-      if (generation !== requestGeneration || revision !== requestRevision) return;
+      if (!gate.accept(request)) return;
       items = new Map(next.map((item) => [item.ticket.id, item]));
       for (const [id, row] of rows) {
         if (!items.has(id)) { row.root.remove(); rows.delete(id); }
@@ -179,7 +179,7 @@ export function createEscalationPanel(root: HTMLElement, initialSource: Escalati
       error.textContent = "";
       heading();
     } catch (exc) {
-      if (generation !== requestGeneration || revision !== requestRevision) return;
+      if (!gate.accept(request)) return;
       error.textContent = `Lỗi tải ticket: ${exc instanceof Error ? exc.message : String(exc)}`;
     }
   }
@@ -189,7 +189,7 @@ export function createEscalationPanel(root: HTMLElement, initialSource: Escalati
     refresh,
     setSource(next: EscalationSource): void {
       generation++;
-      revision++;
+      gate.reset();
       source = next;
       rows.clear();
       items.clear();

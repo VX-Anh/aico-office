@@ -60,6 +60,8 @@ src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, s
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
 src/escalation-panel.ts    panel ticket HTML, ghi chú, xác nhận và cập nhật theo id
+src/latest.ts              chọn kết quả poll mới nhất khi request chồng nhau (hàm thuần)
+src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
 src/main.ts                vòng lặp animation, polling worker + ticket, thẻ trạng thái
 src/scene/index.ts         ghép cảnh: drawScene, sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)

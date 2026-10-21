@@ -2,6 +2,7 @@ import { type ApiConfig, type WorkerStatus, demoWorkers, escalationAction, fetch
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
 import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
+import { createLatestGate } from "./latest";
 import { applyDemoAction, demoTickets, reasonKey } from "./tickets";
 import "./style.css";
 
@@ -22,8 +23,7 @@ const ctx = canvas.getContext("2d")!;
 
 let config: ApiConfig | null = loadConfig();
 let workers: WorkerStatus[] = demoWorkers(Date.now());
-let sourceGeneration = 0;
-let workerRevision = 0;
+const workerGate = createLatestGate();
 
 function ticketSource(current: ApiConfig | null): EscalationSource {
   if (!current) {
@@ -56,7 +56,7 @@ function ticketSource(current: ApiConfig | null): EscalationSource {
 const panel = createEscalationPanel(document.querySelector<HTMLElement>("#escalations")!, ticketSource(config));
 
 function changeSource(): void {
-  sourceGeneration++;
+  workerGate.reset();
   panel.setSource(ticketSource(config));
 }
 
@@ -168,8 +168,7 @@ function renderCards(now: number): void {
 
 async function pollWorkers(): Promise<void> {
   const current = config;
-  const generation = sourceGeneration;
-  const revision = ++workerRevision;
+  const request = workerGate.start();
   if (!current) {
     workers = demoWorkers(Date.now());
     status.textContent = "Chế độ demo (dữ liệu giả)";
@@ -178,12 +177,12 @@ async function pollWorkers(): Promise<void> {
   }
   try {
     const next = await fetchWorkers(current);
-    if (sourceGeneration !== generation || workerRevision !== revision) return;
+    if (!workerGate.accept(request)) return;
     workers = next;
     status.textContent = `Đã nối ${current.baseUrl}`;
     status.className = "conn ok";
   } catch (exc) {
-    if (sourceGeneration !== generation || workerRevision !== revision) return;
+    if (!workerGate.accept(request)) return;
     status.textContent = `Lỗi: ${(exc as Error).message}`;
     status.className = "conn bad";
   }
