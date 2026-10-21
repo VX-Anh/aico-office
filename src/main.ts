@@ -68,7 +68,8 @@ function focusTicket(id: string): void {
 }
 
 const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
-const panel = createNeedsColumn(document.querySelector<HTMLElement>("#needs")!, ticketSource(config), (items) => {
+const needsRoot = document.querySelector<HTMLElement>("#needs")!;
+const panel = createNeedsColumn(needsRoot, ticketSource(config), (items) => {
   needItems = items;
   workspace.classList.toggle("has-needs", items.length > 0);
   needsCount.classList.toggle("hot", items.length > 0);
@@ -80,20 +81,29 @@ const panel = createNeedsColumn(document.querySelector<HTMLElement>("#needs")!, 
 }, (error) => {
   ticketsError.hidden = !error;
   ticketsError.title = error ?? "";
+  ticketsError.setAttribute("aria-label", error ?? "");
 });
 
-function focusNext(): void {
-  const id = nextAttention(needItems.map((item) => item.ticket.id), focusedTicket);
-  if (id) focusTicket(id);
-}
-needsCount.addEventListener("click", focusNext);
+// Bộ đếm luôn tới ticket đầu; phím P đi tiếp từ thẻ đang chọn (kể cả thẻ người dùng tự bấm/Tab tới).
+needsCount.addEventListener("click", () => {
+  const first = needItems[0];
+  if (first) focusTicket(first.ticket.id);
+});
+needsRoot.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement) {
+    focusedTicket = target.closest<HTMLElement>("[data-ticket-id]")?.dataset.ticketId ?? focusedTicket;
+  }
+});
 document.addEventListener("keydown", (event) => {
   const target = event.target;
   const editable = target instanceof HTMLElement && (target.isContentEditable
-    || target.matches("input, textarea, select"));
-  if (isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) {
+    || !!target.closest("input, textarea, select"));
+  if (!isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) return;
+  const next = nextAttention(needItems.map((item) => item.ticket.id), focusedTicket);
+  if (next) {
     event.preventDefault();
-    focusNext();
+    focusTicket(next);
   }
 });
 
@@ -149,7 +159,8 @@ function row(label: string, value: string): HTMLElement {
 }
 
 function renderCards(now: number): void {
-  agentsCount.textContent = `Đang làm: ${workers.reduce((total, worker) => total + roomAgents(worker).agents.length, 0)} agent`;
+  const count = workers.filter((w) => w.state !== "offline").reduce((sum, w) => sum + roomAgents(w).agents.length, 0);
+  agentsCount.textContent = `Đang làm: ${count} agent`;
   cards.replaceChildren(
     ...workers.map((w) => {
       const card = el("article", `card state-${w.state}`);

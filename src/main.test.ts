@@ -126,15 +126,26 @@ describe("ghép activity giữ nguyên cột Cần bạn", () => {
     await source.list();
   });
 
-  it("phím P và bộ đếm lần lượt focus ticket; đổi nguồn xoá trạng thái cũ", async () => {
+  it("phím P đi tiếp từ thẻ đang chọn, bộ đếm luôn tới ticket đầu; đổi nguồn xoá trạng thái cũ", async () => {
     await import("./main");
     h.focus.mockReturnValue(true);
-    h.items([{ ticket: { id: "T-1" }, kind: "plan" }, { ticket: { id: "T-2" }, kind: "merge" }]);
+    h.items([{ ticket: { id: "T-1" }, kind: "plan" }, { ticket: { id: "T-2" }, kind: "merge" }, { ticket: { id: "T-3" }, kind: "escalated" }]);
     const preventDefault = vi.fn();
-    getNode("document").listeners.get("keydown")!({ key: "P", target: null, ctrlKey: false, metaKey: false, altKey: false, preventDefault });
+    const pressP = () => getNode("document").listeners.get("keydown")!({ key: "P", target: null, ctrlKey: false, metaKey: false, altKey: false, preventDefault });
+    pressP();
+    expect(h.focus).toHaveBeenLastCalledWith("T-1");
+    pressP();
+    expect(h.focus).toHaveBeenLastCalledWith("T-2");
+    // Người dùng tự bấm ô ghi chú của T-1 (focusin): P tiếp theo phải tới T-2, không phải T-3.
+    const note = Object.assign(new Node(), { closest: () => ({ dataset: { ticketId: "T-1" } }) });
+    getNode("#needs").listeners.get("focusin")!({ target: note });
+    pressP();
+    expect(h.focus).toHaveBeenLastCalledWith("T-2");
+    // Bộ đếm luôn tới ticket đầu, dù đang ở thẻ nào.
+    getNode("#needs-count").listeners.get("click")!({});
     expect(h.focus).toHaveBeenLastCalledWith("T-1");
     getNode("#needs-count").listeners.get("click")!({});
-    expect(h.focus).toHaveBeenLastCalledWith("T-2");
+    expect(h.focus).toHaveBeenLastCalledWith("T-1");
     const oldSource = h.source();
     getNode("#demo").listeners.get("click")!({});
     expect(h.reset).toHaveBeenCalledOnce();
