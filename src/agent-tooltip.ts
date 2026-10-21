@@ -1,5 +1,6 @@
 import { loadConfig, type WorkerAgent } from "./api";
 import { readAgentActivity } from "./activity";
+import { relativeTime } from "./time";
 import { roleStyle } from "./scene/palette";
 import "./agent-tooltip.css";
 
@@ -22,16 +23,17 @@ export function hitFigure<T extends TooltipFigure>(figures: readonly T[], x: num
   return hit;
 }
 
-function ago(at: string, now: number): string {
-  const seconds = Math.max(0, Math.floor((now - Date.parse(at)) / 1000));
-  if (seconds < 60) return `${seconds} giây trước`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} giờ trước`;
-  return `${Math.floor(seconds / 86400)} ngày trước`;
-}
-
 const TASK_LABEL = { pending: "Chờ", in_progress: "Đang làm", completed: "Đã xong" };
 const missing = "chưa có";
+
+// Chỉ dùng giờ do vòng vẽ truyền vào, không làm đổi thứ tự dữ liệu từ poll.
+export function recentLines(agent: unknown, key: string, nowMs: number): string[] {
+  const recent = readAgentActivity(agent, key).recent?.slice()
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
+  return recent?.length
+    ? recent.map((activity) => `${activity.icon} ${activity.text} · ${relativeTime(activity.at, nowMs)}`)
+    : [missing];
+}
 
 export function createAgentTooltip(canvas: HTMLCanvasElement): {
   update(figures: readonly TooltipFigure[], sceneW: number, now: number): void;
@@ -44,7 +46,7 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
 
   let figures: readonly TooltipFigure[] = [];
   let sceneW = 0;
-  let now = 0;
+  let now = NaN;
   let selected: TooltipFigure | null = null;
   let renderedAt = -Infinity;
   let pointerX = 0;
@@ -82,9 +84,7 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
     line(`Ticket: ${text(figure.agent.ticket_id)}`, "agent-tooltip-title");
     line(`Vai trò: ${figure.agent.role ? roleStyle(figure.agent.role).label : missing}`);
     line("Hoạt động gần nhất", "agent-tooltip-heading");
-    const recent = data.recent?.slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
-    if (!recent?.length) line(missing);
-    else for (const activity of recent) line(`${activity.icon} ${activity.text} · ${ago(activity.at, now)}`);
+    for (const activity of recentLines(figure.agent, figure.key, now)) line(activity);
     line("Task", "agent-tooltip-heading");
     if (!data.tasks?.length) line(missing);
     else for (const task of data.tasks) line(`${TASK_LABEL[task.status]}: ${task.title}`);
@@ -114,7 +114,7 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
     selected = figure;
     source = currentSource();
     tooltip.hidden = false;
-    if (changed || now - renderedAt >= 1000 || now < renderedAt) render(figure);
+    if (changed || !Number.isFinite(renderedAt) || now - renderedAt >= 1000 || now < renderedAt) render(figure);
     position();
   };
   canvas.addEventListener("pointermove", (event) => {
@@ -143,7 +143,7 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
         return;
       }
       selected = figure;
-      if (now - renderedAt >= 1000 || now < renderedAt) render(figure);
+      if (!Number.isFinite(renderedAt) || now - renderedAt >= 1000 || now < renderedAt) render(figure);
       position();
     },
   };
