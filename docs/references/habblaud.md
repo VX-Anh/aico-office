@@ -123,6 +123,82 @@ có test, i18n và changelog.
   `T` terminal, `P` yêu cầu kế tiếp, `O` tổng quan, `[` `]` bật tắt panel.
 - **Mobile:** thanh bên thành ngăn kéo, ngăn chi tiết thành sheet từ dưới lên.
 
+## 6b. Giao diện đo từ bản demo (21/10/2026)
+
+Chạy thử v1.0.3 trên PC ở chế độ demo (`?mock=1`, dữ liệu giả; tắt World, kiểm tra bản mới, Codex và
+timelapse). Tháng 10 nên chủ đề Halloween (bí ngô) tự bật. Ảnh chụp lưu trong `habblaud-ui/`.
+
+| Tổng quan | Chọn một agent | Điện thoại |
+| --- | --- | --- |
+| ![Tổng quan](habblaud-ui/overview.png) | ![Ngăn chi tiết agent](habblaud-ui/agent.png) | ![Điện thoại](habblaud-ui/mobile.png) |
+
+**Vì sao trông đẹp: những quyết định cụ thể**
+
+1. **Canvas chiếm toàn màn hình, UI là panel kính nổi trên cảnh** (không chia cột cứng). Panel dùng nền tối bán
+   trong suốt, `backdrop-filter: blur(14px) saturate(1.25)`, viền mảnh rất nhạt, bóng đổ mềm lớn. Cảnh phía sau vẫn
+   nhìn thấy qua panel nên cả trang liền một khối. Vùng trống (mục 6) giúp camera không đặt thứ quan trọng dưới panel.
+2. **Bố cục cố định 4 vùng:**
+   - thanh trên cao 64px;
+   - thanh bên trái rộng 304px (danh sách phòng và agent);
+   - ngăn chi tiết bên phải rộng 380px (chỉ mở khi chọn);
+   - feed hoạt động dưới đáy, cao 200px, thu gọn còn 38px.
+
+   Toast xếp chồng ở góc dưới phải vùng trống, mỗi toast có nút "Reply".
+3. **Thanh trên gồm các "ô số" gọn:**
+   - bộ đếm số to, nhãn nhỏ bên dưới (agents, working, shells, need you);
+   - thẻ hạn mức theo từng tài khoản: ô chữ cái màu (C/D/X), hai dòng 5h/Wk, thanh pixel, % và giờ reset;
+   - nút icon bên phải (khung hình, zoom, thống kê, timelapse, cài đặt, trợ giúp).
+4. **Hai font, dùng có chủ đích:** `Pixelify Sans` (font pixel) cho logo và tiêu đề panel ("Office", "Activity",
+   "Agent"); font hệ thống cho mọi chữ đọc nhiều. Monospace cho giờ và lệnh.
+5. **Màu theo trạng thái, nhất quán khắp nơi:**
+   - working `#4fd18b`
+   - waiting (cần bạn) `#ffb547`
+   - shell `#3cd8d2`
+   - idle `#8b98b3`
+   - done `#6aa8ff`
+   - offline `#6b7280`
+
+   Mức hạn mức: ok `#4fd18b`, warn `#ffb547`, crit `#ff6b6b`. Màu nhấn `#7cc8ff`.
+
+   Cùng một màu xuất hiện ở chấm trạng thái trong danh sách, viền trái của toast (`inset 3px 0 0`), chip trên thanh
+   trên và bóng nhấn trong cảnh.
+6. **Nền và chữ:**
+   - nền panel `rgba(18,21,29,.85)`, nền đặc `rgba(20,24,33,.97)`;
+   - chữ `#e8ecf5`, chữ phụ `#9aa4b8`;
+   - đường kẻ `rgba(160,176,210,.13)`;
+   - bo góc 10px (nhỏ 7px), khoảng cách 10px;
+   - easing `cubic-bezier(.22,.8,.24,1)` cho mọi chuyển động.
+7. **Cảnh có chiều sâu:**
+   - **Toà nhà:** đặt giữa bãi cỏ có cây, đèn đường, đường nhựa và xe chạy. Phòng có biển tên nổi phía trên ("app-mobile •••
+     3"), sàn và tường mỗi phòng một bảng màu.
+   - **Ánh sáng:** đèn bàn và đèn đường toả quầng sáng.
+   - **Nhân vật:** có bảng tên nhỏ kèm chip tài khoản. Bong bóng trắng bo tròn có icon, đặt trên đầu.
+   - **Sự kiện:** banner nổi, ví dụ "PR #77 opened!" màu vàng, "CI failed" màu đỏ.
+8. **Danh sách bên trái:**
+   - mỗi phòng là một khối: tên, đường dẫn, chip tài khoản, thanh tiến độ task "0/10";
+   - mỗi agent là một dòng: avatar pixel lớn, tên, vai trò bên phải ("Main"/"Explore"), câu đang làm và chấm trạng thái;
+   - subagent thụt vào dưới agent cha.
+9. **Ngăn chi tiết agent:**
+   - đầu ngăn: avatar to, tên, tài khoản, phòng;
+   - dòng trạng thái kèm nút Follow/Center;
+   - các khối "Now", "Running shells", "Social", "Tasks", "Subagents", mỗi khối có tiêu đề font pixel;
+   - ô "Send message" ở đáy.
+10. **Điện thoại:** thanh bên thành ngăn kéo; thanh trên chỉ giữ chip quan trọng (shell, cần bạn, hạn mức); toast
+    chiếm bề ngang; feed thu thành một dòng ở đáy.
+
+**So với aico-office hiện tại và việc nên làm (theo thứ tự)**
+
+| Habblaud | aico-office hiện tại | Nên làm |
+| --- | --- | --- |
+| Canvas toàn màn hình, panel kính nổi | Canvas giữa trang, thẻ phòng nằm dưới | Chuyển sang canvas toàn màn hình + panel kính và vùng trống |
+| Bộ token màu/bo góc/font thống nhất | Màu rải rác trong CSS | Tạo `src/ui/tokens.css` theo bảng trên, mọi panel dùng chung |
+| Thanh bên: phòng → agent → subagent | Thẻ phòng cố định 3 cột | Thanh bên trái: phòng (provider) → agent con, có ticket và việc đang làm |
+| Ngăn chi tiết khi chọn agent | Tooltip khi rê chuột | Ngăn phải với Now / recent / tasks / stats; tooltip giữ cho xem nhanh |
+| Feed hoạt động dưới đáy | Chưa có | Feed từ `recent` của các agent và event ticket |
+| Toast có viền màu theo mức, nút hành động | Toast đơn giản | Theo kiểu viền trái 3px, nút "Xử lý" |
+| Font pixel cho tiêu đề | Font pixel 3x5 tự vẽ trên canvas | Dùng Pixelify Sans (OFL, có trong npm `@fontsource/pixelify-sans`) cho tiêu đề panel |
+| Cảnh ngoài trời, ánh sáng, banner sự kiện | Ba phòng + sảnh | Để sau: cỏ, đèn, banner MR mở/merge |
+
 ## 7. Bảo mật (mô hình đáng tham khảo)
 
 - Mặc định chỉ bind `127.0.0.1`. Từ chối Host không phải localhost/IP (chống DNS rebinding), từ chối POST khác
