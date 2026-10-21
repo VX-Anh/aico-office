@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-8ea8f203). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-d5db63da). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
@@ -8,6 +8,7 @@ flowchart TD
   subgraph Data
     API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /escalation + /decisions qua needAction;<br/>dữ liệu demo; current @deprecated giữ cho aico cũ"]
     USG["src/usage.ts<br/>parseUsage, usageWindows, usageLevel,<br/>shortCountdown, isStale (thuần)"]
+    TIME["src/time.ts (mới)<br/>relativeTime(atIso, nowMs): N giây/phút/giờ/ngày trước,<br/>tương lai → vừa xong, hỏng → chưa rõ (thuần)"]
     TK["src/tickets.ts<br/>parseTickets, needKind, needsYou, createReasonCache,<br/>latestEscalationReason, mergeRequest, previewLink,<br/>actionsFor, commentRequired, irreversible,<br/>needsConfirmation(kind, action): merge/approved cần xác nhận,<br/>build*Request, actionError, waitedLabel,<br/>demoNeedTickets, applyDemoAction(list,id,kind,action) (thuần)"]
     ACTV["src/activity.ts<br/>readAgentActivity, screenFor, bubbleFor,<br/>taskProgress, resolveBubbles, withDemoActivity (thuần)"]
     LATEST["src/latest.ts<br/>createLatestGate: bỏ kết quả poll cũ (thuần)"]
@@ -15,12 +16,13 @@ flowchart TD
   end
   API --> TK
   ACTV -->|isIso| USG
-  MAIN["src/main.ts<br/>vòng lặp animation, polling worker + ticket,<br/>nguồn ticket thật/demo (NeedSource), bộ đếm, phím P, toast"]
+  MAIN["src/main.ts<br/>vòng lặp animation (now = Date.now()), polling worker + ticket,<br/>nguồn ticket thật/demo (NeedSource), bộ đếm, phím P, toast,<br/>thẻ phòng: Lần cuối qua relativeTime"]
   API --> MAIN
   USG --> MAIN
   ACTV --> MAIN
   ATT --> MAIN
   LATEST --> MAIN
+  MAIN -->|fmtAgo| TIME
   MAIN -->|refresh mỗi POLL_MS, setSource, focus, tick| COL["src/needs-column.ts (+ .css)<br/>cột Cần bạn: thẻ plan/merge/escalated, ghi chú,<br/>xác nhận trong thẻ theo needsConfirmation<br/>(Duyệt merge: 'Merge PR vào main'), khoá nút khi gửi"]
   COL --> TK
   COL --> LATEST
@@ -29,11 +31,12 @@ flowchart TD
   MAIN -->|ticket mới cần người| TOAST["src/toasts.ts (+ .css)<br/>toast + nút Xử lý → focus thẻ"]
   MAIN -->|drawScene → SceneFigure[], sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh, màn hình bàn theo screenFor,<br/>trả SceneFigure[]"]
   IDX -->|screenFor, readAgentActivity| ACTV
-  MAIN -->|figures mỗi frame| OVL["src/overlay.ts<br/>bong bóng hoạt động, tiến độ task"]
+  MAIN -->|figures mỗi frame, now epoch| OVL["src/overlay.ts<br/>bong bóng hoạt động, tiến độ task"]
   OVL --> ACTV
   OVL -->|BUBBLE| PAL
-  MAIN -->|figures mỗi frame| TIP["src/agent-tooltip.ts (+ .css)<br/>hitFigure (thuần), tooltip DOM"]
+  MAIN -->|figures mỗi frame, now epoch| TIP["src/agent-tooltip.ts (+ .css)<br/>hitFigure, recentLines (thuần), tooltip DOM<br/>render lại mỗi giây khi mở"]
   TIP --> ACTV
+  TIP -->|relativeTime| TIME
 
   IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi, usageBoard (thuần)"]
   IDX -->|parseUsage| USG
@@ -66,14 +69,18 @@ flowchart TD
   PIX --> CANVAS[["canvas #office"]]
 
   subgraph Tests["npm test (vitest, môi trường node) — cổng cùng npm run build"]
+    T_TIME["time.test.ts (mới)<br/>giây/phút/giờ/ngày, tương lai, at hỏng, now NaN/0"]
+    T_TIP["agent-tooltip.test.ts<br/>hitFigure, recentLines dữ liệu ticket + demo,<br/>DOM giả: tự cập nhật mỗi giây, thêm/mất/xuất hiện lại,<br/>offline, at tương lai, đồng hồ lùi, đổi nguồn"]
     T_TK["tickets.test.ts<br/>bảng kind x action → needsConfirmation,<br/>nút, request, lỗi, demo, dữ liệu đổi giữa chừng"]
-    T_COL["needs-column.test.ts (mới, DOM giả)<br/>Duyệt merge chờ xác nhận; mất/xuất hiện lại,<br/>đổi số lượng, đổi loại, offline, đổi nguồn"]
-    T_MAIN["main.test.ts<br/>ghép nối Cần bạn, nguồn demo/thật, lỗi tải"]
+    T_COL["needs-column.test.ts (DOM giả)<br/>Duyệt merge chờ xác nhận; mất/xuất hiện lại,<br/>đổi số lượng, đổi loại, offline, đổi nguồn"]
+    T_MAIN["main.test.ts<br/>ghép nối Cần bạn, nguồn demo/thật, lỗi tải,<br/>tooltip nhận now epoch, Lần cuối tương lai"]
     T_LATEST["latest.test.ts / attention.test.ts"]
     T_ACT["actors.test.ts / pathing.test.ts / layout.test.ts"]
     T_PB["pixelbolt.test.ts / characters.test.ts"]
-    T_OTHER["usage.test.ts / activity.test.ts / agent-tooltip.test.ts / font.test.ts"]
+    T_OTHER["usage.test.ts / activity.test.ts / font.test.ts"]
   end
+  T_TIME -.-> TIME
+  T_TIP -.-> TIP
   T_TK -.-> TK
   T_COL -.-> COL
   T_MAIN -.-> MAIN
