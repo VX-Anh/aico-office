@@ -29,6 +29,7 @@ export interface AgentStats {
   tool_calls: number | null;
   tokens_in: number | null;
   tokens_out: number | null;
+  tokens_cached: number | null;
 }
 
 export interface AgentActivity {
@@ -179,7 +180,7 @@ function readStats(raw: unknown, who: string): AgentStats | null {
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return reject(who, `stats.${key} phải là số hữu hạn không âm`);
     return v;
   };
-  return { tool_calls: num("tool_calls"), tokens_in: num("tokens_in"), tokens_out: num("tokens_out") };
+  return { tool_calls: num("tool_calls"), tokens_in: num("tokens_in"), tokens_out: num("tokens_out"), tokens_cached: num("tokens_cached") };
 }
 
 function whoOf(agent: Record<string, unknown>, who: string | undefined): string {
@@ -204,6 +205,12 @@ export function readAgentActivity(agent: unknown, who?: string): AgentActivity {
     tasksDone: readTasksDone(agent.tasks_done, tasks ? tasks.length : null, w),
     stats: readStats(agent.stats, w),
   };
+}
+
+// Đầu vào đã gồm cache; số liệu cập nhật lệch nhau có thể tạm cho cache lớn hơn tổng.
+export function cacheRatio(stats: AgentStats | null | undefined): number | null {
+  if (!stats || stats.tokens_in === null || stats.tokens_in <= 0 || stats.tokens_cached === null) return null;
+  return Math.min(1, Math.max(0, stats.tokens_cached / stats.tokens_in));
 }
 
 export function screenFor(kind: ActivityKind | null | undefined): ScreenMode {
@@ -344,9 +351,12 @@ export function withDemoActivity<T>(workers: T[], now: number): T[] {
         title: `Việc ${n + 1}: ${DEMO_SEQ[(n * 3 + offset) % DEMO_SEQ.length].text}`,
         status: n < done ? "completed" : n === done ? "in_progress" : "pending",
       }));
-      const stats: AgentStats = {
+      const tokensIn = 8_000 + Math.floor(elapsed / 1000) * 2_400;
+      // Cursor mô phỏng worker cũ: thiếu hẳn khóa cache, không chỉ trả null.
+      const stats = {
         tool_calls: step * 2 + 1,
-        tokens_in: 8_000 + Math.floor(elapsed / 1000) * 2_400,
+        tokens_in: tokensIn,
+        ...(i === 2 && k === 0 ? {} : { tokens_cached: Math.floor(tokensIn * (70 + ((i + k) % 6) * 5) / 100) }),
         tokens_out: 600 + Math.floor(elapsed / 1000) * 180,
       };
       return { ...a, activity, recent, tasks, tasks_done: done, stats };

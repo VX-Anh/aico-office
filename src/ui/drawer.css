@@ -16,6 +16,9 @@
 .drawer a { margin-left: 10px; color: var(--accent); }
 .drawer-recent, .drawer-task { margin: 8px 0; }
 .drawer-error { color: var(--lvl-crit); }
+.drawer-cache.ok { color: var(--lvl-ok); }
+.drawer-cache.warn { color: var(--lvl-warn); }
+.drawer-cache.crit { color: var(--lvl-crit); }
 .drawer-task.completed { color: var(--st-done); }
 .drawer progress { width: 100%; height: 7px; accent-color: var(--accent); }
 .drawer-needs #needs { position: static; width: auto; max-height: none; padding: 0; border: 0; box-shadow: none; background: transparent; }
