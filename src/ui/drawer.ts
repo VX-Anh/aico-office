@@ -3,6 +3,7 @@ import type { NeedItem } from "../needs-column";
 import { roleStyle } from "../scene/palette";
 import { mergeRequest, previewLink } from "../tickets";
 import { relativeTime } from "../time";
+import { tokenStatsLines } from "./format";
 import type { DrawerView, SelectedAgent } from "./selection";
 import "./drawer.css";
 
@@ -136,8 +137,14 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
           line(tasks, `${labels[task.status]} · ${task.title}`, `drawer-task ${task.status}`);
         }
         const stats = section("Số liệu");
-        for (const [label, value] of [["Lần gọi tool", data.stats?.tool_calls], ["Token vào", data.stats?.tokens_in], ["Token ra", data.stats?.tokens_out]] as const) {
-          line(stats, `${label}: ${value == null ? "chưa có" : value.toLocaleString("vi-VN")}`);
+        for (const item of tokenStatsLines(data.stats)) {
+          const row = line(stats, item.text);
+          if (item.cacheSuffix !== null) {
+            const suffix = document.createElement("span");
+            suffix.className = item.level ? `drawer-cache ${item.level}` : "drawer-cache";
+            suffix.textContent = item.cacheSuffix;
+            row.append(suffix);
+          }
         }
       }
       if (changed) layout();
