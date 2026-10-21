@@ -1,16 +1,17 @@
 # T-96adf6f9: GUI: bong bóng hoạt động trên nhân vật, màn hình bàn theo việc, tiến độ task (dữ liệu activity của /workers)
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | src/activity.ts: đọc phòng thủ activity/recent/tasks/stats, screenFor, bubbleFor, taskProgress, resolveBubbles, dữ liệu demo + test | coder | `src/activity.ts`, `src/activity.test.ts`, `src/usage.ts` | - | xong (claude) |
-| W2 | Màn hình trên bàn theo việc: code/terminal/browser/search/read có hoạt ảnh, màu SCREEN và BUBBLE trong palette | coder | `src/scene/furniture.ts`, `src/scene/palette.ts` | - | xong (codex) |
-| W3 | src/overlay.ts: canvas chữ phủ trên cảnh, vẽ bong bóng hoạt động và thanh tiến độ task | coder | `src/overlay.ts` | W1, W2 | xong (codex) |
-| W4 | src/agent-tooltip.ts: tooltip DOM khi rê chuột hoặc chạm nhân vật (ticket, vai trò, 5 hoạt động, task, stats) | coder | `src/agent-tooltip.ts`, `src/agent-tooltip.css`, `src/agent-tooltip.test.ts` | W1 | xong (codex) |
-| W5 | Ghép nối: drawScene trả SceneFigure[] và chọn màn hình theo screenFor; main.ts gắn overlay, tooltip, demo activity; README | coder | `src/scene/index.ts`, `src/main.ts`, `README.md` | W1, W2, W3, W4 | xong (codex) |
+| W1 | src/activity.ts: đọc phòng thủ activity/recent/tasks/stats, screenFor, bubbleFor, taskProgress, resolveBubbles, dữ liệu demo + test | coder | `src/activity.ts`, `src/activity.test.ts`, `src/usage.ts` | - | chưa chạy |
+| W2 | Màn hình trên bàn theo việc: code/terminal/browser/search/read có hoạt ảnh, màu SCREEN và BUBBLE trong palette | coder | `src/scene/furniture.ts`, `src/scene/palette.ts` | - | chưa chạy |
+| W3 | src/overlay.ts: canvas chữ phủ trên cảnh, vẽ bong bóng hoạt động và thanh tiến độ task | coder | `src/overlay.ts` | W1, W2 | chưa chạy |
+| W4 | src/agent-tooltip.ts: tooltip DOM khi rê chuột hoặc chạm nhân vật (ticket, vai trò, 5 hoạt động, task, stats) | coder | `src/agent-tooltip.ts`, `src/agent-tooltip.css`, `src/agent-tooltip.test.ts` | W1 | chưa chạy |
+| W5 | Ghép nối: drawScene trả SceneFigure[] và chọn màn hình theo screenFor; main.ts gắn overlay, tooltip, demo activity; README | coder | `src/scene/index.ts`, `src/main.ts`, `README.md` | W1, W2, W3, W4 | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
