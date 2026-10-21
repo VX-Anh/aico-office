@@ -70,6 +70,7 @@ src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, s
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
 src/needs-column.ts        cột Cần bạn: duyệt kế hoạch/merge, escalated, ghi chú và xác nhận
+src/needs-column.test.ts   test DOM giả: xác nhận, poll, lỗi và đổi nguồn
 src/needs-column.css       kiểu hiển thị cột Cần bạn
 src/attention.ts           bộ đếm tiêu đề tab, phím P và trạng thái toast (thuần)
 src/attention.test.ts      test tiêu đề, phím tắt và vòng đời toast
