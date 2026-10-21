@@ -219,3 +219,37 @@ describe("banner từ hai lần poll", () => {
     expect(events.observe(run(Number.NaN, [ticket("T-1", "done")]))).toEqual([]);
   });
 });
+
+// Hai lỗi Reviewer tìm ra ở vòng 3 của T-6834e79b (test chép nguyên từ review).
+describe("review T-6834e79b", () => {
+  it.each([false, true])("không phát lại khi ref đổi: %s", (reverse) => {
+    const events = createRoomEvents();
+    const urlOnly: TicketArtifact = {
+      kind: "merge_request", ref: null, url: "https://example.com/mr/1",
+    };
+    const withRef = { ...urlOnly, ref: "!1" };
+    events.observe(run(0, [ticket("T-1", "in_progress")]));
+    events.observe(run(1, [
+      ticket("T-1", "in_progress", [reverse ? withRef : urlOnly]),
+    ]));
+    events.tick(10_001);
+    expect(events.observe(run(10_002, [
+      ticket("T-1", "in_progress", [reverse ? urlOnly : withRef]),
+    ]))).toEqual([]);
+  });
+
+  it.each(["done", "escalated", "mr"])(
+    "snapshot lớn vẫn phát %s cho ticket có phòng", (kind) => {
+      const events = createRoomEvents();
+      const initial = Array.from({ length: 513 }, (_, i) =>
+        ticket(`T-${i}`, "in_progress"));
+      const assignments = [{ ticketId: "T-512", provider: "claude" }];
+      events.observe(run(0, initial, assignments));
+      const next = initial.map((item) => item.id !== "T-512" ? item :
+        ticket(item.id, kind === "mr" ? "in_progress" : kind,
+          kind === "mr" ? [mr("!1")] : []));
+      expect(events.observe(run(1, next, assignments)))
+        .toMatchObject([{ ticket: "T-512", provider: "claude", kind }]);
+    },
+  );
+});

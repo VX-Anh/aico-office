@@ -45,7 +45,10 @@ export function bannerText(kind: BannerKind, ticket: string): string {
 
 interface Memory {
   status: string;
+  /** Mọi định danh MR đã thấy (ref: và url:); một MR có thể có cả hai. */
   named: Set<string>;
+  /** Định danh của từng MR trong snapshot này (để biết MR nào mới). */
+  mrs: string[][];
   anon: number;
   saturated: boolean;
 }
@@ -57,38 +60,42 @@ interface Pending {
   kind: BannerKind;
 }
 
-function artifactKey(artifact: TicketArtifact): string | null {
+// Mọi định danh của một MR: aico có thể bổ sung hoặc bỏ ref/url giữa hai lần poll, nên một MR
+// được nhận ra qua bất kỳ định danh nào đã thấy (không chỉ định danh ưu tiên). [] = MR không tên.
+function artifactKeys(artifact: TicketArtifact): string[] | null {
   if (artifact.kind !== "merge_request") return null;
   const ref = typeof artifact.ref === "string" ? artifact.ref.trim() : "";
   const url = typeof artifact.url === "string" ? artifact.url.trim() : "";
-  if (ref) return `ref:${ref}`;
-  if (url) return `url:${url}`;
-  return "";
+  return [...(ref ? [`ref:${ref}`] : []), ...(url ? [`url:${url}`] : [])];
 }
 
 function capture(ticket: Ticket): Memory | null {
   if (!ticket || typeof ticket.id !== "string" || !ticket.id || typeof ticket.status !== "string") return null;
   const named = new Set<string>();
+  const mrs: string[][] = [];
   let anon = 0;
   const artifacts = Array.isArray(ticket.artifacts) ? ticket.artifacts : [];
   for (const artifact of artifacts) {
     if (!artifact || typeof artifact !== "object") continue;
-    const key = artifactKey(artifact);
-    if (key === null) continue;
-    if (key && named.size < MAX_MRS) named.add(key);
-    else if (!key) anon = Math.min(MAX_MRS, anon + 1);
+    const keys = artifactKeys(artifact);
+    if (keys === null) continue;
+    if (keys.length && mrs.length < MAX_MRS) {
+      mrs.push(keys);
+      for (const key of keys) named.add(key);
+    } else if (!keys.length) anon = Math.min(MAX_MRS, anon + 1);
   }
-  return { status: ticket.status, named, anon, saturated: named.size >= MAX_MRS || anon >= MAX_MRS };
+  return { status: ticket.status, named, mrs, anon, saturated: mrs.length >= MAX_MRS || anon >= MAX_MRS };
 }
 
 function mergeMemory(prev: Memory, next: Memory): Memory {
   const named = new Set(prev.named);
+  // Mỗi MR tối đa 2 định danh (ref, url): trần gấp đôi số MR.
   for (const id of next.named) {
-    if (named.size < MAX_MRS) named.add(id);
+    if (named.size < MAX_MRS * 2) named.add(id);
   }
   return {
-    status: next.status, named, anon: Math.max(prev.anon, next.anon),
-    saturated: prev.saturated || next.saturated || named.size >= MAX_MRS,
+    status: next.status, named, mrs: next.mrs, anon: Math.max(prev.anon, next.anon),
+    saturated: prev.saturated || next.saturated || named.size >= MAX_MRS * 2,
   };
 }
 
@@ -100,12 +107,25 @@ export function createRoomEvents() {
   function touch(ticketId: string): void {
     recent.delete(ticketId);
     recent.set(ticketId, true);
-    while (recent.size > MAX_TICKETS) {
-      const oldest = recent.keys().next().value;
-      if (oldest === undefined) break;
-      recent.delete(oldest);
-      memories.delete(oldest);
-      providers.delete(oldest);
+  }
+  // Giới hạn bộ nhớ sau mỗi lượt (không loại giữa lượt, kẻo ticket sau mất lịch sử để so sánh);
+  // loại ticket cũ nhất không gắn phòng trước, vì chỉ ticket có phòng mới sinh banner.
+  function trim(): void {
+    const excess = recent.size - MAX_TICKETS;
+    if (excess <= 0) return;
+    const victims: string[] = [];
+    for (const id of recent.keys()) {
+      if (victims.length >= excess) break;
+      if (!providers.has(id)) victims.push(id);
+    }
+    for (const id of recent.keys()) {
+      if (victims.length >= excess) break;
+      if (!victims.includes(id)) victims.push(id);
+    }
+    for (const id of victims) {
+      recent.delete(id);
+      memories.delete(id);
+      providers.delete(id);
     }
   }
   const seen = new Set<string>();
@@ -197,8 +217,10 @@ export function createRoomEvents() {
   function emit(ticket: Ticket, prev: Memory, next: Memory, now: number): void {
     const rooms = providers.get(ticket.id);
     if (!rooms || rooms.size === 0) return;
-    for (const id of next.named) {
-      if (prev.saturated || prev.named.has(id)) continue;
+    for (const keys of next.mrs) {
+      // MR đã thấy dưới bất kỳ định danh nào thì không phải MR mới.
+      if (prev.saturated || keys.some((key) => prev.named.has(key))) continue;
+      const id = keys[0];
       for (const provider of rooms) {
         accept({ key: `${provider}|${ticket.id}|mr|${id}`, provider, ticket: ticket.id, kind: "mr" }, now);
       }
@@ -224,7 +246,10 @@ export function createRoomEvents() {
 
   return {
     tick,
-    rememberAssignments: rememberProviders,
+    rememberAssignments(assignments: readonly TicketAssignment[]): void {
+      rememberProviders(assignments);
+      trim();
+    },
     reset(): void {
       primed = false;
       memories.clear();
@@ -252,6 +277,7 @@ export function createRoomEvents() {
           }
         }
         primed = true;
+        trim();
         return tick(now);
       }
       for (const ticket of byId.values()) {
@@ -262,6 +288,7 @@ export function createRoomEvents() {
         if (prev) emit(ticket, prev, next, now);
         memories.set(ticket.id, prev ? mergeMemory(prev, next) : next);
       }
+      trim();
       return tick(now);
     },
   };

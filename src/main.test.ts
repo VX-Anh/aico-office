@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   fetchWorkers: vi.fn(async (): Promise<import("./api").WorkerStatus[]> => []),
   tooltipUpdate: vi.fn(),
   onSnapshot: undefined as ((tickets: unknown[]) => void) | undefined,
-  drawScene: vi.fn(() => [] as Record<string, unknown>[]),
+  drawScene: vi.fn((_ctx: unknown, _workers: WorkerStatus[]) => [] as Record<string, unknown>[]),
   topbarUpdate: vi.fn(),
   sidebarUpdate: vi.fn(),
   sidebarToggle: vi.fn(),
@@ -27,6 +27,8 @@ vi.mock("./api", async (original) => ({
   ...await original<typeof import("./api")>(), loadConfig: () => h.config,
   demoWorkers: () => [], saveConfig: vi.fn(), fetchWorkers: h.fetchWorkers, fetchTickets: h.fetchTickets,
   fetchTicketSnapshot: h.fetchTickets, needAction: h.needAction,
+  // Không gọi mạng thật cho ticket escalated: trên Windows tra tên "aico" chậm làm test hết giờ.
+  fetchEscalationReason: async () => "lý do escalate (test)",
 }));
 vi.mock("./needs-column", async (original) => {
   const actual = await original<typeof import("./needs-column")>();
@@ -415,13 +417,15 @@ describe("chọn agent, feed và lỗi poll", () => {
   it.each(cases)("agent đang chọn %s thì đóng, xuất hiện lại không tự mở và không lặp feed", async (label, mutate) => {
     expect(label.length).toBeGreaterThan(0);
     h.config = { baseUrl: "http://aico", token: "test" };
-    const base = room();
+    const selected = { ...agent, stats: { tokens_in: 100, tokens_cached: 80, tokens_out: 10 } };
+    const base = room("working", [selected]);
     h.fetchWorkers.mockResolvedValue([base]);
     await import("./main");
     await connected();
     h.onSelect!(agentKey("claude", agent));
     expect(drawerOf()).toEqual({ open: true, tab: "agent" });
     expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(1);
+    expect(h.drawerRender.mock.calls.at(-1)?.[1].agent.stats).toEqual(selected.stats);
     const calls = h.sidebarUpdate.mock.calls.length;
     h.fetchWorkers.mockResolvedValue([mutate(base)]);
     pollTick();
@@ -434,7 +438,74 @@ describe("chọn agent, feed và lỗi poll", () => {
     await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(again));
     expect(drawerOf().open).toBe(false);
     expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBeNull();
+    expect(h.drawerRender.mock.calls.at(-1)?.[1]).toBeNull();
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[0][0].agents[0].stats).toEqual(selected.stats);
     expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(1);
+  });
+
+  it("poll đổi stats và số agent 1→2→1 không trộn dữ liệu tới drawer và tooltip", async () => {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    const snapshots = [
+      [{ ...agent, stats: { tokens_in: 1_120_000, tokens_cached: 1_033_000, tokens_out: 100 } }],
+      [{ ...agent, stats: { tokens_in: 200, tokens_cached: 80, tokens_out: 20 } },
+        { ...agent, id: "b", stats: { tokens_in: 900, tokens_cached: 800, tokens_out: 90 } }],
+      [{ ...agent, stats: { tokens_in: 0, tokens_out: 0 } }],
+      [{ ...agent, stats: { tokens_in: 100, tokens_cached: 95, tokens_out: 10 } }],
+    ];
+    h.fetchWorkers.mockResolvedValue([room("working", snapshots[0])]);
+    await import("./main");
+    await connected();
+    h.onSelect!(agentKey("claude", agent));
+    // Cảnh giả chỉ tạo hình từ snapshot main truyền vào, không tự giữ stats.
+    h.drawScene.mockImplementation((_ctx, workers: WorkerStatus[]) => workers.flatMap((worker) =>
+      (worker.agents ?? []).map((current) => ({
+        key: agentKey(worker.name, current), agent: current, room: worker.name,
+        working: true, seated: true, x: 30, headY: 10, footY: 40,
+      }))));
+    const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
+    for (const agents of snapshots) {
+      const calls = h.sidebarUpdate.mock.calls.length;
+      h.fetchWorkers.mockResolvedValue([room("working", agents)]);
+      pollTick();
+      await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(calls));
+      expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+      expect(h.drawerRender.mock.calls.at(-1)?.[1]).toMatchObject({ agent: agents[0] });
+      expect(h.drawerRender.mock.calls.at(-1)?.[1].agent.stats).toEqual(agents[0].stats);
+      expect(tileValue("#agents-count")).toBe(String(agents.length));
+      frame(0);
+      const figures = h.tooltipUpdate.mock.calls.at(-1)?.[0];
+      expect(figures.map((figure: { agent: unknown }) => figure.agent)).toEqual(agents);
+    }
+  });
+
+  it("poll lỗi giữ stats cuối, hồi phục nhận stats mới; nguồn cũ trả muộn không khôi phục lựa chọn", async () => {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    const first = { ...agent, stats: { tokens_in: 100, tokens_cached: 90, tokens_out: 10 } };
+    const next = { ...agent, stats: { tokens_in: 200, tokens_cached: 20, tokens_out: 30 } };
+    h.fetchWorkers.mockResolvedValue([room("working", [first])]);
+    await import("./main");
+    await connected();
+    h.onSelect!(agentKey("claude", agent));
+    h.fetchWorkers.mockRejectedValueOnce(new Error("mất mạng"));
+    pollTick();
+    await vi.waitFor(() => expect(getNode("#conn").textContent).toContain("Lỗi: mất mạng"));
+    expect(h.drawerRender.mock.calls.at(-1)?.[1].agent.stats).toEqual(first.stats);
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    h.fetchWorkers.mockResolvedValue([room("working", [next])]);
+    pollTick();
+    await connected();
+    await vi.waitFor(() => expect(h.drawerRender.mock.calls.at(-1)?.[1].agent.stats).toEqual(next.stats));
+    let resolveOld!: (workers: WorkerStatus[]) => void;
+    h.fetchWorkers.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+    pollTick();
+    getNode("#demo").listeners.get("click")!({});
+    resolveOld([room("working", [first])]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(drawerOf().open).toBe(false);
+    expect(h.drawerRender.mock.calls.at(-1)?.[1]).toBeNull();
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[0]).toEqual([]);
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBeNull();
+    expect(getNode("#conn").textContent).toContain("demo");
   });
 
   it("needs 1→0 đóng ngăn; đang chọn agent thì về tab agent; 0→1 sau Esc thì mở lại", async () => {

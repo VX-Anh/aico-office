@@ -1,6 +1,7 @@
 import { loadConfig, type WorkerAgent } from "./api";
 import { readAgentActivity } from "./activity";
 import { relativeTime } from "./time";
+import { tokenStatsLines } from "./ui/format";
 import { roleStyle } from "./scene/palette";
 import "./agent-tooltip.css";
 
@@ -79,6 +80,7 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
       row.className = className;
       row.textContent = text;
       tooltip.append(row);
+      return row;
     };
     const text = (value: unknown) => typeof value === "string" && value ? value : missing;
     line(`Ticket: ${text(figure.agent.ticket_id)}`, "agent-tooltip-title");
@@ -88,11 +90,16 @@ export function createAgentTooltip(canvas: HTMLCanvasElement): {
     line("Task", "agent-tooltip-heading");
     if (!data.tasks?.length) line(missing);
     else for (const task of data.tasks) line(`${TASK_LABEL[task.status]}: ${task.title}`);
-    const number = (value: number | null | undefined) => value == null ? missing : value.toLocaleString("vi-VN");
     line("Thống kê", "agent-tooltip-heading");
-    line(`Lần gọi tool: ${number(data.stats?.tool_calls)}`);
-    line(`Token vào: ${number(data.stats?.tokens_in)}`);
-    line(`Token ra: ${number(data.stats?.tokens_out)}`);
+    for (const stat of tokenStatsLines(data.stats)) {
+      const row = line(stat.text);
+      if (stat.cacheSuffix) {
+        const suffix = document.createElement("span");
+        suffix.className = `agent-tooltip-cache ${stat.level ?? ""}`;
+        suffix.textContent = stat.cacheSuffix;
+        row.append(suffix);
+      }
+    }
     renderedAt = now;
   };
   const atPointer = (event: PointerEvent) => {

@@ -41,7 +41,9 @@ aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc địn
 
 `GET /workers` của aico trả mỗi phòng: `state`, `roles`, `slots` (số agent con tối đa chạy song song), `agents` (danh sách agent con đang chạy: `id`, `role`, `ticket_id`, `mode`, `started_at`), `runs_today`, `tokens_today`, tổng lượt và token, `last_error`, `limit` (`message`, `resets_at`), và `usage`.
 
-Mỗi agent có thể có thêm `activity` (`kind`, `icon`, `text`, `detail`, `tool`, `at`, `error`), `recent` (tối đa 20 hoạt động), `tasks` (`id`, `title`, `status`), `tasks_done` và `stats` (`tool_calls`, `tokens_in`, `tokens_out`). Các trường đều có thể thiếu ở aico cũ; dữ liệu sai kiểu bị từ chối để cảnh tiếp tục chạy. Agent đang làm có bong bóng hoạt động (quá 60 giây thì chỉ còn icon mờ), lỗi có viền đỏ; màn hình bàn đổi theo loại việc, thiếu activity thì giữ màn hình code. Thanh tiến độ task nằm dưới chân; rê chuột hoặc chạm nhân vật để xem ticket, vai trò, hoạt động gần nhất, task và thống kê. Demo có hoạt động đổi vòng, lỗi, stale và task tăng dần.
+Mỗi agent có thể có thêm `activity` (`kind`, `icon`, `text`, `detail`, `tool`, `at`, `error`), `recent` (tối đa 20 hoạt động), `tasks` (`id`, `title`, `status`), `tasks_done` và `stats` (`tool_calls`, `tokens_in`, `tokens_cached`, `tokens_out`). Các trường đều có thể thiếu ở aico cũ; dữ liệu sai kiểu bị từ chối để cảnh tiếp tục chạy. Agent đang làm có bong bóng hoạt động (quá 60 giây thì chỉ còn icon mờ), lỗi có viền đỏ; màn hình bàn đổi theo loại việc, thiếu activity thì giữ màn hình code. Thanh tiến độ task nằm dưới chân; rê chuột hoặc chạm nhân vật để xem ticket, vai trò, hoạt động gần nhất, task và thống kê. Demo có hoạt động đổi vòng, lỗi, stale và task tăng dần.
+
+Trong khối Số liệu của ngăn chi tiết và tooltip, `tokens_in` đã gồm token đọc từ cache (`tokens_cached`). Khi có cache, token hiển thị gọn theo nghìn/triệu: “Token vào: 1,12 triệu (92% từ cache)”, “Token mới: 87 nghìn” và “Token ra: …”. Token mới bằng đầu vào trừ cache, tối thiểu 0; tỉ lệ cache kẹp trong 0–100%, xanh từ 70%, vàng từ 40% đến dưới 70%, đỏ dưới 40%. Đầu vào bằng 0 không hiện phần trăm. Thiếu/null hoặc cache sai kiểu thì giữ cách hiển thị cũ, không có hậu tố và dòng Token mới; sai kiểu cảnh báo một lần. Poll cập nhật số liệu đang mở, tooltip làm mới mỗi giây; lỗi poll giữ snapshot cuối đến khi hồi phục. Demo có agent cache 70–95% và một agent thiếu trường cache.
 
 `current` (agent đầu tiên) đã deprecated; GUI chỉ dùng khi aico bản cũ chưa trả `agents`.
 
@@ -106,11 +108,12 @@ src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
 src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
 src/ui/drawer.ts           ngăn chi tiết: tab Agent / Cần bạn, Esc
 src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
+src/ui/drawer.test.ts      test DOM số liệu cache, fallback, màu và cập nhật khi đang mở
 src/ui/feed.ts             feed hoạt động, phím ]
 src/ui/feed.css            kiểu feed
 src/main.ts                vòng lặp, poll, vùng trống, chọn agent, feed, phím P [ ] Esc
-src/main.test.ts           test ghép nối Cần bạn, chọn agent, đổi nguồn, lỗi poll
-src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap; drawScene trả SceneFigure[]
+src/main.test.ts           test ghép nối Cần bạn, chọn agent, stats tới UI, vòng đời agent, đổi nguồn, lỗi và hồi phục poll
+src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/index.test.ts    test cache nền, xe, quầng màn hình và fit nguồn sáng
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ, sân; giữ chỗ ngồi theo id (hàm thuần)
 src/scene/outdoor.ts       ngoại cảnh thuần: cỏ, cây, bụi, đèn, lối, đường và xe
