@@ -49,7 +49,9 @@ aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc địn
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
-Panel HTML ở góc phải canvas liệt kê ticket `escalated`, có thể thu gọn và hiện số ticket. Mỗi ticket có lý do lần escalate mới nhất, link MR, ghi chú và nút Đẩy lại/Merge/Đóng/Đánh dấu lỗi (actor `owner`). Merge, Đóng và Đánh dấu lỗi xác nhận ngay trong panel. Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú và xác nhận qua các lần poll; lỗi tải giữ danh sách cũ. Demo có hai ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+Cột HTML “Cần bạn” nằm cạnh canvas, xuống dưới trên màn hẹp và ẩn khi không có ticket. Cột gom duyệt kế hoạch, duyệt merge và escalated; có ghi chú, link MR/xem trước và xác nhận ngay trong thẻ. Thanh trên đếm agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm bộ đếm để tới ticket đầu, phím P để tới ticket kế tiếp (khi không gõ trong ô nhập). Ticket mới có toast ở góc dưới phải canvas, nút “Xử lý” đưa tới thẻ; có thể đóng toast.
+
+Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú qua các lần poll; lỗi tải giữ thẻ, bộ đếm và toast cũ, báo dấu ! cạnh bộ đếm. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại. Đổi nguồn sẽ xoá toast và bỏ kết quả request của nguồn cũ; lần tải đầu nguồn mới không bật toast.
 
 ## Cấu trúc
 
@@ -59,7 +61,12 @@ src/usage.ts               đọc usage phòng thủ, mức màu, đếm ngượ
 src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
-src/escalation-panel.ts    panel ticket HTML, ghi chú, xác nhận và cập nhật theo id
+src/attention.ts           tiêu đề tab, phím P, gộp/huỷ toast (hàm thuần)
+src/attention.test.ts      test chú ý, phím tắt và vòng đời toast
+src/needs-column.ts        cột Cần bạn, thẻ duyệt/escalated, ghi chú và xác nhận
+src/needs-column.css       kiểu thẻ và trạng thái trong cột Cần bạn
+src/toasts.ts              toast HTML cần người, nút Xử lý và đóng
+src/toasts.css             toast góc dưới phải canvas
 src/latest.ts              chọn kết quả poll mới nhất khi request chồng nhau (hàm thuần)
 src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
 src/main.ts                vòng lặp animation, polling worker + ticket, thẻ trạng thái

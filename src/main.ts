@@ -1,9 +1,11 @@
-import { type ApiConfig, type WorkerStatus, demoWorkers, escalationAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
+import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
-import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
+import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
+import { isShortcut, nextAttention, tabTitle } from "./attention";
+import { createToasts } from "./toasts";
 import { createLatestGate } from "./latest";
-import { applyDemoAction, createReasonCache, demoTickets } from "./tickets";
+import { applyDemoAction, createReasonCache, demoNeedTickets, NEED_LABEL, needKind, needsYou } from "./tickets";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -25,26 +27,100 @@ let config: ApiConfig | null = loadConfig();
 let workers: WorkerStatus[] = demoWorkers(Date.now());
 const workerGate = createLatestGate();
 
-function ticketSource(current: ApiConfig | null): EscalationSource {
+const workspace = document.querySelector<HTMLElement>(".workspace")!;
+const needsRoot = document.querySelector<HTMLElement>("#needs")!;
+const needsCount = document.querySelector<HTMLButtonElement>("#needs-count")!;
+const agentsCount = document.querySelector<HTMLElement>("#agents-count")!;
+const ticketError = document.querySelector<HTMLElement>("#tickets-error")!;
+let attentionItems: NeedItem[] = [];
+let currentAttention: string | null = null;
+
+function ticketSource(current: ApiConfig | null): NeedSource {
   if (!current) {
-    let tickets = demoTickets();
+    let tickets = demoNeedTickets(Date.now());
     return {
-      async list() { return tickets.filter((ticket) => ticket.status === "escalated").map((ticket) => ({ ticket, reason: ticket.reason })); },
-      async act(id, action) { tickets = applyDemoAction(tickets, id, action); },
+      async list() {
+        return needsYou(tickets).map((ticket) => ({
+          ticket, kind: needKind(ticket.status)!, reason: ticket.reason,
+        }));
+      },
+      async act(item, action) {
+        tickets = applyDemoAction(tickets, item.ticket.id, item.kind, action);
+      },
     };
   }
   const reasons = createReasonCache((id) => fetchEscalationReason(current, id));
   return {
-    async list() { return reasons.resolve(await fetchTickets(current)); },
-    act(id, action, comment) { return escalationAction(current, id, action, "owner", comment); },
+    async list() {
+      const tickets = await fetchTickets(current);
+      const resolved = await reasons.resolve(tickets.filter((ticket) => needKind(ticket.status) === "escalated"));
+      const byId = new Map(resolved.map((item) => [item.ticket.id, item.reason]));
+      return tickets.map((ticket) => ({
+        ticket, kind: needKind(ticket.status)!, reason: byId.get(ticket.id) ?? null,
+      }));
+    },
+    act(item, action, comment) { return needAction(current, item.kind, item.ticket.id, action, comment); },
   };
 }
 
-const panel = createEscalationPanel(document.querySelector<HTMLElement>("#escalations")!, ticketSource(config));
+function focusTicket(id: string): void {
+  if (column.focus(id)) currentAttention = id;
+}
+
+const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
+
+function onItems(items: NeedItem[]): void {
+  attentionItems = items;
+  const n = items.length;
+  needsCount.textContent = `Cần bạn: ${n}`;
+  needsCount.disabled = n === 0;
+  needsCount.classList.toggle("hot", n > 0);
+  document.title = tabTitle(n);
+  workspace.classList.toggle("has-needs", n > 0);
+  toasts.update(items.map(({ ticket, kind }) => ({ id: ticket.id, kind, label: NEED_LABEL[kind] })));
+}
+
+const column = createNeedsColumn(needsRoot, ticketSource(config), onItems);
+// Cột đã gate kết quả tải: đọc dòng lỗi này để request cũ không báo lỗi sang nguồn mới.
+new MutationObserver(() => {
+  const message = needsRoot.querySelector(".needs-error")?.textContent ?? "";
+  ticketError.hidden = !message;
+  ticketError.title = message;
+  ticketError.setAttribute("aria-label", message);
+}).observe(needsRoot.querySelector(".needs-error")!, { childList: true, characterData: true, subtree: true });
+
+needsCount.addEventListener("click", () => {
+  const first = attentionItems[0];
+  if (first) focusTicket(first.ticket.id);
+});
+needsRoot.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (target instanceof Element) currentAttention = target.closest<HTMLElement>("[data-ticket-id]")?.dataset.ticketId ?? currentAttention;
+});
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const editable = target instanceof Element && (
+    !!target.closest("input, textarea, select") ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+  if (!isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) return;
+  const next = nextAttention(attentionItems.map((item) => item.ticket.id), currentAttention);
+  if (next) {
+    event.preventDefault();
+    focusTicket(next);
+  }
+});
 
 function changeSource(): void {
   workerGate.reset();
-  panel.setSource(ticketSource(config));
+  column.setSource(ticketSource(config));
+  currentAttention = null;
+  onItems([]);
+  // Nguồn mới cần được primed bằng lần tải thành công đầu, kể cả khi nguồn cũ đang tải.
+  toasts.reset();
+  ticketError.hidden = true;
+  ticketError.title = "";
+  ticketError.setAttribute("aria-label", "");
 }
 
 
@@ -81,6 +157,9 @@ function row(label: string, value: string): HTMLElement {
 }
 
 function renderCards(now: number): void {
+  column.tick(now);
+  const count = workers.filter((w) => w.state !== "offline").reduce((sum, w) => sum + roomAgents(w).agents.length, 0);
+  agentsCount.textContent = `Đang làm: ${count} agent`;
   cards.replaceChildren(
     ...workers.map((w) => {
       const card = el("article", `card state-${w.state}`);
@@ -176,7 +255,7 @@ async function pollWorkers(): Promise<void> {
 }
 
 async function poll(): Promise<void> {
-  await Promise.allSettled([pollWorkers(), panel.refresh()]);
+  await Promise.allSettled([pollWorkers(), column.refresh()]);
 }
 
 form.addEventListener("submit", (event) => {
