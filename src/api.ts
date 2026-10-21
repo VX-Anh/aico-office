@@ -200,13 +200,18 @@ const DEMO_ROLES: { role: string; mode: AgentMode }[] = [
 
 const DEMO_CYCLE = 48_000;
 
+const LIMIT_ERROR = "You've hit your session limit";
+// Lỗi phòng khi codex còn idle: khác câu hạn mức, để biển tên hiện dấu lỗi chứ không phải đồng hồ reset.
+const CODEX_ROOM_ERROR = "CLI thoát giữa chừng (mã 1)";
+
 // Dữ liệu giả: kịch bản 48 giây, mỗi pha ít nhất 8 giây để kịp thấy nhân vật đi vào/ra.
-// claude (3 chỗ): 0 → 1 → 2 → 1 → 0 agent con; hạn mức session 20 → 70% (xanh → vàng), tuần 84% (đỏ),
+// claude (3 chỗ): 0 → 1 → 3/3 (16–32 giây) → +1 vượt chỗ (32–40) → 0;
+//   hạn mức session 20 → 70% (xanh → vàng), tuần 84% (đỏ),
 //   40–48 giây số liệu cũ 20 phút kèm lỗi đọc CLI;
 // codex (2 chỗ): hạn mức 5h 40 → 100% trong 0–36 giây (đủ ba màu), 1 agent từ giây 28,
-//   chạm 100% thì hết hạn mức tới cuối chu kỳ và agent rời bàn;
+//   0–28 giây last_error khác hạn mức, chạm 100% thì hết hạn mức tới cuối chu kỳ và agent rời bàn;
 // cursor (2 chỗ): không công bố hạn mức (gói Pro); hết hạn mức 24 giây (ngủ trên sofa)
-//   → mất kết nối 12 giây (tắt đèn, chưa có usage) → rảnh.
+//   → mất kết nối 12 giây (tắt đèn, chưa có usage) → rảnh, 1 agent trong pha idle 40–48 giây.
 export function demoWorkers(now: number): WorkerStatus[] {
   const names = ["claude", "codex", "cursor"];
   const slots = [3, 2, 2];
@@ -227,9 +232,14 @@ export function demoWorkers(now: number): WorkerStatus[] {
   };
   const codexLimited = s >= 36;
   const running: WorkerAgent[][] = [
-    [...(s >= 8 && s < 40 ? [agent(0, 0, 8)] : []), ...(s >= 16 && s < 32 ? [agent(0, 1, 16)] : [])],
+    [
+      ...(s >= 8 && s < 40 ? [agent(0, 0, 8)] : []),
+      ...(s >= 16 && s < 40 ? [agent(0, 1, 16)] : []),
+      ...(s >= 16 && s < 40 ? [agent(0, 2, 16)] : []),
+      ...(s >= 32 && s < 40 ? [agent(0, 3, 32)] : []),
+    ],
     s >= 28 && !codexLimited ? [agent(1, 0, 28)] : [],
-    [],
+    s >= 40 ? [agent(2, 0, 40)] : [],
   ];
   const cursorState: WorkerState = s < 24 ? "limited" : s < 36 ? "offline" : "idle";
   const claudeStale = s >= 40;
@@ -279,8 +289,8 @@ export function demoWorkers(now: number): WorkerStatus[] {
       output_tokens: 40_000 + i * 9_000,
       last_run_at: iso(now - 90_000),
       last_duration_seconds: 30 + i * 12,
-      last_error: state === "limited" ? "You've hit your session limit" : null,
-      limit: state === "limited" ? { message: "You've hit your session limit", resets_at: resets[i], detected_at: iso(now) } : null,
+      last_error: i === 1 && s < 28 ? CODEX_ROOM_ERROR : state === "limited" ? LIMIT_ERROR : null,
+      limit: state === "limited" ? { message: LIMIT_ERROR, resets_at: resets[i], detected_at: iso(now) } : null,
       usage: usages[i],
     };
   });

@@ -812,6 +812,112 @@ describe("demo", () => {
   });
 });
 
+describe("demo đủ trạng thái trong chu kỳ 48 giây", () => {
+  const CYCLE = 48_000;
+  const T0 = 1_000 * CYCLE;
+  const LIMIT = "You've hit your session limit";
+  const ROOM_ERROR = "CLI thoát giữa chừng (mã 1)";
+  const at = (s: number, cycle = 0) => demoWorkers(T0 + cycle * CYCLE + s * 1000);
+  const room = (s: number, name: string, cycle = 0) => at(s, cycle).find((w) => w.name === name)!;
+
+  it("claude: 0 → 1 → 3/3 trong 16–32 giây → +1 → 0, đúng cả hai phía biên", () => {
+    const count = (s: number) => room(s, "claude").agents!.length;
+    expect([count(0), count(7.999)]).toEqual([0, 0]);
+    expect(room(0, "claude").state).toBe("idle");
+    expect([count(8), count(15.999)]).toEqual([1, 1]);
+    expect(room(8, "claude").state).toBe("working");
+    expect([count(16), count(31.999)]).toEqual([3, 3]);
+    expect(room(20, "claude").slots).toBe(3);
+    expect(room(20, "claude").state).toBe("working");
+    expect([count(32), count(39.999)]).toEqual([4, 4]);
+    expect(room(36, "claude").slots).toBe(3);
+    expect(room(36, "claude").state).toBe("working");
+    expect([count(40), count(47.999)]).toEqual([0, 0]);
+    expect(room(44, "claude").state).toBe("idle");
+  });
+
+  it("claude: id giữ nguyên trong pha, agent sau không có sớm, chu kỳ sau là id khác", () => {
+    const ids = (s: number, cycle = 0) => room(s, "claude", cycle).agents!.map((a) => a.id);
+    const early = ids(20);
+    expect(early).toHaveLength(3);
+    expect(ids(31)).toEqual(early);
+    expect(ids(12)).toEqual([early[0]]);
+    expect(ids(4)).toEqual([]);
+    const full = ids(36);
+    expect(full.slice(0, 3)).toEqual(early);
+    expect(full).toHaveLength(4);
+    expect(new Set(full).size).toBe(4);
+    expect(ids(39).slice(0, 3)).toEqual(early);
+    expect(ids(41)).toEqual([]);
+    expect(ids(20, 1)[0]).not.toBe(early[0]);
+    expect(room(36, "claude").agents!.map((a) => a.ticket_id)).toEqual(["T-demo00", "T-demo01", "T-demo02", "T-demo03"]);
+  });
+
+  it("cursor: limited → offline → idle, agent chỉ trong pha idle 40–48 giây", () => {
+    expect(room(0, "cursor").state).toBe("limited");
+    expect(room(23.999, "cursor").agents).toEqual([]);
+    expect(room(24, "cursor").state).toBe("offline");
+    expect(room(35.999, "cursor").agents).toEqual([]);
+    expect(room(30, "cursor").usage).toBeNull();
+    expect(room(36, "cursor").state).toBe("idle");
+    expect(room(39.999, "cursor").agents).toEqual([]);
+    expect(room(40, "cursor").state).toBe("idle");
+    expect(room(40, "cursor").agents).toHaveLength(1);
+    expect(room(47.999, "cursor").agents).toHaveLength(1);
+    expect(room(40, "cursor").agents![0].id).toBe(room(47, "cursor").agents![0].id);
+    expect(room(44, "cursor").agents![0].ticket_id).toBe("T-demo20");
+    expect(room(0, "cursor", 1).state).toBe("limited");
+    expect(room(0, "cursor", 1).agents).toEqual([]);
+    expect(room(44, "cursor", 1).agents![0].id).not.toBe(room(44, "cursor").agents![0].id);
+  });
+
+  it("codex: last_error khác hạn mức trong 0–28 giây; đang làm thì hết; limited thì đúng câu hạn mức", () => {
+    for (const s of [0, 14, 27.999]) {
+      const w = room(s, "codex");
+      expect(w.state).toBe("idle");
+      expect(w.agents).toEqual([]);
+      expect(w.last_error).toBe(ROOM_ERROR);
+      expect(w.last_error).not.toBe(LIMIT);
+      expect(w.limit).toBeNull();
+    }
+    for (const s of [28, 35.999]) {
+      const w = room(s, "codex");
+      expect(w.state).toBe("working");
+      expect(w.agents).toHaveLength(1);
+      expect(w.last_error).toBeNull();
+      expect(w.limit).toBeNull();
+    }
+    for (const s of [36, 47.999]) {
+      const w = room(s, "codex");
+      expect(w.state).toBe("limited");
+      expect(w.agents).toEqual([]);
+      expect(w.last_error).toBe(LIMIT);
+      expect(w.limit?.message).toBe(LIMIT);
+    }
+    expect(room(10, "claude").last_error).toBeNull();
+    expect(room(44, "claude").last_error).toBeNull();
+    expect(room(10, "cursor").last_error).toBe(LIMIT);
+    expect(room(44, "cursor").last_error).toBeNull();
+    expect(room(10, "codex", 1).last_error).toBe(ROOM_ERROR);
+    expect(room(40, "codex", 1).last_error).toBe(LIMIT);
+  });
+
+  it("demoNeedTickets: đúng 4 ticket, 3 loại, một ticket trùng ticket_id của agent demo", () => {
+    const list = demoNeedTickets();
+    expect(list).toHaveLength(4);
+    expect(new Set(list.map((t) => needKind(t.status)))).toEqual(new Set(["plan", "merge", "escalated"]));
+    const agentTickets = new Set<string>();
+    for (let s = 0; s < 48; s += 1) {
+      for (const w of at(s)) for (const a of w.agents ?? []) if (a.ticket_id) agentTickets.add(a.ticket_id);
+    }
+    const shared = list.filter((t) => agentTickets.has(t.id));
+    expect(shared.length).toBeGreaterThan(0);
+    expect(shared.every((t) => needKind(t.status) !== null)).toBe(true);
+    expect(list.some((t) => t.id === "T-demo00" && t.status === "awaiting_plan_approval")).toBe(true);
+    expect(agentTickets.has("T-demo00")).toBe(true);
+  });
+});
+
 describe("dữ liệu đổi giữa chừng", () => {
   const view = (raw: unknown, name: string, reasons: Record<string, string | null> = {}) =>
     (parseTickets(raw, name) ?? []).filter((t) => t.status === "escalated").map((t: Ticket) => {
@@ -930,9 +1036,10 @@ describe("cần người: dữ liệu đổi giữa chừng", () => {
       ["T-1:escalated:merge,close,fail"],
     ]);
     // thẻ plan cũ bấm Yêu cầu sửa sau khi ticket đã sang merge: demo không đổi gì
-    const list = demoNeedTickets().map((t) => (t.id === "T-demo-plan" ? { ...t, status: "awaiting_merge_approval" } : t));
-    expect(applyDemoAction(list, "T-demo-plan", "plan", "revise")).toEqual(list);
-    expect(applyDemoAction(list, "T-demo-plan", "merge", "approved").find((t) => t.id === "T-demo-plan")!.status).toBe("done");
+    const planId = demoNeedTickets().find((t) => t.status === "awaiting_plan_approval")!.id;
+    const list = demoNeedTickets().map((t) => (t.id === planId ? { ...t, status: "awaiting_merge_approval" } : t));
+    expect(applyDemoAction(list, planId, "plan", "revise")).toEqual(list);
+    expect(applyDemoAction(list, planId, "merge", "approved").find((t) => t.id === planId)!.status).toBe("done");
   });
 
   it("số ticket 0 → 3 → 1 → 0", () => {
