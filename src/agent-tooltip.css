@@ -1,0 +1,30 @@
+.agent-tooltip {
+  position: fixed;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(340px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 3px 12px #0003;
+  font: 13px/1.5 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.agent-tooltip[hidden] {
+  display: none;
+}
+
+.agent-tooltip-title,
+.agent-tooltip-heading {
+  font-weight: 600;
+}
+
+.agent-tooltip-heading {
+  margin-top: 6px;
+}
