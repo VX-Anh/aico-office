@@ -9,6 +9,7 @@ import { isShortcut, nextAttention, tabTitle } from "./attention";
 import { createToasts } from "./toasts";
 import { createLatestGate } from "./latest";
 import { applyDemoAction, createReasonCache, demoNeedTickets, needKind, needsYou, NEED_LABEL } from "./tickets";
+import { relativeTime } from "./time";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -131,11 +132,9 @@ function fmtNumber(n: number | undefined): string {
 }
 
 function fmtAgo(iso: string | null | undefined, now: number): string {
+  // Thiếu mốc: phòng chưa từng chạy. Có iso thì cùng chuỗi với tooltip (floor, tương lai là "vừa xong").
   if (!iso) return "chưa chạy";
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return `${s} giây trước`;
-  if (s < 3600) return `${Math.round(s / 60)} phút trước`;
-  return `${Math.round(s / 3600)} giờ trước`;
+  return relativeTime(iso, now);
 }
 
 function fmtElapsed(iso: string, now: number): string {
