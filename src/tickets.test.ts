@@ -17,13 +17,11 @@ import {
   createReasonCache,
   demoNeedTickets,
   demoTickets,
-  escalatedOnly,
-  escalationError,
   irreversible,
   latestEscalationReason,
   mergeRequest,
   needKind,
-  needsConfirm,
+  needsConfirmation,
   needsYou,
   parseTickets,
   previewLink,
@@ -65,12 +63,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("parseTickets và escalatedOnly", () => {
+const escalated = (list: Ticket[]) => list.filter((t) => needKind(t.status) === "escalated");
+
+describe("parseTickets", () => {
   it("giữ ticket đúng, lọc escalated", () => {
     const raw = [ticket("T-1"), ticket("T-2", { status: "done" }), ticket("T-3", { artifacts: [MR] })];
     const parsed = parseTickets(raw, who())!;
     expect(parsed).toEqual(raw);
-    expect(escalatedOnly(parsed).map((t) => t.id)).toEqual(["T-1", "T-3"]);
+    expect(escalated(parsed).map((t) => t.id)).toEqual(["T-1", "T-3"]);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -221,7 +221,7 @@ describe("mergeRequest", () => {
   });
 });
 
-describe("actionAvailability và needsConfirm", () => {
+describe("actionAvailability và needsConfirmation của escalated", () => {
   const plain = parseTickets([ticket("T-1")], who())![0];
   const withMr = parseTickets([ticket("T-2", { artifacts: [MR] })], who())![0];
 
@@ -245,10 +245,10 @@ describe("actionAvailability và needsConfirm", () => {
   });
 
   it("chỉ Đẩy lại gửi ngay, còn lại hỏi xác nhận", () => {
-    expect(needsConfirm("retry_push")).toBe(false);
-    expect(needsConfirm("merge")).toBe(true);
-    expect(needsConfirm("close")).toBe(true);
-    expect(needsConfirm("fail")).toBe(true);
+    expect(needsConfirmation("escalated", "retry_push")).toBe(false);
+    expect(needsConfirmation("escalated", "merge")).toBe(true);
+    expect(needsConfirmation("escalated", "close")).toBe(true);
+    expect(needsConfirmation("escalated", "fail")).toBe(true);
   });
 });
 
@@ -345,14 +345,70 @@ describe("actionsFor, commentRequired, canSubmit, irreversible", () => {
     }
   });
 
-  it("irreversible: rejected, close, fail, merge; needsConfirm cũ trùng kết quả", () => {
+  it("irreversible: rejected, close, fail, merge", () => {
     const yes = ["rejected", "close", "fail", "merge"];
     for (const action of ["approved", "revise", "changes_requested", "rejected", "retry_push", "merge", "close", "fail"] as NeedAction[]) {
       expect(irreversible(action)).toBe(yes.includes(action));
     }
-    for (const action of ["retry_push", "merge", "close", "fail"] as const) {
-      expect(needsConfirm(action)).toBe(irreversible(action));
+  });
+});
+
+describe("needsConfirmation", () => {
+  // Ghi tay đủ 3 loại x 8 hành động, không sinh từ hàm đang kiểm.
+  const table: [NeedKind, NeedAction, boolean][] = [
+    ["plan", "approved", false],
+    ["plan", "revise", false],
+    ["plan", "changes_requested", false],
+    ["plan", "rejected", true],
+    ["plan", "retry_push", false],
+    ["plan", "merge", false],
+    ["plan", "close", false],
+    ["plan", "fail", false],
+    ["merge", "approved", true],
+    ["merge", "revise", false],
+    ["merge", "changes_requested", false],
+    ["merge", "rejected", true],
+    ["merge", "retry_push", false],
+    ["merge", "merge", false],
+    ["merge", "close", false],
+    ["merge", "fail", false],
+    ["escalated", "approved", false],
+    ["escalated", "revise", false],
+    ["escalated", "changes_requested", false],
+    ["escalated", "rejected", false],
+    ["escalated", "retry_push", false],
+    ["escalated", "merge", true],
+    ["escalated", "close", true],
+    ["escalated", "fail", true],
+  ];
+
+  for (const [kind, action, yes] of table) {
+    it(`${kind}/${action}: ${yes ? "hỏi xác nhận" : "không hỏi"}`, () => {
+      expect(needsConfirmation(kind, action)).toBe(yes);
+    });
+  }
+
+  it("bảng đủ 24 cặp, không trùng", () => {
+    expect(new Set(table.map(([k, a]) => `${k}/${a}`)).size).toBe(24);
+  });
+
+  it("cặp hợp lệ khác merge/approved giữ đúng như irreversible", () => {
+    const valid: [NeedKind, NeedAction][] = [
+      ["plan", "approved"], ["plan", "revise"], ["plan", "rejected"],
+      ["merge", "changes_requested"], ["merge", "rejected"],
+      ["escalated", "retry_push"], ["escalated", "merge"], ["escalated", "close"], ["escalated", "fail"],
+    ];
+    for (const [kind, action] of valid) {
+      expect(needsConfirmation(kind, action)).toBe(irreversible(action));
     }
+    // merge/approved là chỗ duy nhất khác irreversible
+    expect(irreversible("approved")).toBe(false);
+    expect(needsConfirmation("merge", "approved")).toBe(true);
+  });
+
+  it("ticket đổi loại plan → merge → escalated: cùng hành động hỏi xác nhận theo loại hiện tại", () => {
+    expect(["plan", "merge", "escalated"].map((k) => needsConfirmation(k as NeedKind, "approved"))).toEqual([false, true, false]);
+    expect(["plan", "merge", "escalated"].map((k) => needsConfirmation(k as NeedKind, "merge"))).toEqual([false, false, true]);
   });
 });
 
@@ -450,10 +506,6 @@ describe("actionError", () => {
     expect(actionError(401, { detail: "bad token" })).toBe("Sai API token");
     expect(actionError(401, null)).toBe("Sai API token");
     expect(actionError(302, { detail: "x" })).toBe("aico trả 302");
-  });
-
-  it("escalationError là alias cũ", () => {
-    expect(escalationError).toBe(actionError);
   });
 });
 
@@ -675,7 +727,7 @@ describe("demo", () => {
   it("2 ticket escalated: một lỗi đẩy code không MR, một có MR", () => {
     const [push, merge] = demoTickets();
     expect(parseTickets(demoTickets(), who())).toHaveLength(2);
-    expect(escalatedOnly(demoTickets())).toHaveLength(2);
+    expect(escalated(demoTickets())).toHaveLength(2);
     expect(actionAvailability(push.reason, push)).toEqual({ retry_push: true, merge: false, close: true, fail: true });
     expect(actionAvailability(merge.reason, merge)).toEqual({ retry_push: false, merge: true, close: true, fail: true });
     expect(mergeRequest(merge).url).toMatch(/^https:/);
@@ -748,9 +800,9 @@ describe("demo", () => {
     expect(applyDemoAction(demoNeedTickets(), "T-không-có", "escalated", "close")).toEqual(demoNeedTickets());
   });
 
-  it("dạng cũ 3 tham số vẫn chạy cho escalated", () => {
+  it("ticket escalated cũ (demoTickets) đổi qua dạng 4 tham số", () => {
     const before = demoTickets();
-    const after = applyDemoAction(before, before[0].id, "merge");
+    const after = applyDemoAction(before, before[0].id, "escalated", "merge");
     expect(after[0].status).toBe("done");
     expect(after[1]).toBe(before[1]);
   });
@@ -816,7 +868,7 @@ describe("dữ liệu đổi giữa chừng", () => {
     let shown: string[] = [];
     const seen = [good, { detail: "lỗi" }, [ticket("T-1"), { id: 5 }], { detail: "lỗi" }, good].map((raw) => {
       const parsed = parseTickets(raw, name);
-      if (parsed) shown = escalatedOnly(parsed).map((t) => t.id);
+      if (parsed) shown = escalated(parsed).map((t) => t.id);
       return [parsed === null, shown.join(",")];
     });
     expect(seen).toEqual([

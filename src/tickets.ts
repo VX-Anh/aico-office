@@ -89,10 +89,6 @@ export function parseTickets(raw: unknown, who = "tickets"): Ticket[] | null {
   return out;
 }
 
-export function escalatedOnly(tickets: Ticket[]): Ticket[] {
-  return tickets.filter((t) => t.status === "escalated");
-}
-
 export type NeedKind = "plan" | "merge" | "escalated";
 
 const NEED_STATUS: Record<string, NeedKind> = {
@@ -265,9 +261,11 @@ export function irreversible(action: NeedAction): boolean {
   return action === "rejected" || action === "close" || action === "fail" || action === "merge";
 }
 
-/** @deprecated dùng `irreversible`; giữ cho escalation-panel.ts tới khi bỏ panel cũ */
-export function needsConfirm(action: EscalationAction): boolean {
-  return irreversible(action);
+// Duyệt merge là merge thật vào main; duyệt kế hoạch thì quay lại được nên gửi ngay.
+// Cặp không thuộc loại thì false: thẻ không có nút đó và needAction cũng từ chối gửi.
+export function needsConfirmation(kind: NeedKind, action: NeedAction): boolean {
+  if (!isActionOf(kind, action)) return false;
+  return irreversible(action) || (kind === "merge" && action === "approved");
 }
 
 export function apiUrl(config: ApiConfig, path: string): string {
@@ -325,9 +323,6 @@ export function actionError(status: number, body: unknown): string {
   const detail = status >= 400 ? detailText(body) : null;
   return detail ?? `aico trả ${status}`;
 }
-
-/** @deprecated dùng `actionError` */
-export const escalationError = actionError;
 
 // Thời gian chờ tính từ lần đổi trạng thái gần nhất; giờ tương lai (lệch đồng hồ) coi như vừa xong.
 export function waitedLabel(updatedAt: string | null, now: number): string {
@@ -417,17 +412,7 @@ function demoResult(kind: NeedKind, action: NeedAction): string | null {
 
 // Đổi trạng thái giả tại chỗ: ticket rời danh sách cần người như khi aico xử lý xong.
 // Ticket đã đổi loại (thẻ cũ) hoặc hành động không thuộc loại thì không đổi gì, như aico trả 409.
-export function applyDemoAction<T extends Ticket>(list: T[], id: string, kind: NeedKind, action: NeedAction): T[];
-/** @deprecated dạng cũ chỉ cho escalated; giữ cho main.ts tới khi ghép cột "Cần bạn" */
-export function applyDemoAction<T extends Ticket>(list: T[], id: string, action: EscalationAction): T[];
-export function applyDemoAction<T extends Ticket>(
-  list: T[],
-  id: string,
-  kindOrAction: NeedKind | EscalationAction,
-  maybeAction?: NeedAction,
-): T[] {
-  const [kind, action]: [NeedKind, NeedAction] =
-    maybeAction === undefined ? ["escalated", kindOrAction as EscalationAction] : [kindOrAction as NeedKind, maybeAction];
+export function applyDemoAction<T extends Ticket>(list: T[], id: string, kind: NeedKind, action: NeedAction): T[] {
   const status = demoResult(kind, action);
   if (status === null) return list;
   return list.map((t) => (t.id === id && needKind(t.status) === kind ? { ...t, status } : t));

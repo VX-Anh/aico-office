@@ -9,7 +9,7 @@ import {
   NEED_LABEL,
   actionsFor,
   canSubmit,
-  irreversible,
+  needsConfirmation,
   mergeRequest,
   needsYou,
   previewLink,
@@ -164,7 +164,11 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
       for (const [action, button] of buttons) button.disabled = busy || !available.get(action);
       comment.readOnly = busy;
       confirmation.hidden = confirming === null;
-      question.textContent = confirming ? `${actionLabel(kind, confirming)} ${id}?` : "";
+      question.textContent = confirming
+        ? kind === "merge" && confirming === "approved"
+          ? `Merge PR vào main: ${id}?`
+          : `${actionLabel(kind, confirming)} ${id}?`
+        : "";
       yes.disabled = cancel.disabled = busy;
       article.setAttribute("aria-busy", String(busy));
       tick();
@@ -182,7 +186,8 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
     }
 
     async function submit(action: NeedAction): Promise<void> {
-      if (generation !== cardGeneration || pending.has(key) || !enabled(action)) return;
+      // Thẻ đã bị poll gỡ hoặc thay thế không được gửi từ listener cũ.
+      if (generation !== cardGeneration || cards.get(key) !== card || pending.has(key) || !enabled(action)) return;
       if (needComment(action)) return;
       const requestSource = source;
       pending.add(key);
@@ -215,7 +220,7 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
       button.type = "button";
       button.addEventListener("click", () => {
         if (needComment(action)) return;
-        if (irreversible(action)) {
+        if (needsConfirmation(kind, action)) {
           confirming = action;
           say("", false);
           render();
