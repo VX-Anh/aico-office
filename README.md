@@ -86,6 +86,9 @@ vitest.config.ts           cấu hình vitest (môi trường Node, chỉ src/**
 art/characters/body.pixel.json      thân nhân vật (đủ 7 tư thế)
 art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái, 2 dài, 3 búi
 art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer)
+public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/
+public/assets/CREDITS.md            nguồn và giấy phép của mọi tài sản bên ngoài
+docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (văn phòng pixel cho agent) và đề xuất áp dụng
 ```
 
 Sơ đồ module: [docs/architecture.md](docs/architecture.md).
