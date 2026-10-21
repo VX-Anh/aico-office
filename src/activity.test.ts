@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoWorkers } from "./api";
 import {
   bubbleFor,
+  cacheRatio,
   readAgentActivity,
   resolveBubbles,
   screenFor,
@@ -67,7 +68,7 @@ describe("readAgentActivity: thiếu trường", () => {
   });
 
   it("stats thiếu trường con thì trường đó null", () => {
-    expect(readAgentActivity(agent({ stats: { tool_calls: 4 } })).stats).toEqual({ tool_calls: 4, tokens_in: null, tokens_out: null });
+    expect(readAgentActivity(agent({ stats: { tool_calls: 4 } })).stats).toEqual({ tool_calls: 4, tokens_in: null, tokens_out: null, tokens_cached: null });
     expect(warn).not.toHaveBeenCalled();
   });
 });
@@ -80,7 +81,7 @@ describe("readAgentActivity: dữ liệu đúng", () => {
     expect(r.recent).toEqual([ACT]);
     expect(r.tasks).toHaveLength(7);
     expect(r.tasksDone).toBe(3);
-    expect(r.stats).toEqual({ tool_calls: 12, tokens_in: 3400, tokens_out: 0 });
+    expect(r.stats).toEqual({ tool_calls: 12, tokens_in: 3400, tokens_out: 0, tokens_cached: null });
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -183,6 +184,7 @@ describe("readAgentActivity: sai kiểu", () => {
       tool_calls: null,
       tokens_in: null,
       tokens_out: null,
+      tokens_cached: null,
     });
     expect(warn).toHaveBeenCalledTimes(5);
   });
@@ -192,6 +194,59 @@ describe("readAgentActivity: sai kiểu", () => {
       expect(readAgentActivity(agent({ tasks: tasks(3, 7), tasks_done: bad })).tasksDone).toBeNull();
     }
     expect(warn).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe("tokens_cached và cacheRatio", () => {
+  const base = { tool_calls: 12, tokens_in: 100, tokens_out: 20 };
+
+  it("thiếu hoặc null im lặng, giữ các stats khác", () => {
+    for (const stats of [base, { ...base, tokens_cached: null }]) {
+      expect(readAgentActivity(agent({ stats })).stats).toEqual({ ...base, tokens_cached: null });
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each(["80", true, {}, [], -1, NaN, Infinity, -Infinity])("cache hỏng %j chỉ bỏ trường đó, warn một lần", (bad) => {
+    const a = agent({ stats: { ...base, tokens_cached: bad } });
+    for (let n = 0; n < 3; n++) {
+      expect(readAgentActivity(a).stats).toEqual({ ...base, tokens_cached: null });
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("thiếu stats, đầu vào hoặc cache, đầu vào 0 thì không có tỉ lệ", () => {
+    expect(cacheRatio(null)).toBeNull();
+    expect(cacheRatio(undefined)).toBeNull();
+    for (const stats of [{ ...base, tokens_cached: null }, { ...base, tokens_in: null, tokens_cached: 80 }, { ...base, tokens_in: 0, tokens_cached: 0 }]) {
+      expect(cacheRatio(stats)).toBeNull();
+    }
+  });
+
+  it.each([[0, 0], [40, 0.4], [70, 0.7], [95, 0.95], [100, 1], [120, 1]])("cache %s cho tỉ lệ %s, không sửa stats", (cached, ratio) => {
+    const stats = Object.freeze({ ...base, tokens_cached: cached });
+    expect(cacheRatio(stats)).toBe(ratio);
+    expect(stats.tokens_cached).toBe(cached);
+  });
+
+  it("cùng agent có → mất → có, hỏng → hồi phục, số tăng/giảm/reset và vượt đầu vào", () => {
+    const a = agent();
+    const samples = [
+      [{ ...base, tokens_cached: 80 }, 80, 0.8],
+      [base, null, null],
+      [{ ...base, tokens_cached: 90 }, 90, 0.9],
+      [{ ...base, tokens_cached: "lỗi" }, null, null],
+      [{ ...base, tokens_in: 200, tokens_cached: 140 }, 140, 0.7],
+      [{ ...base, tokens_in: 50, tokens_cached: 20 }, 20, 0.4],
+      [{ ...base, tokens_in: 0, tokens_cached: 0 }, 0, null],
+      [{ ...base, tokens_in: 50, tokens_cached: 60 }, 60, 1],
+    ] as const;
+    for (const [stats, cached, ratio] of samples) {
+      const result = readAgentActivity({ ...a, stats }).stats;
+      expect(result).toEqual({ ...stats, tokens_cached: cached });
+      expect(cacheRatio(result)).toBe(ratio);
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -459,6 +514,30 @@ describe("withDemoActivity", () => {
     expect(pairs).toBeGreaterThan(0);
     // có agent đi hết 7 task trong chu kỳ
     expect(Math.max(...lastDone.values())).toBe(7);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("demo có cache 70–95% và đúng một agent thiếu hẳn khóa cache", () => {
+    const missing = new Set<string>();
+    const cached = new Set<string>();
+    for (let s = 0; s < 48; s += 0.5) {
+      for (const w of sample(s).workers) {
+        for (const a of w.agents ?? []) {
+          const raw = a as unknown as { stats: Record<string, unknown> };
+          const stats = readAgentActivity(a).stats;
+          if (!Object.prototype.hasOwnProperty.call(raw.stats, "tokens_cached")) {
+            missing.add(a.id);
+            expect(stats?.tokens_cached).toBeNull();
+          } else {
+            cached.add(a.id);
+            expect(cacheRatio(stats)).toBeGreaterThanOrEqual(0.7);
+            expect(cacheRatio(stats)).toBeLessThanOrEqual(0.95);
+          }
+        }
+      }
+    }
+    expect(missing.size).toBe(1);
+    expect(cached.size).toBeGreaterThan(0);
     expect(warn).not.toHaveBeenCalled();
   });
 
