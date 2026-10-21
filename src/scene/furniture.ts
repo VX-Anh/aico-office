@@ -5,30 +5,63 @@
 import { shortCountdown } from "../usage";
 import { glyph, text, textWidth } from "./font";
 import type { Desk, LoungeBox, Sofa, SofaSet } from "./layout";
-import { C, CODE_COLORS } from "./palette";
+import { C, CODE_COLORS, SCREEN } from "./palette";
 import { type Ctx, OUTLINE, type Rect, outlineRect, rect } from "./pixel";
 
-export type Screen = "code" | "cursor" | "off";
+export type Screen = "code" | "terminal" | "browser" | "search" | "read" | "cursor" | "off";
 
 // Máy tính kiểu cũ: vỏ trắng ngà, mặt kính sáng theo trạng thái; code chạy màu theo mode của agent con.
 function drawMonitor(ctx: Ctx, x: number, y: number, screen: Screen, mode: string, t: number): void {
   outlineRect(ctx, x, y, 14, 13, C.ivory);
   rect(ctx, x + 1, y + 10, 12, 2, C.ivoryShade);
   rect(ctx, x + 2, y + 2, 10, 7, OUTLINE);
-  rect(ctx, x + 3, y + 3, 8, 5, screen === "code" ? "#123a5a" : screen === "cursor" ? "#1b2c3c" : "#0b0d11");
+  const sx = x + 3;
+  const sy = y + 3;
+  const bg = screen === "code" ? SCREEN.codeBg : screen === "cursor" ? SCREEN.cursorBg
+    : screen === "terminal" ? SCREEN.terminalBg : screen === "browser" ? SCREEN.browserFrame
+    : screen === "search" ? SCREEN.searchBg : screen === "read" ? SCREEN.paperBg : SCREEN.offBg;
+  rect(ctx, sx, sy, 8, 5, bg);
   if (screen === "code") {
     const scroll = Math.floor(t / 180);
-    const base = CODE_COLORS[mode] ?? "#7fd1ff";
+    const base = CODE_COLORS[mode] ?? SCREEN.codeLine;
     for (let i = 0; i < 3; i++) {
       const indent = (scroll + i) % 3;
       const len = 2 + ((scroll + i * 7) % 5);
-      const color = (scroll + i) % 4 === 0 ? "#f5c26b" : base;
+      const color = (scroll + i) % 4 === 0 ? SCREEN.codeAccent : base;
       rect(ctx, x + 3 + indent, y + 3 + i * 2, Math.min(len, 8 - indent), 1, color);
     }
+  } else if (screen === "terminal") {
+    const scroll = Math.floor(t / 450);
+    for (let row = 0; row < 5; row++) {
+      const line = scroll + row;
+      if (line % 2 === 0) rect(ctx, sx, sy + row, 2 + (line % 5), 1, SCREEN.terminalLine);
+    }
+    if (Math.floor(t / 600) % 2 === 0) rect(ctx, sx + 6, sy + 4, 2, 1, SCREEN.terminalLine);
+  } else if (screen === "browser") {
+    rect(ctx, sx + 1, sy + 1, 6, 3, SCREEN.browserPage);
+    rect(ctx, sx, sy, 8, 1, SCREEN.browserBar);
+    rect(ctx, sx + 1, sy + 2, 2, 2, SCREEN.browserContent);
+    rect(ctx, sx + 4, sy + 2, 2, 1, SCREEN.browserContent);
+    rect(ctx, sx + 7, sy + 1 + Math.floor(t / 700) % 3, 1, 1, SCREEN.browserBar);
+  } else if (screen === "search") {
+    rect(ctx, sx, sy + 1, 7, 1, SCREEN.searchLine);
+    rect(ctx, sx + 1, sy + 3, 6, 1, SCREEN.searchLine);
+    const lensX = sx + 1 + Math.round((Math.sin(t / 700) + 1) * 1.5);
+    rect(ctx, lensX + 1, sy, 2, 1, SCREEN.searchGlass);
+    rect(ctx, lensX, sy + 1, 1, 2, SCREEN.searchGlass);
+    rect(ctx, lensX + 3, sy + 1, 1, 2, SCREEN.searchGlass);
+    rect(ctx, lensX + 1, sy + 3, 2, 1, SCREEN.searchGlass);
+    rect(ctx, lensX + 4, sy + 4, 1, 1, SCREEN.searchGlass);
+  } else if (screen === "read") {
+    const page = Math.floor(t / 1600) % 2;
+    rect(ctx, sx + 1, sy, 6, 5, SCREEN.paper);
+    rect(ctx, sx + 2, sy + 1, 4 - page, 1, SCREEN.paperLine);
+    rect(ctx, sx + 2, sy + 3, 3 + page, 1, SCREEN.paperLine);
+    rect(ctx, sx + 6, sy + page * 4, 1, 1, SCREEN.paperLine);
   } else if (screen === "cursor" && Math.floor(t / 600) % 2 === 0) {
-    rect(ctx, x + 4, y + 4, 1, 2, "#7fd1ff"); // con trỏ nhấp nháy
+    rect(ctx, x + 4, y + 4, 1, 2, SCREEN.codeLine); // con trỏ nhấp nháy
   }
-  rect(ctx, x + 11, y + 11, 1, 1, screen === "off" ? "#5c6370" : "#4fae60"); // đèn nguồn
+  rect(ctx, x + 11, y + 11, 1, 1, screen === "off" ? SCREEN.powerOff : SCREEN.powerOn); // đèn nguồn
 }
 
 export function drawDesk(ctx: Ctx, d: Desk, screen: Screen, mode: string, t: number): void {
