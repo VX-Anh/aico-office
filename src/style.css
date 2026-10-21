@@ -109,3 +109,40 @@ main { max-width: 1152px; margin: 0 auto; padding: 16px; }
 .usage .value { margin-left: auto; }
 .usage-note, .usage-stale { margin: 4px 0 0; color: var(--muted); }
 .usage-stale { color: var(--working); }
+
+.stage { position: relative; }
+#escalations {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  width: min(340px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+#escalations button, #escalations textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+#escalations button { cursor: pointer; }
+#escalations button:disabled { opacity: 0.45; cursor: default; }
+#escalations .escalation-toggle { width: 100%; text-align: left; }
+.escalation-ticket { padding: 10px 0; border-top: 1px solid var(--muted); }
+.escalation-ticket h3 { margin: 4px 0; font-size: 14px; }
+.escalation-ticket p { margin: 6px 0; }
+.escalation-ticket a { color: var(--working); }
+#escalations textarea { display: block; width: 100%; margin: 8px 0; resize: vertical; }
+.escalation-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.escalation-confirm { margin-top: 8px; }
+.escalation-confirm span { display: block; margin-bottom: 4px; }
+.escalation-confirm button { margin-right: 4px; }

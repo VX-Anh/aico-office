@@ -49,13 +49,18 @@ aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc địn
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
+Panel HTML ở góc phải canvas liệt kê ticket `escalated`, có thể thu gọn và hiện số ticket. Mỗi ticket có lý do lần escalate mới nhất, link MR, ghi chú và nút Đẩy lại/Merge/Đóng/Đánh dấu lỗi (actor `owner`). Merge, Đóng và Đánh dấu lỗi xác nhận ngay trong panel. Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú và xác nhận qua các lần poll; lỗi tải giữ danh sách cũ. Demo có hai ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+
 ## Cấu trúc
 
 ```text
 src/api.ts                 gọi aico, kiểu dữ liệu, dữ liệu demo
 src/usage.ts               đọc usage phòng thủ, mức màu, đếm ngược, số liệu cũ (hàm thuần)
 src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ
-src/main.ts                vòng lặp animation, polling, thẻ trạng thái
+src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
+src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
+src/escalation-panel.ts    panel ticket HTML, ghi chú, xác nhận và cập nhật theo id
+src/main.ts                vòng lặp animation, polling worker + ticket, thẻ trạng thái
 src/scene/index.ts         ghép cảnh: drawScene, sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
 src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo thời gian (hàm thuần)

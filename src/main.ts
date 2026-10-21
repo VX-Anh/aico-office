@@ -1,6 +1,8 @@
-import { type ApiConfig, type WorkerStatus, demoWorkers, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
+import { type ApiConfig, type WorkerStatus, demoWorkers, escalationAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
+import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
+import { applyDemoAction, demoTickets, reasonKey } from "./tickets";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -20,6 +22,44 @@ const ctx = canvas.getContext("2d")!;
 
 let config: ApiConfig | null = loadConfig();
 let workers: WorkerStatus[] = demoWorkers(Date.now());
+let sourceGeneration = 0;
+let workerRevision = 0;
+
+function ticketSource(current: ApiConfig | null): EscalationSource {
+  if (!current) {
+    let tickets = demoTickets();
+    return {
+      async list() { return tickets.filter((ticket) => ticket.status === "escalated").map((ticket) => ({ ticket, reason: ticket.reason })); },
+      async act(id, action) { tickets = applyDemoAction(tickets, id, action); },
+    };
+  }
+  const reasons = new Map<string, Promise<string | null>>();
+  return {
+    async list() {
+      const tickets = await fetchTickets(current);
+      const keys = new Set(tickets.map(reasonKey));
+      for (const key of reasons.keys()) if (!keys.has(key)) reasons.delete(key);
+      return Promise.all(tickets.map(async (ticket) => {
+        const key = reasonKey(ticket);
+        let reason = reasons.get(key);
+        if (!reason) {
+          reason = fetchEscalationReason(current, ticket.id).catch(() => null);
+          reasons.set(key, reason);
+        }
+        return { ticket, reason: await reason };
+      }));
+    },
+    act(id, action, comment) { return escalationAction(current, id, action, "owner", comment); },
+  };
+}
+
+const panel = createEscalationPanel(document.querySelector<HTMLElement>("#escalations")!, ticketSource(config));
+
+function changeSource(): void {
+  sourceGeneration++;
+  panel.setSource(ticketSource(config));
+}
+
 
 function fmtNumber(n: number | undefined): string {
   return new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(n ?? 0);
@@ -126,21 +166,31 @@ function renderCards(now: number): void {
   );
 }
 
-async function poll(): Promise<void> {
-  if (!config) {
+async function pollWorkers(): Promise<void> {
+  const current = config;
+  const generation = sourceGeneration;
+  const revision = ++workerRevision;
+  if (!current) {
     workers = demoWorkers(Date.now());
     status.textContent = "Chế độ demo (dữ liệu giả)";
     status.className = "conn demo";
     return;
   }
   try {
-    workers = await fetchWorkers(config);
-    status.textContent = `Đã nối ${config.baseUrl}`;
+    const next = await fetchWorkers(current);
+    if (sourceGeneration !== generation || workerRevision !== revision) return;
+    workers = next;
+    status.textContent = `Đã nối ${current.baseUrl}`;
     status.className = "conn ok";
   } catch (exc) {
+    if (sourceGeneration !== generation || workerRevision !== revision) return;
     status.textContent = `Lỗi: ${(exc as Error).message}`;
     status.className = "conn bad";
   }
+}
+
+async function poll(): Promise<void> {
+  await Promise.allSettled([pollWorkers(), panel.refresh()]);
 }
 
 form.addEventListener("submit", (event) => {
@@ -150,6 +200,7 @@ form.addEventListener("submit", (event) => {
   const token = String(data.get("token") ?? "").trim();
   config = baseUrl && token ? { baseUrl, token } : null;
   saveConfig(config);
+  changeSource();
   // đổi nguồn dữ liệu: xoá cảnh cũ, agent của nguồn mới được đặt thẳng vào ghế
   if (config) workers = [];
   resetActors();
@@ -158,6 +209,7 @@ form.addEventListener("submit", (event) => {
 form.querySelector<HTMLButtonElement>("#demo")!.addEventListener("click", () => {
   config = null;
   saveConfig(null);
+  changeSource();
   resetActors();
   void poll();
 });
