@@ -51,7 +51,9 @@ Mỗi agent có thể có thêm `activity` (`kind`, `icon`, `text`, `detail`, `t
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
-Panel HTML ở góc phải canvas liệt kê ticket `escalated`, có thể thu gọn và hiện số ticket. Mỗi ticket có lý do lần escalate mới nhất, link MR, ghi chú và nút Đẩy lại/Merge/Đóng/Đánh dấu lỗi (actor `owner`). Merge, Đóng và Đánh dấu lỗi xác nhận ngay trong panel. Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú và xác nhận qua các lần poll; lỗi tải giữ danh sách cũ. Demo có hai ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+Cột “Cần bạn” cạnh canvas liệt kê ticket chờ duyệt kế hoạch, chờ duyệt merge và `escalated`. Có liên kết MR/xem trước, ghi chú và các thao tác theo trạng thái; thao tác không thể hoàn tác cần xác nhận. Danh sách làm mới mỗi 3 giây, giữ ghi chú khi poll và giữ thẻ cũ khi tải lỗi; dấu `!` cạnh bộ đếm báo lỗi tải ticket. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+
+Thanh đầu trang đếm agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm bộ đếm hoặc phím **P** (khi không nhập chữ) để lần lượt tới thẻ cần xử lý. Ticket mới cần người hiện toast với nút “Xử lý”; đổi nguồn xoá thông báo và trạng thái cũ.
 
 ## Cấu trúc
 
@@ -67,10 +69,16 @@ src/usage.ts               đọc usage phòng thủ, mức màu, đếm ngượ
 src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
-src/escalation-panel.ts    panel ticket HTML, ghi chú, xác nhận và cập nhật theo id
+src/needs-column.ts        cột Cần bạn: duyệt kế hoạch/merge, escalated, ghi chú và xác nhận
+src/needs-column.css       kiểu hiển thị cột Cần bạn
+src/attention.ts           bộ đếm tiêu đề tab, phím P và trạng thái toast (thuần)
+src/attention.test.ts      test tiêu đề, phím tắt và vòng đời toast
+src/toasts.ts              toast ticket mới cần người, mở thẻ và đóng thông báo
+src/toasts.css             kiểu hiển thị toast
 src/latest.ts              chọn kết quả poll mới nhất khi request chồng nhau (hàm thuần)
 src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
-src/main.ts                vòng lặp animation, polling worker + ticket, thẻ trạng thái
+src/main.ts                vòng lặp animation, polling worker + ticket, bộ đếm, phím P, toast
+src/main.test.ts           test ghép nối Cần bạn, nguồn demo/thật, đổi trạng thái và lỗi tải
 src/scene/index.ts         ghép cảnh, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
 src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo thời gian (hàm thuần)

@@ -1,12 +1,14 @@
 import { withDemoActivity } from "./activity";
 import { createOverlay } from "./overlay";
 import { createAgentTooltip } from "./agent-tooltip";
-import { type ApiConfig, type WorkerStatus, demoWorkers, escalationAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
+import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
-import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
+import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
+import { isShortcut, nextAttention, tabTitle } from "./attention";
+import { createToasts } from "./toasts";
 import { createLatestGate } from "./latest";
-import { applyDemoAction, createReasonCache, demoTickets } from "./tickets";
+import { applyDemoAction, createReasonCache, demoNeedTickets, needKind, needsYou, NEED_LABEL } from "./tickets";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -31,28 +33,92 @@ const initialNow = Date.now();
 let workers: WorkerStatus[] = withDemoActivity(demoWorkers(initialNow), initialNow);
 const workerGate = createLatestGate();
 
-function ticketSource(current: ApiConfig | null): EscalationSource {
-  if (!current) {
-    let tickets = demoTickets();
-    return {
-      async list() { return tickets.filter((ticket) => ticket.status === "escalated").map((ticket) => ({ ticket, reason: ticket.reason })); },
-      async act(id, action) { tickets = applyDemoAction(tickets, id, action); },
-    };
-  }
-  const reasons = createReasonCache((id) => fetchEscalationReason(current, id));
+const agentsCount = document.querySelector<HTMLElement>("#agents-count")!;
+const needsCount = document.querySelector<HTMLButtonElement>("#needs-count")!;
+const ticketsError = document.querySelector<HTMLElement>("#tickets-error")!;
+let needItems: NeedItem[] = [];
+let focusedTicket: string | null = null;
+let sourceGeneration = 0;
+
+function ticketSource(current: ApiConfig | null): NeedSource {
+  const generation = sourceGeneration;
+  let tickets = demoNeedTickets(Date.now());
+  const reasons = current ? createReasonCache((id) => fetchEscalationReason(current, id)) : null;
   return {
-    async list() { return reasons.resolve(await fetchTickets(current)); },
-    act(id, action, comment) { return escalationAction(current, id, action, "owner", comment); },
+    async list() {
+      try {
+        const list = needsYou(current ? await fetchTickets(current) : tickets);
+        const escalated = list.filter((ticket) => needKind(ticket.status) === "escalated");
+        const resolved = reasons ? await reasons.resolve(escalated) : [];
+        if (generation === sourceGeneration) {
+          ticketsError.hidden = true;
+          ticketsError.title = "";
+        }
+        return list.map((ticket) => ({
+          ticket,
+          kind: needKind(ticket.status)!,
+          reason: current
+            ? resolved.find((item) => item.ticket.id === ticket.id)?.reason ?? null
+            : tickets.find((item) => item.id === ticket.id)?.reason ?? null,
+        }));
+      } catch (exc) {
+        if (generation === sourceGeneration) {
+          ticketsError.hidden = false;
+          ticketsError.title = `Lỗi tải ticket: ${exc instanceof Error ? exc.message : String(exc)}`;
+        }
+        throw exc;
+      }
+    },
+    async act(item, action, comment) {
+      if (current) await needAction(current, item.kind, item.ticket.id, action, comment);
+      else tickets = applyDemoAction(tickets, item.ticket.id, item.kind, action);
+    },
   };
 }
 
-const panel = createEscalationPanel(document.querySelector<HTMLElement>("#escalations")!, ticketSource(config));
+function focusTicket(id: string): void {
+  if (panel.focus(id)) focusedTicket = id;
+}
+
+const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
+const panel = createNeedsColumn(document.querySelector<HTMLElement>("#needs")!, ticketSource(config), (items) => {
+  needItems = items;
+  needsCount.textContent = `Cần bạn: ${items.length}`;
+  needsCount.disabled = items.length === 0;
+  document.title = tabTitle(items.length);
+  if (!items.some((item) => item.ticket.id === focusedTicket)) focusedTicket = null;
+  toasts.update(items.map((item) => ({ id: item.ticket.id, kind: item.kind, label: NEED_LABEL[item.kind] })));
+});
+
+function focusNext(): void {
+  const id = nextAttention(needItems.map((item) => item.ticket.id), focusedTicket);
+  if (id) focusTicket(id);
+}
+needsCount.addEventListener("click", focusNext);
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const editable = target instanceof HTMLElement && (target.isContentEditable
+    || target.matches("input, textarea, select"));
+  if (isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) {
+    event.preventDefault();
+    focusNext();
+  }
+});
 
 function changeSource(): void {
   workerGate.reset();
+  sourceGeneration++;
   const now = Date.now();
   overlay.draw([], sceneSize(workers).width, now);
   tooltip.update([], sceneSize(workers).width, now);
+  needItems = [];
+  focusedTicket = null;
+  needsCount.textContent = "Cần bạn: 0";
+  needsCount.disabled = true;
+  document.title = tabTitle(0);
+  ticketsError.hidden = true;
+  ticketsError.title = "";
+  toasts.reset();
   panel.setSource(ticketSource(config));
 }
 
@@ -90,6 +156,7 @@ function row(label: string, value: string): HTMLElement {
 }
 
 function renderCards(now: number): void {
+  agentsCount.textContent = `Đang làm: ${workers.reduce((total, worker) => total + roomAgents(worker).agents.length, 0)} agent`;
   cards.replaceChildren(
     ...workers.map((w) => {
       const card = el("article", `card state-${w.state}`);
@@ -244,7 +311,11 @@ function frame(t: number): void {
 
 void poll();
 setInterval(() => void poll(), POLL_MS);
-setInterval(() => renderCards(Date.now()), 1000);
+setInterval(() => {
+  const now = Date.now();
+  renderCards(now);
+  panel.tick(now);
+}, 1000);
 renderCards(Date.now());
 renderLegend();
 requestAnimationFrame(frame);
