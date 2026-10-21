@@ -368,6 +368,7 @@ async function pollWorkers(): Promise<PollOutcome> {
   if (!current) {
     const now = Date.now();
     workers = withDemoActivity(demoWorkers(now), now);
+    roomEvents.rememberAssignments(assignmentsAt(now));
     status.textContent = "Chế độ demo (dữ liệu giả)";
     status.className = "conn demo";
     return "applied";
@@ -376,6 +377,7 @@ async function pollWorkers(): Promise<PollOutcome> {
     const next = await fetchWorkers(current);
     if (!workerGate.accept(request)) return "stale";
     workers = next;
+    roomEvents.rememberAssignments(assignmentsAt(Date.now()));
     status.textContent = `Đã nối ${current.baseUrl}`;
     status.className = "conn ok";
     return "applied";

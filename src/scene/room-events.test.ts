@@ -175,6 +175,42 @@ describe("banner từ hai lần poll", () => {
     expect(seen.has(`T-${MAX_QUEUE + 1}`)).toBe(false);
   });
 
+  it.each([
+    ["in_progress", "done"],
+    ["in_progress", "escalated"],
+    ["done", "escalated"],
+  ])("không hồi sinh banner hết hạn %s → %s khi chưa tick", (first, next) => {
+    const events = createRoomEvents();
+    events.observe(run(0, [ticket("T-1", "in_progress")]));
+    events.observe(run(1000, [ticket("T-1", first, first === "done" ? [] : [mr("!1")])]));
+    expect(events.observe(run(12000, [ticket("T-1", next, first === "done" ? [] : [mr("!1")])], [])))
+      .toMatchObject([{ kind: next }]);
+    expect(events.tick(22000)).toEqual([]);
+  });
+
+  it("dọn memory và ánh xạ ticket cũ theo giới hạn lịch sử", () => {
+    const events = createRoomEvents();
+    events.observe(run(0, [ticket("T-1", "in_progress")]));
+    for (let i = 0; i < 1000; i++) {
+      events.observe(run(i + 1, [ticket(`T-new-${i}`, "in_progress")],
+        [{ ticketId: `T-new-${i}`, provider: "codex" }]));
+    }
+    // Ticket bị đẩy khỏi cửa sổ lịch sử trở lại làm baseline riêng.
+    expect(events.observe(run(2000, [ticket("T-1", "done")], []))).toEqual([]);
+    // Ánh xạ cũ cũng phải được dọn.
+    expect(events.observe(run(3000, [ticket("T-1", "escalated")], []))).toEqual([]);
+  });
+
+  it("MR vượt giới hạn không phát lại khi artifact mất rồi trở lại", () => {
+    const events = createRoomEvents();
+    events.observe(run(0, [ticket("T-1", "in_progress")]));
+    for (let i = 0; i < 1000; i++) {
+      events.observe(run(i * 20000 + 1, [ticket("T-1", "in_progress", [mr(`!${i}`)])]));
+    }
+    expect(events.observe(run(21_000_000, [ticket("T-1", "in_progress", [mr("!999")])]))).toEqual([]);
+    expect(events.observe(run(21_001_000, [ticket("T-1", "in_progress", [mr("!0")])]))).toEqual([]);
+  });
+
   it("artifact hỏng hoặc danh sách không phải mảng thì bỏ qua, không ném", () => {
     const events = createRoomEvents();
     const broken = { id: "T-1", title: "x", status: "in_progress", project: null, updated_at: null, artifacts: null } as unknown as Ticket;

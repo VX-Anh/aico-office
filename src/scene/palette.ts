@@ -195,6 +195,9 @@ export const LIGHTING_ALPHA = { night: 0.55, dusk: 0.28, dawn: 0.22, day: 0 } as
 
 // Banner sự kiện trên phòng (overlay chữ).
 export const BANNER = {
+  offlineBg: "#c8c2b8",
+  border: "#6787a5",
+  offlineText: "#4a4f5a",
   mr: "#f5c26b",
   done: "#4fae60",
   escalated: "#d6454f",

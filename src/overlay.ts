@@ -132,15 +132,15 @@ export function createOverlay(canvas: HTMLCanvasElement): {
         const x = clamp(sign.anchor.x * scale - w / 2, 1, width - w - 1);
         const y = clamp((sign.band.y + sign.band.h) * scale - h - 1, 1, height - h - 1);
         signBox.set(sign.key, { x, y, w, h });
-        ctx.fillStyle = sign.state === "offline" ? "#c8c2b8" : BANNER.bg;
-        ctx.strokeStyle = "#6787a5";
+        ctx.fillStyle = sign.state === "offline" ? BANNER.offlineBg : BANNER.bg;
+        ctx.strokeStyle = BANNER.border;
         ctx.beginPath();
         ctx.roundRect(x, y, w, h, Math.min(4, h / 2));
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = LAMP[sign.state];
         ctx.fillRect(x + 6, y + Math.floor((h - 6) / 2), 6, 6);
-        ctx.fillStyle = sign.state === "offline" ? "#4a4f5a" : BANNER.text;
+        ctx.fillStyle = sign.state === "offline" ? BANNER.offlineText : BANNER.text;
         ctx.fillText(label, x + 16, y + h / 2, Math.max(1, w - 20));
         if (showError) {
           ctx.fillStyle = BANNER.escalated;
@@ -160,7 +160,7 @@ export function createOverlay(canvas: HTMLCanvasElement): {
         const x = clamp(host.x + host.w / 2 - w / 2, 1, width - w - 1);
         const y = clamp(host.y - (h + 2) * (slot + 1), 1, height - h - 1);
         ctx.fillStyle = BANNER[banner.kind];
-        ctx.strokeStyle = banner.kind === "escalated" ? BANNER.escalated : "#6787a5";
+        ctx.strokeStyle = banner.kind === "escalated" ? BANNER.escalated : BANNER.border;
         ctx.beginPath();
         ctx.roundRect(x, y, w, h, Math.min(4, h / 2));
         ctx.fill();

@@ -7,6 +7,11 @@ import type { Ticket, TicketArtifact } from "../api";
 export const BANNER_MS = 10_000;
 export const MAX_QUEUE = 8;
 export const MAX_HISTORY = 64;
+// Cửa sổ LRU chung cho snapshot và ánh xạ; ticket bị loại trở lại làm baseline.
+export const MAX_TICKETS = 512;
+// Chạm trần thì ngừng banner MR cho ticket này để không quên rồi phát lại MR cũ.
+// done/escalated vẫn hoạt động; reset hoặc loại ticket khỏi LRU sẽ xoá cờ.
+export const MAX_MRS = 64;
 
 export type BannerKind = "mr" | "done" | "escalated";
 
@@ -42,6 +47,7 @@ interface Memory {
   status: string;
   named: Set<string>;
   anon: number;
+  saturated: boolean;
 }
 
 interface Pending {
@@ -69,22 +75,39 @@ function capture(ticket: Ticket): Memory | null {
     if (!artifact || typeof artifact !== "object") continue;
     const key = artifactKey(artifact);
     if (key === null) continue;
-    if (key) named.add(key);
-    else anon += 1;
+    if (key && named.size < MAX_MRS) named.add(key);
+    else if (!key) anon = Math.min(MAX_MRS, anon + 1);
   }
-  return { status: ticket.status, named, anon };
+  return { status: ticket.status, named, anon, saturated: named.size >= MAX_MRS || anon >= MAX_MRS };
 }
 
 function mergeMemory(prev: Memory, next: Memory): Memory {
   const named = new Set(prev.named);
-  for (const id of next.named) named.add(id);
-  return { status: next.status, named, anon: Math.max(prev.anon, next.anon) };
+  for (const id of next.named) {
+    if (named.size < MAX_MRS) named.add(id);
+  }
+  return {
+    status: next.status, named, anon: Math.max(prev.anon, next.anon),
+    saturated: prev.saturated || next.saturated || named.size >= MAX_MRS,
+  };
 }
 
 export function createRoomEvents() {
   let primed = false;
   const memories = new Map<string, Memory>();
   const providers = new Map<string, Set<string>>();
+  const recent = new Map<string, true>();
+  function touch(ticketId: string): void {
+    recent.delete(ticketId);
+    recent.set(ticketId, true);
+    while (recent.size > MAX_TICKETS) {
+      const oldest = recent.keys().next().value;
+      if (oldest === undefined) break;
+      recent.delete(oldest);
+      memories.delete(oldest);
+      providers.delete(oldest);
+    }
+  }
   const seen = new Set<string>();
   const history: string[] = [];
   const queue: Pending[] = [];
@@ -119,6 +142,8 @@ export function createRoomEvents() {
 
   function accept(ev: Pending, now: number): void {
     if (!remember(ev.key)) return;
+    const expired = active.get(ev.provider);
+    if (expired && now >= expired.expiresAt) active.delete(ev.provider);
     const current = active.get(ev.provider);
     if (!current) {
       show(ev, now);
@@ -162,9 +187,10 @@ export function createRoomEvents() {
     for (const item of assignments) {
       if (!item || typeof item.ticketId !== "string" || !item.ticketId) continue;
       if (typeof item.provider !== "string" || !item.provider) continue;
+      touch(item.ticketId);
       let set = providers.get(item.ticketId);
       if (!set) providers.set(item.ticketId, (set = new Set()));
-      set.add(item.provider);
+      if (set.size < MAX_HISTORY) set.add(item.provider);
     }
   }
 
@@ -172,12 +198,12 @@ export function createRoomEvents() {
     const rooms = providers.get(ticket.id);
     if (!rooms || rooms.size === 0) return;
     for (const id of next.named) {
-      if (prev.named.has(id)) continue;
+      if (prev.saturated || prev.named.has(id)) continue;
       for (const provider of rooms) {
         accept({ key: `${provider}|${ticket.id}|mr|${id}`, provider, ticket: ticket.id, kind: "mr" }, now);
       }
     }
-    const freshAnon = Math.max(0, next.anon - prev.anon);
+    const freshAnon = prev.saturated ? 0 : Math.max(0, next.anon - prev.anon);
     for (let i = 0; i < freshAnon; i++) {
       const id = `anon:${prev.anon + i}`;
       for (const provider of rooms) {
@@ -198,9 +224,11 @@ export function createRoomEvents() {
 
   return {
     tick,
+    rememberAssignments: rememberProviders,
     reset(): void {
       primed = false;
       memories.clear();
+      recent.clear();
       providers.clear();
       seen.clear();
       history.length = 0;
@@ -218,7 +246,10 @@ export function createRoomEvents() {
       if (!primed) {
         for (const ticket of byId.values()) {
           const memory = capture(ticket);
-          if (memory) memories.set(ticket.id, memory);
+          if (memory) {
+            touch(ticket.id);
+            memories.set(ticket.id, memory);
+          }
         }
         primed = true;
         return tick(now);
@@ -226,6 +257,7 @@ export function createRoomEvents() {
       for (const ticket of byId.values()) {
         const next = capture(ticket);
         if (!next) continue;
+        touch(ticket.id);
         const prev = memories.get(ticket.id);
         if (prev) emit(ticket, prev, next, now);
         memories.set(ticket.id, prev ? mergeMemory(prev, next) : next);

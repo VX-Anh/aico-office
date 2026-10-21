@@ -111,6 +111,15 @@ class Node {
   dataset: Record<string, string> = {};
   vars: Record<string, string> = {};
   setAttribute() {}
+  insertBefore(child: Node, before: Node | null) {
+    const old = this.children.indexOf(child);
+    if (old >= 0) this.children.splice(old, 1);
+    const index = before ? this.children.indexOf(before) : -1;
+    this.children.splice(index < 0 ? this.children.length : index, 0, child);
+  }
+  removeAttribute() {}
+  scrollIntoView() {}
+  focus() {}
   textContent = "";
   hidden = false;
   disabled = false;
@@ -529,6 +538,71 @@ describe("chọn agent, feed và lỗi poll", () => {
 });
 
 describe("ánh sáng, snapshot và banner demo", () => {
+  it.each(["done", "mr", "escalated"].flatMap((kind) => [false, true].map((slow) => ({ kind, slow }))))(
+    "nhớ phòng từ worker khi ticket lỗi hoặc chậm: $kind / $slow", async ({ kind, slow }) => {
+      h.config = { baseUrl: "http://aico", token: "test" };
+      h.realColumn = true;
+      const initial = { id: "T-1", title: "Một", status: "in_progress", project: null, updated_at: null, artifacts: [] };
+      h.fetchTickets.mockResolvedValue([initial]);
+      h.fetchWorkers.mockResolvedValue([]);
+      await import("./main");
+      await connected();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
+      let release!: (tickets: unknown[]) => void;
+      if (slow) h.fetchTickets.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
+      else h.fetchTickets.mockRejectedValueOnce(new Error("mất mạng"));
+      h.fetchWorkers.mockResolvedValue([room("working", [{ ...agent, ticket_id: "T-1" }])]);
+      const calls = h.fetchWorkers.mock.calls.length;
+      pollTick();
+      await vi.waitFor(() => expect(h.fetchWorkers.mock.calls.length).toBeGreaterThan(calls));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      h.fetchWorkers.mockResolvedValue([]);
+      h.fetchTickets.mockResolvedValue([{
+        ...initial, status: kind === "mr" ? "in_progress" : kind,
+        artifacts: kind === "mr" ? [{ kind: "merge_request", ref: "!1", url: null }] : [],
+      }]);
+      const updates = h.sidebarUpdate.mock.calls.length;
+      pollTick();
+      await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(updates));
+      if (slow) {
+        release([initial]);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(getNode("#tickets-error").title).toBe("");
+      frame(0);
+      expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners)
+        .toMatchObject([{ provider: "claude", ticket: "T-1", kind }]);
+    },
+  );
+
+  it("worker cũ trả muộn không được thêm ánh xạ ticket", async () => {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    h.realColumn = true;
+    const initial = { id: "T-1", title: "Một", status: "in_progress", project: null, updated_at: null, artifacts: [] };
+    h.fetchTickets.mockResolvedValue([initial]);
+    await import("./main");
+    await connected();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let release!: (workers: WorkerStatus[]) => void;
+    h.fetchWorkers.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
+    pollTick();
+    h.fetchWorkers.mockResolvedValue([]);
+    pollTick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release([room("working", [{ ...agent, ticket_id: "T-1" }])]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    h.fetchTickets.mockResolvedValue([{ ...initial, status: "done" }]);
+    const calls = h.sidebarUpdate.mock.calls.length;
+    pollTick();
+    await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(calls));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
+    frame(0);
+    expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners).toEqual([]);
+  });
+
   it("snapshot nguồn thật giữ done, panel chỉ lấy ticket cần người", async () => {
     h.config = { baseUrl: "http://aico", token: "test" };
     const done = { id: "T-done", title: "Xong", status: "done", project: null, updated_at: null, artifacts: [] };
@@ -591,6 +665,7 @@ describe("ánh sáng, snapshot và banner demo", () => {
       poll();
       await vi.waitFor(() => expect(polls).toBe(1));
       await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(getNode("#tickets-error").title).toBe("");
       frame(0);
       expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners).toEqual([]);
       now.mockReturnValue(12_000);

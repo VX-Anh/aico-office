@@ -57,6 +57,12 @@ Ngăn chi tiết, tab “Cần bạn”, liệt kê ticket chờ duyệt kế ho
 
 Ô số trên thanh trên đếm agent đang chạy, agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm ô cần bạn, phím **P** hoặc nút “Xử lý” trên toast (khi không nhập chữ) để mở tab Cần bạn rồi tới thẻ. Ticket mới cần người hiện toast. Bấm agent trên thanh bên hoặc trên canvas thì mở tab Agent. Agent biến mất, hoặc phòng offline/hết hạn mức, thì đóng tab Agent và không tự mở lại. Đổi nguồn xoá lựa chọn, feed, cờ đóng ngăn và toast.
 
+Bộ phát hiện banner giữ tối đa 512 ticket gần đây (LRU chung cho snapshot và ánh xạ
+phòng). Ticket tạm mất vẫn giữ lịch sử trong cửa sổ này; ticket đã bị loại khi trở lại
+được lấy làm baseline, không phát lại lịch sử. Mỗi ticket giữ tối đa 64 danh tính MR
+và 64 phòng; khi chạm trần MR, dừng banner MR của ticket đó để tránh phát trùng,
+nhưng vẫn phát chuyển trạng thái done/escalated.
+
 ## Cấu trúc
 
 ```text
