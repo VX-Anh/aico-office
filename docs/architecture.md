@@ -1,30 +1,33 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-626ddd48). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-96adf6f9). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data
-    API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /tickets/{id}/escalation, /tickets/{id}/decisions (needAction);<br/>dữ liệu demo worker (có usage)"]
-    USG["src/usage.ts<br/>parseUsage (từ chối usage hỏng → null),<br/>usageWindows, usageLevel, shortCountdown, isStale (thuần)"]
-    TK["src/tickets.ts<br/>parseTickets, needsYou/needKind (plan, merge, escalated),<br/>actionsFor, commentRequired, irreversible, previewLink,<br/>buildDecisionRequest/buildEscalationRequest, actionError,<br/>latestEscalationReason, reason cache, demoNeedTickets (thuần)"]
-    ATT["src/attention.ts<br/>tabTitle, nextAttention (phím P), isShortcut,<br/>reconcileToasts/dismissToast: gộp, tối đa 3, huỷ khi rời trạng thái (thuần)"]
+    API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /tickets/{id}/escalation; dữ liệu demo (có usage)<br/>agents[] đi qua nguyên vẹn (activity, recent, tasks, stats)"]
+    USG["src/usage.ts<br/>parseUsage (từ chối usage hỏng → null), isIso,<br/>usageWindows, usageLevel, shortCountdown, isStale (thuần)"]
+    TK["src/tickets.ts<br/>parseTickets, escalatedOnly, latestEscalationReason,<br/>mergeRequest, actionAvailability, needsConfirm,<br/>buildEscalationRequest, escalationError, demoTickets (thuần)"]
+    ACTV["src/activity.ts<br/>readAgentActivity (đọc phòng thủ activity/recent/tasks/stats),<br/>screenFor, bubbleFor (stale 60s, error, cắt 28), taskProgress,<br/>resolveBubbles, withDemoActivity (thuần)"]
   end
   API --> TK
-  MAIN["src/main.ts<br/>vòng lặp animation, polling worker + ticket cùng POLL_MS,<br/>thanh trên: Đang làm X, Cần bạn N, tiêu đề tab, phím P;<br/>thẻ phòng, chú thích, nguồn ticket thật/demo"]
+  ACTV -->|isIso| USG
+  MAIN["src/main.ts<br/>vòng lặp animation, polling (worker + ticket cùng chu kỳ),<br/>thẻ trạng thái, chú thích, nguồn ticket thật/demo,<br/>demo + withDemoActivity"]
   API --> MAIN
   USG --> MAIN
-  ATT --> MAIN
-  MAIN -->|refresh, nguồn list/act, focus id| COL["src/needs-column.ts (+ .css)<br/>cột Cần bạn cạnh canvas, ẩn khi rỗng;<br/>thẻ theo id|kind: duyệt kế hoạch / duyệt merge / escalated,<br/>ghi chú bắt buộc, xác nhận trong thẻ, khoá khi gửi"]
-  COL -->|onItems| MAIN
-  COL --> TK
-  MAIN -->|update entries, reset| TOAST["src/toasts.ts (+ .css)<br/>toast góc dưới phải canvas, nút Xử lý/đóng"]
-  TOAST --> ATT
-  TOAST -->|onOpen id| MAIN
-  COL --> ASIDE[["aside#needs trong .workspace (grid, cột phải;<br/>< 900px xuống dưới canvas)"]]
-  TOAST --> STACK[["#toasts trong .stage"]]
-  MAIN -->|drawScene, sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh"]
+  ACTV --> MAIN
+  MAIN -->|refresh mỗi POLL_MS, nguồn list/act| PANEL["src/escalation-panel.ts<br/>panel HTML phủ góc phải canvas, thu gọn được;<br/>ghi chú + Đẩy lại/Merge/Đóng/Đánh dấu lỗi,<br/>xác nhận trong panel, khoá nút khi gửi"]
+  PANEL --> TK
+  PANEL --> OVERLAY[["#escalations trong .stage<br/>(phủ trên canvas)"]]
+  MAIN -->|drawScene → SceneFigure[], sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh, màn hình bàn theo screenFor,<br/>trả SceneFigure[] (vị trí đầu/chân, working)"]
+  IDX -->|screenFor, readAgentActivity| ACTV
+  MAIN -->|figures mỗi frame| OVL["src/overlay.ts<br/>canvas chữ phủ (pointer-events:none, DPR):<br/>bong bóng icon+text, error viền đỏ, stale mờ,<br/>chồng nhau thu về icon; thanh tiến độ done/total"]
+  OVL --> ACTV
+  OVL -->|BUBBLE| PAL
+  OVL --> TXT[["canvas .activity-overlay<br/>phủ trên #office, dưới #escalations"]]
+  MAIN -->|figures mỗi frame| TIP["src/agent-tooltip.ts (+ .css)<br/>hitFigure (thuần), tooltip DOM cạnh con trỏ;<br/>chạm để mở/đóng; ticket, vai trò, 5 recent, task, stats"]
+  TIP --> ACTV
 
   IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi, usageBoard (thuần)"]
   IDX -->|parseUsage| USG
@@ -38,14 +41,15 @@ flowchart TD
   ACT --> PATH["pathing.ts<br/>đường đi, vị trí theo thời gian (thuần)"]
   ACT -->|agentLook| CHAR
   IDX --> TILES["tiles.ts<br/>sàn, tường, cửa"]
-  IDX --> FURN["furniture.ts<br/>bàn, ghế, sofa, biển tên, biển đếm ngược"]
+  IDX --> FURN["furniture.ts<br/>bàn, ghế, sofa, biển tên, biển đếm ngược;<br/>màn hình code/terminal/browser/search/read/cursor/off"]
   FURN -->|shortCountdown| USG
+  FURN -->|SCREEN| PAL
   IDX -->|drawWalker, drawSeatedBack,<br/>drawSofaSitter, drawSleeper, residentLook| CHAR["characters.ts<br/>chọn tư thế, chồng lớp thân→tóc→phụ kiện,<br/>thay khoá màu theo Look"]
 
   ART[("art/characters/*.pixel.json<br/>body, hair/style0-3, acc/role")] -->|import.meta.glob lúc build| CHAR
   CHAR -->|công thức + bộ màu| PB["pixelbolt.ts<br/>đọc palette, frames grid/from, animations<br/>từ chối frame hỏng → fallback"]
   CHAR -->|tư thế thiếu hoặc hỏng| LEG["legacy-characters.ts<br/>sprite lưới ký tự cũ"]
-  CHAR --> PAL["palette.ts<br/>màu provider, vai trò + accent, da, tóc, USAGE"]
+  CHAR --> PAL["palette.ts<br/>màu provider, vai trò + accent, da, tóc, USAGE,<br/>SCREEN, BUBBLE"]
   PB --> PIX["pixel.ts<br/>drawGrid, cached bitmap, shade"]
   LEG --> PIX
   CHAR --> PIX
@@ -53,7 +57,7 @@ flowchart TD
   TILES --> PIX
   FURN --> PIX
   FURN --> FONT
-  PIX -->|canvas offscreen| CANVAS[["canvas #office trong .stage<br/>image-rendering: pixelated, không bị panel đè"]]
+  PIX -->|canvas offscreen| CANVAS[["canvas #office<br/>image-rendering: pixelated"]]
 
   subgraph Tests["npm test (vitest) — cổng cùng npm run build, chạy trong CI"]
     T_PATH["pathing.test.ts / layout.test.ts<br/>usageBoard không chồng đồ vật"]
@@ -61,9 +65,9 @@ flowchart TD
     T_PB["pixelbolt.test.ts / characters.test.ts<br/>công thức hỏng + mọi file art/"]
     T_USG["usage.test.ts<br/>ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ"]
     T_FONT["font.test.ts<br/>glyph % và ?"]
-    T_TK["tickets.test.ts<br/>phân loại cần người, hành động theo trạng thái,<br/>ghi chú bắt buộc, request decisions/escalation, lỗi 4xx/5xx,<br/>dữ liệu đổi giữa chừng"]
-    T_ATT["attention.test.ts<br/>tiêu đề tab, ticket kế tiếp (P), phím tắt,<br/>gộp/huỷ toast khi ticket rời trạng thái"]
-    T_LAT["latest.test.ts<br/>poll chồng nhau, đổi nguồn"]
+    T_TK["tickets.test.ts<br/>lọc escalated, lý do mới nhất, nút bật/tắt,<br/>dựng request, lỗi 409/501, dữ liệu đổi giữa chừng"]
+    T_ACTV["activity.test.ts<br/>thiếu trường, sai kiểu, kind lạ → other, screenFor,<br/>bubbleFor stale/error/cắt chữ, taskProgress,<br/>resolveBubbles, dữ liệu đổi giữa chừng, demo"]
+    T_TIP["agent-tooltip.test.ts<br/>hitFigure trúng/trượt/chồng nhau"]
   end
   T_PATH -.-> PATH
   T_PATH -.-> LAYOUT
@@ -74,5 +78,6 @@ flowchart TD
   T_USG -.-> USG
   T_FONT -.-> FONT
   T_TK -.-> TK
-  T_ATT -.-> ATT
+  T_ACTV -.-> ACTV
+  T_TIP -.-> TIP
 ```
