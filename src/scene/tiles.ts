@@ -1,6 +1,7 @@
 // Nền: viền ngoài và vách ngăn tối, sàn gỗ dạng ván, sàn xanh và caro của phòng nghỉ, mặt trước tường, ô cửa.
 
 import type { Layout, LoungeBox, RoomBox } from "./layout";
+import { drawOutdoorStatic, outdoorLayout } from "./outdoor";
 import { C } from "./palette";
 import { type Ctx, type Rect, rect } from "./pixel";
 
@@ -50,10 +51,13 @@ function loungeWall(ctx: Ctx, l: LoungeBox): void {
   rect(ctx, l.x, l.y + wallH - 2, l.w, 2, C.woodFace);
 }
 
-export function drawBackdrop(ctx: Ctx, layout: Layout): void {
-  rect(ctx, 0, 0, layout.width, layout.height, C.wall);
-  // mép sáng trên viền ngoài cho có khối
-  rect(ctx, 0, 0, layout.width, 1, C.wallLight);
+export function drawBackdrop(ctx: Ctx, layout: Layout, outdoor = outdoorLayout(layout)): void {
+  // Sân trước, tường sau: tô tường cả scene sẽ che cỏ. Xe không nằm ở đây vì nó chạy theo thời gian.
+  // `outdoor` để cache dùng đúng seed; mặc định vẫn sinh từ layout.
+  drawOutdoorStatic(ctx, outdoor);
+  const b = layout.building;
+  rect(ctx, b.x, b.y, b.w, b.h, C.wall);
+  rect(ctx, b.x, b.y, b.w, 1, C.wallLight);
 }
 
 export function drawRoomShell(ctx: Ctx, r: RoomBox, accent: string): void {

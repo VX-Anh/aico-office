@@ -151,3 +151,57 @@ export const C = {
   shadow: "rgba(20,10,20,0.25)",
   books: ["#c94f4f", "#e0b84f", "#4f8fc9", "#5fae6a", "#a86fc9", "#e08a4f"],
 };
+
+// Ngoại cảnh. W2/W5/W6 dùng đúng các khoá này, không rải mã màu mới.
+export const GROUND = {
+  grass: "#4e9a46",
+  grassDark: "#3d7c38",
+  grassEdge: "#2d5e2a",
+  tuft: "#67b35a",
+  path: "#cbb892",
+  pathAlt: "#b7a47e",
+  pathMortar: "#8d7b5e",
+  road: "#3c4352",
+  roadDark: "#2c3340",
+  lane: "#e6d27a",
+  laneEdge: "#d8d4cc",
+  trunk: "#6b4428",
+  canopy: "#3f8a3f",
+  canopyLight: "#5fae4f",
+  bush: "#347233",
+  bushLight: "#5fae4f",
+  pole: "#3a342c",
+  lamp: "#f6e7a2",
+  lampShade: "#c9b56a",
+  car: "#c94f4f",
+  carAlt: "#3f6fbf",
+  carWindow: "#d5ecf6",
+  carWheel: "#1c1e24",
+} as const;
+
+// Tông lightmap (nhân multiply). day gần trắng để ban ngày gần như không đổi màu nền.
+export const LIGHTING = {
+  night: "#0c1838",
+  dusk: "#4a3048",
+  dawn: "#7a5348",
+  day: "#fff8ee",
+  lampGlow: "#ffe7a0",
+  screenGlow: "#9fd4ff",
+  roomLit: "#fff6e4",
+  roomDim: "#1a2438",
+} as const;
+
+export const LIGHTING_ALPHA = { night: 0.55, dusk: 0.28, dawn: 0.22, day: 0 } as const;
+
+// Banner sự kiện trên phòng (overlay chữ).
+export const BANNER = {
+  offlineBg: "#c8c2b8",
+  border: "#6787a5",
+  offlineText: "#4a4f5a",
+  mr: "#f5c26b",
+  done: "#4fae60",
+  escalated: "#d6454f",
+  text: "#2a2f3a",
+  bg: "#f4efe4",
+  confetti: ["#f5c26b", "#d6454f", "#7fd1ff", "#4fae60", "#e57fb0"],
+} as const;

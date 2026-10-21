@@ -1,125 +1,145 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-30755290). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-6834e79b). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
-  subgraph Data["Dữ liệu và logic thuần"]
-    API["src/api.ts<br/>GET /workers, tickets, events, needAction<br/>demo phòng 48 giây"]
-    ACTV["src/activity.ts<br/>readAgentActivity, cacheRatio<br/>screenFor, bubbleFor, taskProgress<br/>withDemoActivity: cache 70–95% và agent thiếu cache"]
-    USG["src/usage.ts<br/>parseUsage, usageLevel, countdown, isStale"]
-    TK["src/tickets.ts<br/>phân loại, hành động, request, demo ticket"]
-    TIME["src/time.ts<br/>relativeTime"]
+  subgraph Data["Dữ liệu và logic thuần hiện có"]
+    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây"]
+    TK["src/tickets.ts<br/>parseTickets, needsYou, actions, MR, demoNeedTickets"]
+    ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
+    USG["src/usage.ts"]
+    TIME["src/time.ts"]
     LATEST["src/latest.ts<br/>createLatestGate"]
-    ATT["src/attention.ts<br/>tiêu đề tab, phím P, toast state"]
+    ATT["src/attention.ts"]
   end
   API --> TK
-  ACTV -->|isIso| USG
+  ACTV --> USG
 
-  subgraph UIPure["src/ui — hàm thuần"]
-    VP["viewport.ts<br/>computeInsets, fitScene"]
-    FM["feed-model.ts<br/>reduceFeed"]
-    SEL["selection.ts<br/>agentKey, resolveSelection, drawerView"]
-    FMT["format.ts<br/>fmtNumber, fmtAgo, usageTile, agentStatus<br/>fmtTokenCount, tokenStatsLines<br/>nội dung cache và mức ok/warn/crit"]
-  end
-  FM --> ACTV
-  FMT --> USG
-  FMT --> ACTV
+  COL["src/needs-column.ts + CSS<br/>gate chấp nhận snapshot<br/>lọc items cho panel, giữ xác nhận/ghi chú"]
+  API -->|cùng request tickets| COL
+  LATEST --> COL
+  COL --> TK
+  COL -->|actions| API
+  COL -->|snapshot đầy đủ đã chấp nhận| MAIN
+  COL -->|NeedItem đã lọc| MAIN
 
-  subgraph UIDom["Panel DOM và CSS"]
-    TOK["ui/tokens.css<br/>--lvl-ok, --lvl-warn, --lvl-crit"]
-    TOP["ui/topbar.ts"]
-    SIDE["ui/sidebar.ts + avatar.ts"]
-    DRW["ui/drawer.ts + drawer.css<br/>Agent / Cần bạn<br/>Số liệu cache, token mới, fallback cũ"]
-    FEED["ui/feed.ts"]
-    TIP["agent-tooltip.ts + .css<br/>xem nhanh và số liệu cache<br/>làm mới mỗi giây"]
-  end
-  TOP --> FMT
-  SIDE --> FMT
-  SIDE --> CHAR
-  DRW --> ACTV
-  DRW --> FMT
-  DRW --> TIME
-  DRW --> TK
-  TIP --> ACTV
-  TIP --> FMT
-  TIP --> TIME
-  TOK -.-> DRW
-  TOK -.-> TIP
-
-  MAIN["src/main.ts<br/>polling, animation, chọn agent, đổi nguồn<br/>relayout, insets, fitScene"]
-  API -->|workers giữ nguyên trường mở rộng| MAIN
-  ACTV -->|bổ sung dữ liệu demo| MAIN
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent"]
+  API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
+
+  subgraph UI["Khung UI hiện có"]
+    VP["ui/viewport.ts<br/>insets và fitScene"]
+    FM["ui/feed-model.ts"]
+    SEL["ui/selection.ts"]
+    FMT["ui/format.ts"]
+    TOK["ui/tokens.css"]
+    TOP["ui/topbar.ts + CSS"]
+    SIDE["ui/sidebar.ts + avatar.ts + CSS"]
+    DRW["ui/drawer.ts + CSS"]
+    FEED["ui/feed.ts + CSS"]
+    NEEDS["#needs trong drawer"]
+    TOAST["toasts.ts + CSS"]
+  end
   MAIN --> VP
   MAIN --> FM
   MAIN --> SEL
   MAIN --> TOP
   MAIN --> SIDE
-  MAIN -->|render agent hiện tại| DRW
+  MAIN --> DRW
   MAIN --> FEED
-  MAIN --> COL["needs-column.ts + .css"]
-  COL --> TK
-  COL --> LATEST
-  COL -->|NeedSource.act| API
-  COL --> NEEDS["#needs trong tab Cần bạn"]
+  MAIN --> TOAST
+  TOP --> FMT
+  SIDE --> FMT
+  FMT --> USG
+  FMT --> ACTV
+  FM --> ACTV
+  DRW --> TK
+  DRW --> ACTV
+  DRW --> TIME
   DRW --> NEEDS
-  MAIN --> TOAST["toasts.ts + .css"]
-  MAIN --> IDX["scene/index.ts<br/>drawScene, sceneSize, resetActors<br/>trả SceneFigure[]"]
-  IDX --> ACTV
-  MAIN --> OVL["overlay.ts<br/>bong bóng, tiến độ task"]
-  OVL --> ACTV
-  MAIN -->|figures, hitFigure, update| TIP
+  COL --> NEEDS
+  TOK -.-> TOP
+  TOK -.-> SIDE
+  TOK -.-> DRW
+  TOK -.-> FEED
 
-  subgraph Scene["Canvas và pixel art"]
-    LAYOUT["layout.ts — thuần"]
-    BOARD["usage-board.ts"]
-    ACT["actors.ts<br/>seated khi cuối path bằng ghế hiện tại"]
-    PATH["pathing.ts — thuần"]
-    TILES["tiles.ts"]
-    FURN["furniture.ts"]
-    CHAR["characters.ts"]
-    ART["art/characters/*.pixel.json"]
-    PB["pixelbolt.ts"]
-    LEG["legacy-characters.ts"]
-    PAL["palette.ts"]
-    PIX["pixel.ts"]
-    CANVAS["canvas #office trong #stage"]
-  end
+  DEMO["scene/demo-events.ts<br/>snapshot định kỳ, cùng bộ phát hiện"]
+  EVENTS["scene/room-events.ts<br/>so snapshot, MR mới/done/escalated<br/>nhớ ticket-provider, dedup, TTL 10 giây"]
+  DEMO --> MAIN
+  MAIN -->|snapshot và liên hệ agent.ticket_id| EVENTS
+  EVENTS -->|banner đang sống| MAIN
+
+  IDX["scene/index.ts<br/>ghép cảnh, SceneFigure và dữ liệu biển phòng"]
+  MAIN -->|workers, thời gian, reduced motion| IDX
+  LAYOUT["scene/layout.ts<br/>thuần: phòng/bàn/ghế, ngoại cảnh, sceneSize"]
+  OUT["scene/outdoor.ts<br/>seed thuần, cây/đèn/lối đi/đường<br/>vẽ ngoại cảnh và xe"]
+  CACHE["Canvas cache nền tĩnh<br/>khóa hình học, palette, seed"]
+  TILES["scene/tiles.ts<br/>tường, sàn, cửa"]
+  ACT["scene/actors.ts<br/>seated chỉ khi cuối path đúng ghế hiện tại"]
+  PATH["scene/pathing.ts<br/>thuần"]
+  FURN["scene/furniture.ts<br/>đồ đạc, đồng hồ, màn hình"]
+  BOARD["scene/usage-board.ts"]
+  CHAR["scene/characters.ts"]
+  PB["scene/pixelbolt.ts"]
+  LEG["scene/legacy-characters.ts"]
+  ART["art/characters/*.pixel.json"]
+  PAL["scene/palette.ts<br/>màu chung, ngoại cảnh, ánh sáng, banner"]
+  PIX["scene/pixel.ts"]
+  LIGHT["scene/lighting.ts<br/>độ sáng thuần và lightmap canvas cache<br/>bucket 5 phút, hình học, nguồn sáng"]
+
   IDX --> LAYOUT
-  IDX --> BOARD
-  BOARD --> USG
+  IDX --> OUT
+  IDX --> CACHE
+  CACHE --> OUT
+  CACHE --> TILES
   IDX --> ACT
   ACT --> LAYOUT
   ACT --> PATH
-  IDX --> TILES
   IDX --> FURN
+  IDX --> BOARD
+  BOARD --> USG
+  IDX --> ACTV
   IDX --> CHAR
-  ART -->|import.meta.glob| CHAR
+  SIDE --> CHAR
+  ART --> CHAR
   CHAR --> PB
   CHAR --> LEG
   CHAR --> PAL
-  PB --> PIX
+  OUT --> PAL
+  LIGHT --> PAL
+  FURN --> PAL
   TILES --> PIX
+  OUT --> PIX
   FURN --> PIX
-  PIX --> CANVAS
+  PB --> PIX
+  IDX -->|phút địa phương, layout, nguồn sáng| LIGHT
 
-  subgraph Tests["Vitest và build"]
-    TA["activity.test.ts<br/>đọc phòng thủ, cacheRatio, demo"]
-    TF["ui/format.test.ts<br/>định dạng, fallback, ngưỡng màu"]
-    TD["ui/drawer.test.ts<br/>DOM số liệu và dữ liệu đổi giữa chừng"]
-    TT["agent-tooltip.test.ts<br/>DOM, cập nhật, mất và trở lại"]
-    TM["main.test.ts<br/>poll, lựa chọn, offline, đổi nguồn"]
-    OTHER["test hiện có<br/>UI thuần, tickets, needs, scene, art"]
-    CHECK["npm run build + npm test"]
-  end
-  TA -.-> ACTV
-  TF -.-> FMT
-  TD -.-> DRW
-  TT -.-> TIP
-  TM -.-> MAIN
-  OTHER -.-> Scene
-  CHECK -.-> Tests
+  CANVAS["canvas #office<br/>nền cache → phần động → lightmap multiply"]
+  CACHE -->|drawImage mỗi frame| CANVAS
+  IDX -->|đồ đạc, nhân vật, xe| CANVAS
+  LIGHT -->|drawImage multiply mỗi frame| CANVAS
+  VP -->|kích thước mới, vùng trống, focus| MAIN
+
+  OVL["src/overlay.ts<br/>chữ DPR: hoạt động, progress<br/>biển phòng, banner và confetti hữu hạn"]
+  TIP["src/agent-tooltip.ts + CSS<br/>hit-test và xem nhanh"]
+  MAIN -->|figures, biển phòng, banner| OVL
+  MAIN -->|figures và chọn agent| TIP
+  OVL --> ACTV
+  OVL --> PAL
+  TIP --> ACTV
+  OVL --> SCREEN["Lớp chữ trên cảnh"]
+  CANVAS --> SCREEN
+
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport<br/>giữ actors và mọi test cũ"]
+  TEST -.-> OUT
+  TEST -.-> LIGHT
+  TEST -.-> EVENTS
+  TEST -.-> COL
+  TEST -.-> OVL
+  TEST -.-> IDX
+  TEST -.-> MAIN
+  TEST -.-> ACT
 ```

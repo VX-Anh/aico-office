@@ -1,6 +1,6 @@
 # AICO Office
 
-Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Canvas phủ cả màn hình; thanh trên, thanh bên, ngăn chi tiết và feed nổi trên cảnh như kính, không che phòng.
+Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Canvas phủ cả màn hình; thanh trên, thanh bên, ngăn chi tiết và feed nổi trên cảnh như kính, không che phòng. Toà nhà nằm trên bãi cỏ có cây, lối gạch, đèn và đường xe (xe đứng yên khi trình duyệt yêu cầu giảm chuyển động). Biển tên phòng và banner sự kiện nằm trên lớp chữ. Thêm `?hour=21:30` để thử ánh sáng đêm mà không đổi đồng hồ. Demo 48 giây có banner MR mở, đã merge và leo thang.
 
 Repo này cũng là **repo pilot** của aico: tính năng mới được tạo thành issue (nhãn `ai-company`) để chính các agent làm qua luồng plan → code → review → merge.
 
@@ -59,13 +59,21 @@ Ngăn chi tiết, tab “Cần bạn”, liệt kê ticket chờ duyệt kế ho
 
 Ô số trên thanh trên đếm agent đang chạy, agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm ô cần bạn, phím **P** hoặc nút “Xử lý” trên toast (khi không nhập chữ) để mở tab Cần bạn rồi tới thẻ. Ticket mới cần người hiện toast. Bấm agent trên thanh bên hoặc trên canvas thì mở tab Agent. Agent biến mất, hoặc phòng offline/hết hạn mức, thì đóng tab Agent và không tự mở lại. Đổi nguồn xoá lựa chọn, feed, cờ đóng ngăn và toast.
 
+Bộ phát hiện banner giữ tối đa 512 ticket gần đây (LRU chung cho snapshot và ánh xạ
+phòng). Ticket tạm mất vẫn giữ lịch sử trong cửa sổ này; ticket đã bị loại khi trở lại
+được lấy làm baseline, không phát lại lịch sử. Mỗi ticket giữ tối đa 64 danh tính MR
+và 64 phòng; khi chạm trần MR, dừng banner MR của ticket đó để tránh phát trùng,
+nhưng vẫn phát chuyển trạng thái done/escalated.
+
 ## Cấu trúc
 
 ```text
-src/api.ts                 gọi aico, kiểu dữ liệu, dữ liệu demo
+src/api.ts                 gọi aico, kiểu dữ liệu, snapshot ticket đầy đủ, dữ liệu demo
+src/api.test.ts            test snapshot còn trạng thái done, fetchTickets vẫn lọc cần người
 src/activity.ts            đọc activity/recent/tasks/stats phòng thủ, chọn màn hình, bong bóng và demo (thuần)
 src/activity.test.ts       test activity, stale, task, chồng bong bóng và dữ liệu đổi giữa chừng
-src/overlay.ts             canvas chữ phủ: bong bóng hoạt động và tiến độ task
+src/overlay.ts             canvas chữ phủ: biển phòng, banner, bong bóng hoạt động và tiến độ task
+src/overlay.test.ts        test biển, banner, confetti, resize và reduced motion
 src/agent-tooltip.ts       tooltip chuột/chạm: ticket, vai trò, hoạt động, task, stats
 src/agent-tooltip.css      kiểu hiển thị tooltip nhân vật
 src/agent-tooltip.test.ts  test vùng chạm và nhân vật chồng nhau
@@ -104,9 +112,18 @@ src/ui/drawer.test.ts      test DOM số liệu cache, fallback, màu và cập 
 src/ui/feed.ts             feed hoạt động, phím ]
 src/ui/feed.css            kiểu feed
 src/main.ts                vòng lặp, poll, vùng trống, chọn agent, feed, phím P [ ] Esc
-src/main.test.ts           test ghép nối Cần bạn, stats tới UI, vòng đời agent, đổi nguồn, lỗi và hồi phục poll
-src/scene/index.ts         ghép cảnh, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
-src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
+src/main.test.ts           test ghép nối Cần bạn, chọn agent, stats tới UI, vòng đời agent, đổi nguồn, lỗi và hồi phục poll
+src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
+src/scene/index.test.ts    test cache nền, xe, quầng màn hình và fit nguồn sáng
+src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ, sân; giữ chỗ ngồi theo id (hàm thuần)
+src/scene/outdoor.ts       ngoại cảnh thuần: cỏ, cây, bụi, đèn, lối, đường và xe
+src/scene/outdoor.test.ts  test seed, footprint cây/đèn và xe reduced motion
+src/scene/lighting.ts      độ sáng theo giờ địa phương và cache lightmap
+src/scene/lighting.test.ts test đêm, bình minh, ngày, hoàng hôn và cache bucket
+src/scene/room-events.ts   so snapshot ticket: MR mới, done, escalated, banner 10 giây
+src/scene/room-events.test.ts  test MR, done, escalated, ánh xạ phòng và hàng đợi
+src/scene/demo-events.ts   snapshot demo định kỳ, đi qua cùng bộ phát hiện banner
+src/scene/demo-events.test.ts  test chu kỳ MR/done/escalated và reset nguồn
 src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo thời gian (hàm thuần)
 src/scene/actors.ts        nhân vật đi vào/ra theo thay đổi của agents[]
 src/scene/tiles.ts         sàn gỗ, sàn phòng nghỉ, tường, vách, ô cửa

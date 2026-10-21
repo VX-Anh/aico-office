@@ -1,10 +1,25 @@
 // Bố cục cảnh (hàm thuần, không vẽ): các phòng provider xếp một hàng ở trên, phòng nghỉ chung trải ngang ở dưới.
 // Toạ độ tính theo pixel gốc; CSS phóng to với image-rendering: pixelated.
+// Toà nhà nằm lùi vào sân (YARD): phòng, cửa, bàn, ghế, phòng nghỉ và sceneSize cùng một gốc (0,0).
 
 import { type WorkerAgent, type WorkerStatus, roomAgents } from "../api";
 import type { Pt, Rect } from "./pixel";
 
 export const WALL = 5; // độ dày viền ngoài và vách ngăn
+
+// Lề ngoại cảnh quanh toà nhà. Đổi các số này thì sceneSize, lối đi và đường nhựa đổi theo.
+export const YARD = {
+  left: 40,
+  right: 40,
+  top: 56, // hàng cây sát mép trên, phần dưới chừa dải biển/banner
+  apron: 16, // cỏ giữa móng nhà và lối đi, chỗ đứng của đèn
+  path: 18,
+  road: 26,
+  bottom: 10,
+} as const;
+
+// Dải trống phía trên mỗi phòng, sát mái: overlay đặt biển và banner trong rect này.
+export const SIGN_BAND_H = 28;
 export const ROOM_WALL_H = 28; // mặt trước tường trên của phòng
 const ROOM_FLOOR_H = 60;
 const ROOM_H = ROOM_WALL_H + ROOM_FLOOR_H;
@@ -44,6 +59,8 @@ export interface RoomBox extends Rect {
   clock: Pt;
   usageBoard: Rect;
   plateY: number;
+  signAnchor: Pt; // mép trên, giữa biển tên (overlay)
+  signBand: Rect; // cả dải biển + banner, không đè sàn phòng
 }
 
 export interface Sofa extends Rect {
@@ -72,16 +89,32 @@ export interface LoungeBox extends Rect {
 export interface Layout {
   width: number;
   height: number;
+  building: Rect; // toà nhà kể cả tường ngoài
+  path: Rect; // lối lát gạch dưới toà nhà
+  road: Rect; // dải nhựa dưới lối đi
   rooms: RoomBox[];
   lounge: LoungeBox;
   storage: Rect | null; // phần dư bên phải hàng phòng: khối tường kín
 }
 
-function roomBox(worker: WorkerStatus, index: number, x: number): RoomBox {
+/** Biển phòng cho overlay: hình học lấy từ layout, không từ trạng thái đi bộ của actor. */
+export interface RoomSign {
+  key: string;
+  anchor: Pt;
+  band: Rect;
+  name: string;
+  state: WorkerStatus["state"];
+  agents: number;
+  slots: number;
+  overflow: number;
+  /** Lỗi chạy gần nhất, trừ offline/limited (hai trạng thái đó không gắn dấu !). */
+  error: boolean;
+}
+
+function roomBox(worker: WorkerStatus, index: number, x: number, y: number): RoomBox {
   const { agents, slots } = roomAgents(worker);
   // phòng 0 chỗ vẫn rộng bằng 1 chỗ; không hẹp hơn mức đủ treo biển tên
   const w = Math.max(ROOM_MIN_W, Math.max(1, slots) * DESK_W + ROOM_PAD * 2);
-  const y = WALL;
   const floorY = y + ROOM_WALL_H;
   const deskX = x + Math.floor((w - slots * DESK_W) / 2);
   const desks = Array.from({ length: slots }, (_, k) => {
@@ -108,6 +141,8 @@ function roomBox(worker: WorkerStatus, index: number, x: number): RoomBox {
     clock: { x: x + w - 16, y: y + 14 },
     usageBoard: { x: x + 33, y: y + 13, w: 60, h: 15 },
     plateY: y + 2,
+    signAnchor: { x: cx, y: y - WALL - SIGN_BAND_H },
+    signBand: { x, y: y - WALL - SIGN_BAND_H, w, h: SIGN_BAND_H },
   };
 }
 
@@ -160,10 +195,12 @@ function loungeBox(x: number, y: number, w: number, rooms: RoomBox[]): LoungeBox
 }
 
 export function computeLayout(workers: WorkerStatus[]): Layout {
+  const ox = YARD.left;
+  const oy = YARD.top;
   const rooms: RoomBox[] = [];
-  let x = WALL;
+  let x = ox + WALL;
   workers.forEach((worker, index) => {
-    const room = roomBox(worker, index, x);
+    const room = roomBox(worker, index, x, oy + WALL);
     rooms.push(room);
     x += room.w + WALL;
   });
@@ -171,12 +208,32 @@ export function computeLayout(workers: WorkerStatus[]): Layout {
     if (i < rooms.length - 1) room.sideDoor = { x: room.x + room.w, y: room.aisleY - 13, w: WALL, h: 15 };
   });
   const rowRight = x;
-  const width = Math.max(rowRight, LOUNGE_MIN_W + WALL * 2);
-  const loungeY = WALL + ROOM_H + WALL;
-  const lounge = loungeBox(WALL, loungeY, width - WALL * 2, rooms);
-  const storageW = width - WALL - rowRight;
-  const storage = storageW > 0 ? { x: rowRight, y: WALL, w: storageW, h: ROOM_H } : null;
-  return { width, height: loungeY + LOUNGE_H + WALL, rooms, lounge, storage };
+  const innerRight = Math.max(rowRight, ox + LOUNGE_MIN_W + WALL * 2);
+  const loungeY = oy + WALL + ROOM_H + WALL;
+  const buildingW = innerRight - ox;
+  const lounge = loungeBox(ox + WALL, loungeY, buildingW - WALL * 2, rooms);
+  const storageW = innerRight - WALL - rowRight;
+  const storage = storageW > 0 ? { x: rowRight, y: oy + WALL, w: storageW, h: ROOM_H } : null;
+  const building = { x: ox, y: oy, w: buildingW, h: lounge.y + lounge.h + WALL - oy };
+  const width = innerRight + YARD.right;
+  const path = { x: 0, y: building.y + building.h + YARD.apron, w: width, h: YARD.path };
+  const road = { x: 0, y: path.y + path.h, w: width, h: YARD.road };
+  const height = road.y + road.h + YARD.bottom;
+  return { width, height, building, path, road, rooms, lounge, storage };
+}
+
+export function roomSigns(layout: Layout): RoomSign[] {
+  return layout.rooms.map((room) => ({
+    key: room.worker.name,
+    anchor: room.signAnchor,
+    band: room.signBand,
+    name: room.worker.name,
+    state: room.worker.state,
+    agents: room.agents.length,
+    slots: room.slots,
+    overflow: Math.max(0, room.agents.length - room.slots),
+    error: Boolean(room.worker.last_error) && room.worker.state !== "limited" && room.worker.state !== "offline",
+  }));
 }
 
 export function sceneSize(workers: WorkerStatus[]): { width: number; height: number } {

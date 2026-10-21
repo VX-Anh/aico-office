@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { demoWorkers } from "../api";
+import { sceneSize } from "../scene/layout";
 import { computeInsets, fitScene, type Panels } from "./viewport";
 
 const view = { width: 1440, height: 900 };
@@ -71,5 +73,25 @@ describe("fitScene", () => {
   });
   it("vùng trống bằng 0 và dpr hỏng không gây NaN", () => {
     expect(fitScene({ left: 0, top: 0, width: 0, height: 0 }, scene, NaN)).toMatchObject({ k: 1, cssW: 0, cssH: 0, crisp: false });
+  });
+  it("cảnh có sân vẫn nằm gọn trong vùng trống 1440×900", () => {
+    const insets = computeInsets(view, panels, opts);
+    const free = {
+      left: insets.left,
+      top: insets.top,
+      width: view.width - insets.left - insets.right,
+      height: view.height - insets.top - insets.bottom,
+    };
+    const size = sceneSize(demoWorkers(0));
+    expect(size.width).toBeGreaterThan(400);
+    expect(size.height).toBeGreaterThan(200);
+    const fit = fitScene(free, size, 1);
+    expect(fit.cssW).toBeGreaterThan(0);
+    expect(fit.cssW).toBeLessThanOrEqual(free.width + 0.01);
+    expect(fit.cssH).toBeLessThanOrEqual(free.height + 0.01);
+    expect(fit.left).toBeGreaterThanOrEqual(free.left - 0.01);
+    expect(fit.top).toBeGreaterThanOrEqual(free.top - 0.01);
+    expect(fit.left + fit.cssW).toBeLessThanOrEqual(free.left + free.width + 0.01);
+    expect(fit.top + fit.cssH).toBeLessThanOrEqual(free.top + free.height + 0.01);
   });
 });

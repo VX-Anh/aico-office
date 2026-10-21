@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkerAgent, WorkerStatus } from "../api";
 import type { Rect } from "./pixel";
 import { textWidth } from "./font";
-import { ROOM_WALL_H, WALL, assignSeats, computeLayout, resetSeats } from "./layout";
+import { ROOM_WALL_H, SIGN_BAND_H, WALL, YARD, assignSeats, computeLayout, resetSeats, roomSigns, sceneSize } from "./layout";
 
 function agent(id: string): WorkerAgent {
   return { id, role: "coder", ticket_id: null, mode: "write", started_at: "2026-01-01T00:00:00Z" };
@@ -133,5 +133,73 @@ describe("computeLayout", () => {
   it("phòng nghỉ đủ chỗ: sofa + chỗ đứng bằng ít nhất số phòng", () => {
     const many = computeLayout(Array.from({ length: 6 }, (_, i) => w(`p${i}`, { slots: 1 })));
     expect(many.lounge.spots.length + many.lounge.standSpots.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("sceneSize trùng layout, toà nhà và sân cùng một hệ toạ độ", () => {
+    const workers = [w("claude", { slots: 3 }), w("codex", { slots: 1 }), w("cursor", { slots: 0 })];
+    const layout = computeLayout(workers);
+    expect(sceneSize(workers)).toEqual({ width: layout.width, height: layout.height });
+    expect(layout.building).toMatchObject({ x: YARD.left, y: YARD.top });
+    expect(layout.width - (layout.building.x + layout.building.w)).toBe(YARD.right);
+    expect(layout.path).toMatchObject({ x: 0, w: layout.width, h: YARD.path });
+    expect(layout.path.y).toBe(layout.building.y + layout.building.h + YARD.apron);
+    expect(layout.road).toMatchObject({ x: 0, w: layout.width, h: YARD.road });
+    expect(layout.road.y).toBe(layout.path.y + layout.path.h);
+    expect(layout.height).toBe(layout.road.y + layout.road.h + YARD.bottom);
+    for (const room of layout.rooms) {
+      expect(room.x).toBeGreaterThanOrEqual(layout.building.x + WALL);
+      expect(room.y).toBe(layout.building.y + WALL);
+      expect(room.x + room.w).toBeLessThanOrEqual(layout.building.x + layout.building.w - WALL);
+      expect(room.signAnchor).toEqual({ x: room.x + Math.floor(room.w / 2), y: room.signBand.y });
+      expect(room.signBand.h).toBe(SIGN_BAND_H);
+      expect(room.signBand.y + room.signBand.h).toBe(layout.building.y);
+      expect(room.signBand.y).toBeGreaterThanOrEqual(0);
+    }
+    const lounge = layout.lounge;
+    expect(lounge.x).toBeGreaterThanOrEqual(layout.building.x);
+    expect(lounge.y + lounge.h).toBeLessThanOrEqual(layout.building.y + layout.building.h);
+    if (layout.storage) {
+      expect(layout.storage.x + layout.storage.w).toBeLessThanOrEqual(layout.building.x + layout.building.w);
+    }
+  });
+
+  it("neo biển đứng yên khi agent mất hoặc offline, dịch khi slots phòng trước đổi", () => {
+    const codex = (slots: number, agents: number, state: WorkerStatus["state"] = "working", front = 1) => computeLayout([
+      w("front", { slots: front }),
+      w("codex", { state, slots, agents: Array.from({ length: agents }, (_, i) => agent(`a${i}`)) }),
+    ]);
+    const seated = roomSigns(codex(2, 2));
+    const gone = roomSigns(codex(2, 0));
+    const back = roomSigns(codex(2, 2));
+    expect(gone[1].anchor).toEqual(seated[1].anchor);
+    expect(gone[1].band).toEqual(seated[1].band);
+    expect(gone[1].agents).toBe(0);
+    expect(back[1]).toEqual(seated[1]);
+    expect(roomSigns(codex(2, 2, "offline"))[1]).toMatchObject({ state: "offline", anchor: seated[1].anchor, agents: 2 });
+    expect(roomSigns(codex(2, 0, "limited"))[1]).toMatchObject({ state: "limited", agents: 0, slots: 2, overflow: 0, error: false });
+    expect(roomSigns(codex(1, 4))[1]).toMatchObject({ agents: 4, slots: 1, overflow: 3, error: false });
+    const erred = computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "working", slots: 2, agents: [agent("a")], last_error: "CLI lỗi" }),
+    ]);
+    expect(roomSigns(erred)[1].error).toBe(true);
+    expect(roomSigns(computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "offline", slots: 2, agents: [agent("a")], last_error: "CLI lỗi" }),
+    ]))[1].error).toBe(false);
+    expect(roomSigns(computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "limited", slots: 2, agents: [], last_error: "hết hạn" }),
+    ]))[1].error).toBe(false);
+    // slots 1 và 2 đều chạm ROOM_MIN_W nên tâm phòng không nhảy; slots 4 mới nới rộng.
+    const wideRoom = roomSigns(codex(4, 4));
+    expect(wideRoom[1].anchor.x).toBeGreaterThan(seated[1].anchor.x);
+    expect(wideRoom[1].slots).toBe(4);
+    expect(roomSigns(codex(1, 1))[1].anchor).toEqual(seated[1].anchor);
+    expect(roomSigns(codex(1, 1))[1].anchor.x).toBeLessThan(wideRoom[1].anchor.x);
+    const widerFront = roomSigns(codex(2, 2, "working", 4));
+    expect(widerFront[1].anchor.x).toBeGreaterThan(seated[1].anchor.x);
+    expect(sceneSize([w("front", { slots: 4 }), w("codex", { slots: 2 })]).width)
+      .toBeGreaterThan(sceneSize([w("front", { slots: 1 }), w("codex", { slots: 2 })]).width);
   });
 });

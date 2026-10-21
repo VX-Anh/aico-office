@@ -1,7 +1,15 @@
 // Chữ dùng pixel màn hình để giữ dấu tiếng Việt sắc nét khi cảnh được phóng to.
 import { type Bubble, bubbleFor, resolveBubbles, taskProgress, truncate } from "./activity";
 import type { WorkerAgent } from "./api";
-import { BUBBLE } from "./scene/palette";
+import type { RoomSign } from "./scene/layout";
+import { BANNER, BUBBLE, LAMP } from "./scene/palette";
+import { type RoomBanner, bannerText } from "./scene/room-events";
+
+export interface OverlayExtras {
+  signs?: readonly RoomSign[];
+  banners?: readonly RoomBanner[];
+  reducedMotion?: boolean;
+}
 
 // Nhận phần hình học của SceneFigure, không phụ thuộc vòng vẽ cảnh.
 interface OverlayFigure {
@@ -47,8 +55,32 @@ function labelFor(ctx: CanvasRenderingContext2D, bubble: Bubble, compact: boolea
   return label;
 }
 
+function liveBanners(banners: readonly RoomBanner[], now: number): RoomBanner[] {
+  return banners.filter((banner) => now >= banner.startedAt && now < banner.expiresAt);
+}
+
+function drawConfetti(
+  ctx: CanvasRenderingContext2D,
+  banner: RoomBanner,
+  box: { x: number; y: number; w: number },
+  now: number,
+  reduced: boolean,
+): void {
+  if (reduced || banner.kind !== "done") return;
+  const elapsed = now - banner.startedAt;
+  const span = Math.max(1, banner.expiresAt - banner.startedAt);
+  if (elapsed < 0 || elapsed >= span) return;
+  const width = Math.max(8, box.w - 2);
+  for (let i = 0; i < 8; i++) {
+    ctx.fillStyle = BANNER.confetti[i % BANNER.confetti.length];
+    const x = box.x + ((i * 17 + Math.floor(elapsed / 80)) % width);
+    const y = box.y - 2 - ((i * 5 + Math.floor(elapsed / 50)) % 14);
+    ctx.fillRect(x, y, 2, 2);
+  }
+}
+
 export function createOverlay(canvas: HTMLCanvasElement): {
-  draw(figures: OverlayFigure[], sceneW: number, now: number): void;
+  draw(figures: OverlayFigure[], sceneW: number, now: number, extras?: OverlayExtras): void;
 } {
   const overlay = document.createElement("canvas");
   overlay.className = "activity-overlay";
@@ -62,7 +94,7 @@ export function createOverlay(canvas: HTMLCanvasElement): {
   const ctx = overlay.getContext("2d");
 
   return {
-    draw(figures, sceneW, now): void {
+    draw(figures, sceneW, now, extras: OverlayExtras = {}): void {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       const dpr = window.devicePixelRatio || 1;
@@ -86,9 +118,59 @@ export function createOverlay(canvas: HTMLCanvasElement): {
       ctx.textAlign = "left";
       ctx.lineWidth = 1;
       const scale = width / sceneW;
+      const maxWidth = Math.max(1, width - 2);
+      const reduced = extras.reducedMotion === true;
+      const signs = extras.signs ?? [];
+      const signBox = new Map<string, { x: number; y: number; w: number; h: number }>();
+      for (const sign of signs) {
+        const overflow = sign.overflow ?? Math.max(0, sign.agents - sign.slots);
+        const showError = sign.error && sign.state !== "offline" && sign.state !== "limited";
+        const name = [...sign.name.trim()].slice(0, 16).join("");
+        const label = `${name}  ${sign.agents}/${sign.slots}${overflow > 0 ? ` +${overflow}` : ""}${showError ? " !" : ""}`;
+        const w = Math.min(maxWidth, ctx.measureText(label).width + PAD * 2 + 10);
+        const h = 22;
+        const x = clamp(sign.anchor.x * scale - w / 2, 1, width - w - 1);
+        const y = clamp((sign.band.y + sign.band.h) * scale - h - 1, 1, height - h - 1);
+        signBox.set(sign.key, { x, y, w, h });
+        ctx.fillStyle = sign.state === "offline" ? BANNER.offlineBg : BANNER.bg;
+        ctx.strokeStyle = BANNER.border;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, Math.min(4, h / 2));
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = LAMP[sign.state];
+        ctx.fillRect(x + 6, y + Math.floor((h - 6) / 2), 6, 6);
+        ctx.fillStyle = sign.state === "offline" ? BANNER.offlineText : BANNER.text;
+        ctx.fillText(label, x + 16, y + h / 2, Math.max(1, w - 20));
+        if (showError) {
+          ctx.fillStyle = BANNER.escalated;
+          ctx.fillRect(x + w - 8, y + 4, 4, h - 8);
+        }
+      }
+      const banners = liveBanners(extras.banners ?? [], now);
+      const stacked = new Map<string, number>();
+      for (const banner of banners) {
+        const host = signBox.get(banner.provider);
+        if (!host) continue;
+        const text = bannerText(banner.kind, banner.ticket);
+        const w = Math.min(maxWidth, ctx.measureText(text).width + PAD * 2);
+        const h = 20;
+        const slot = stacked.get(banner.provider) ?? 0;
+        stacked.set(banner.provider, slot + 1);
+        const x = clamp(host.x + host.w / 2 - w / 2, 1, width - w - 1);
+        const y = clamp(host.y - (h + 2) * (slot + 1), 1, height - h - 1);
+        ctx.fillStyle = BANNER[banner.kind];
+        ctx.strokeStyle = banner.kind === "escalated" ? BANNER.escalated : BANNER.border;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, Math.min(4, h / 2));
+        ctx.fill();
+        ctx.stroke();
+        drawConfetti(ctx, banner, { x, y, w }, now, reduced);
+        ctx.fillStyle = banner.kind === "escalated" ? BANNER.bg : BANNER.text;
+        ctx.fillText(text, x + PAD, y + h / 2, Math.max(1, w - PAD * 2));
+      }
       const active = figures.filter((figure) => figure.working);
       const placed: PlacedBubble[] = [];
-      const maxWidth = Math.max(1, width - 2);
       for (const figure of active) {
         const bubble = bubbleFor(figure.agent, now);
         if (!bubble) continue;
