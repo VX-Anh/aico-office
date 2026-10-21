@@ -1,136 +1,50 @@
+@import "./ui/tokens.css";
+
 :root {
-  --bg: #1b1e25;
-  --panel: #252a33;
-  --text: #e6e9ef;
-  --muted: #9aa3b2;
-  --idle: #4fae60;
-  --working: #f5c26b;
-  --limited: #e06c75;
-  --offline: #5c6370;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
+  font-size: 14px;
   color: var(--text);
   background: var(--bg);
+  color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  /* Thanh cuộn mảnh hợp với panel kính. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+/* Cảnh phủ toàn màn, panel nổi bên trên: trang không cuộn, từng panel tự cuộn. */
+html, body { height: 100%; overflow: hidden; }
 body { margin: 0; background: var(--bg); }
 
-.top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--panel);
-}
-.top h1 { margin: 0; font-size: 18px; letter-spacing: 1px; }
-.conn { font-size: 13px; color: var(--muted); }
-.conn.ok { color: var(--idle); }
-.conn.bad { color: var(--limited); }
-.conn.demo { color: var(--working); }
-#settings { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-#settings input, #settings button {
-  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 4px;
-  border: 1px solid #3a4150; background: #1b1e25; color: var(--text);
-}
-#settings button { cursor: pointer; background: #343b48; }
+button, input, textarea, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-main { max-width: 1528px; margin: 0 auto; padding: 16px; }
-#office {
-  display: block;
-  width: 100%;
-  image-rendering: pixelated;
-  border-radius: 6px;
-  border: 2px solid #11141a;
-}
+/* Trạng thái kết nối, main.ts đổi class theo nguồn và kết quả poll. */
+.conn { font-size: 13px; color: var(--text-dim); }
+.conn.ok { color: var(--st-working); }
+.conn.bad { color: var(--lvl-crit); }
+.conn.demo { color: var(--st-need); }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.legend-item { display: inline-flex; align-items: center; gap: 6px; }
-.swatch {
-  display: inline-block;
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-.card {
-  background: var(--panel);
-  border-radius: 6px;
-  padding: 12px 14px;
-  border-top: 4px solid var(--offline);
-}
-.card.state-idle { border-top-color: var(--idle); }
-.card.state-working { border-top-color: var(--working); }
-.card.state-limited { border-top-color: var(--limited); }
-.card-head { display: flex; justify-content: space-between; align-items: center; }
-.name { margin: 0; font-size: 16px; text-transform: capitalize; }
-.badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #1b1e25; }
-.state-idle .badge { color: var(--idle); }
-.state-working .badge { color: var(--working); }
-.state-limited .badge { color: var(--limited); }
-.state-offline .badge { color: var(--muted); }
-.roles { margin: 6px 0 10px; font-size: 13px; color: var(--muted); }
-.row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 3px 0; }
-.label { color: var(--muted); }
-.value { text-align: right; }
-.limit {
-  margin: 8px 0;
-  padding: 8px;
-  border-radius: 4px;
-  background: rgba(224, 108, 117, 0.12);
-  font-size: 13px;
-}
-.limit p { margin: 4px 0 0; color: var(--muted); }
-.error { margin: 8px 0 0; font-size: 12px; color: var(--limited); word-break: break-word; }
-.agents { list-style: none; margin: 2px 0 6px; padding: 0; }
-.agent-row { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
-.agent-role { color: var(--muted); }
-.agent-row .value { margin-left: auto; }
-
-.usage { margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
-.usage-title { margin: 0 0 4px; font-size: 13px; }
-.usage-window { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }
-.usage-window .swatch { border-radius: 0; }
-.usage .row { flex-wrap: wrap; }
-.usage .value { margin-left: auto; }
-.usage-note, .usage-stale { margin: 4px 0 0; color: var(--muted); }
-.usage-stale { color: var(--working); }
-
-#agents-count, .needs-summary { font-size: 13px; }
-.needs-summary { display: inline-flex; align-items: center; gap: 6px; }
-#needs-count {
-  font: inherit;
-  color: var(--muted);
+/* Nền tối quanh cảnh; main.ts đặt vị trí và kích thước canvas theo vùng trống. */
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   background: var(--bg);
-  border: 1px solid var(--muted);
-  border-radius: 4px;
-  padding: 6px 8px;
 }
-#needs-count.hot { color: var(--working); border-color: var(--working); cursor: pointer; }
-#needs-count:disabled { opacity: 0.65; }
-#tickets-error { color: var(--limited); cursor: help; }
+#office {
+  position: absolute;
+  display: block;
+  left: 0;
+  top: 0;
+  image-rendering: pixelated;
+  border-radius: var(--radius-sm);
+  outline: 1px solid var(--line);
+}
 
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.workspace.has-needs { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); }
-.stage { position: relative; min-width: 0; align-self: start; }
-/* Chiều cao canvas quyết định hàng; danh sách dài cuộn trong cột. */
-#needs { contain: size; min-height: 0; overflow: auto; }
-
-@media (max-width: 899px) {
-  .workspace.has-needs { grid-template-columns: minmax(0, 1fr); }
-  #needs { contain: none; max-height: 70vh; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01s !important; }
 }

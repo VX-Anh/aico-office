@@ -1,58 +1,74 @@
-/* Cột "Cần bạn": nằm trong grid cạnh canvas (style.css lo bố cục), không đè lên canvas. */
+/* Cột "Cần bạn": nằm trong tab của ngăn chi tiết (drawer.css lo vị trí), ngăn tự cuộn. */
 .needs-column {
   min-width: 0;
-  overflow: auto;
-  background: var(--panel);
-  border: 1px solid #3a4150;
-  border-radius: 6px;
-  padding: 8px;
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 .needs-column[hidden] { display: none; }
-.needs-column h2 { margin: 0 0 4px; font-size: 15px; }
-.needs-error { margin: 4px 0; color: var(--limited); }
+.needs-column h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  font-weight: 600;
+}
+.needs-error { margin: 4px 0; color: var(--lvl-crit); }
 .needs-error:empty { display: none; }
 
 .need-card {
-  padding: 8px;
-  margin-top: 8px;
-  border: 1px solid #3a4150;
-  border-radius: 6px;
-  background: var(--bg);
+  padding: 10px;
+  margin-top: var(--gap);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  /* Vạch trái theo mức để nhận loại thẻ khi lướt nhanh. */
+  box-shadow: inset 3px 0 0 var(--st-need);
 }
+.need-card:has(.need-kind-escalated) { box-shadow: inset 3px 0 0 var(--lvl-crit); }
 .need-card[aria-busy="true"] { opacity: 0.75; }
-.need-card.flash { animation: need-flash 1.2s ease-out; }
+.need-card.flash { animation: need-flash 1.2s var(--ease); }
 @keyframes need-flash {
-  0%, 40% { border-color: var(--working); box-shadow: 0 0 0 2px var(--working); }
-  100% { border-color: #3a4150; box-shadow: none; }
+  0%, 40% { border-color: var(--st-need); background: var(--need-soft); }
+  100% { border-color: var(--line); background: var(--hover); }
 }
 .need-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-.need-kind { padding: 0 6px; border-radius: 3px; background: #343b48; color: var(--working); }
-.need-kind-escalated { color: var(--limited); }
-.need-waited { margin-left: auto; color: var(--muted); }
-.need-card h3 { margin: 6px 0; font-size: 14px; }
-.need-reason { margin: 6px 0; color: var(--muted); }
+.need-kind {
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--need-soft);
+  color: var(--st-need);
+  font-size: 12px;
+}
+.need-kind-escalated { background: var(--crit-soft); color: var(--lvl-crit); }
+.need-waited { margin-left: auto; color: var(--text-dim); font-family: var(--font-mono); font-size: 12px; }
+.need-card h3 { margin: 6px 0; font-size: 14px; font-weight: 600; }
+.need-reason { margin: 6px 0; color: var(--text-dim); }
 .need-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
 .need-links[hidden], .need-links a[hidden], .need-reason[hidden], .need-confirm[hidden] { display: none; }
-.need-links a { color: var(--working); }
+.need-links a { color: var(--accent); }
 
 .need-card button, .need-card textarea {
-  font: inherit;
   color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 4px;
-  padding: 5px 7px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
 }
 .need-card button { cursor: pointer; }
+.need-card button:hover:not(:disabled) { border-color: var(--accent); }
 .need-card button:disabled { opacity: 0.45; cursor: default; }
 .need-card textarea { display: block; width: 100%; margin: 8px 0; resize: vertical; }
-.need-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.need-confirm { margin-top: 8px; padding: 6px; border: 1px dashed var(--limited); border-radius: 4px; }
-.need-confirm span { display: block; margin-bottom: 4px; }
+.need-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.need-confirm {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed var(--lvl-crit);
+  border-radius: var(--radius-sm);
+  background: var(--crit-soft);
+}
+.need-confirm span { display: block; margin-bottom: 6px; }
 .need-confirm button { margin-right: 4px; }
-.need-message { margin: 6px 0 0; color: var(--limited); }
+.need-message { margin: 6px 0 0; color: var(--lvl-crit); }
 .need-message:empty { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
