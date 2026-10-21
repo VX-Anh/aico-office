@@ -36,3 +36,7 @@
   margin-top: 6px;
   color: var(--text-dim);
 }
+
+.agent-tooltip-cache.ok { color: var(--lvl-ok); }
+.agent-tooltip-cache.warn { color: var(--lvl-warn); }
+.agent-tooltip-cache.crit { color: var(--lvl-crit); }

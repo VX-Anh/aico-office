@@ -83,7 +83,9 @@ describe("recentLines", () => {
 
 class TooltipNode {
   children: TooltipNode[] = [];
-  textContent = "";
+  private text = "";
+  get textContent(): string { return this.text + this.children.map((child) => child.textContent).join(""); }
+  set textContent(value: string) { this.text = value; this.children = []; }
   className = "";
   hidden = false;
   style = {};
@@ -103,17 +105,19 @@ class TooltipNode {
 let canvas: TooltipNode;
 let body: TooltipNode;
 let config: string | null;
+let documentListeners: Map<string, (event: unknown) => void>;
 beforeEach(() => {
   canvas = new TooltipNode();
   body = new TooltipNode();
   config = null;
-  vi.stubGlobal("document", { body, createElement: () => new TooltipNode(), addEventListener() {} });
+  documentListeners = new Map();
+  vi.stubGlobal("document", { body, createElement: () => new TooltipNode(), addEventListener: (type: string, fn: (event: unknown) => void) => documentListeners.set(type, fn) });
   vi.stubGlobal("window", { innerWidth: 800, innerHeight: 600 });
   vi.stubGlobal("localStorage", { getItem: () => config });
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-function openTooltip(initial = withRecent(), at = now) {
+function openTooltip(initial: Parameters<ReturnType<typeof createAgentTooltip>["update"]>[0][number] = withRecent(), at = now) {
   const tooltip = createAgentTooltip(canvas as unknown as HTMLCanvasElement);
   tooltip.update([initial], 100, at);
   canvas.listeners.get("pointermove")!({ pointerType: "mouse", clientX: 30, clientY: 40 });
@@ -193,6 +197,104 @@ describe("tooltip đang mở", () => {
     const { tooltip, node } = openTooltip();
     config = JSON.stringify({ baseUrl: "https://aico", token: "test" });
     tooltip.update([withRecent()], 100, now + 1);
+    expect(node.hidden).toBe(true);
+  });
+});
+
+const withStats = (stats: unknown, key = "a", x = 30) => ({
+  ...figure(key, x), agent: { ...figure(key).agent, stats },
+});
+const stats = (tokens_in = 1_120_000, tokens_cached: unknown = 1_033_000) => ({
+  tool_calls: 12, tokens_in, tokens_cached, tokens_out: 2500,
+});
+function statRows(node: TooltipNode) {
+  const start = node.children.findIndex((child) => child.textContent === "Thống kê");
+  return node.children.slice(start + 1);
+}
+function assertStats(node: TooltipNode, expected: string[], level: string | null) {
+  const rows = statRows(node);
+  expect(rows.map((row) => row.textContent)).toEqual(expected);
+  const suffixes = rows.flatMap((row) => row.children);
+  expect(suffixes.map((suffix) => suffix.className)).toEqual(level ? [`agent-tooltip-cache ${level}`] : []);
+}
+const cachedRows = ["Lần gọi tool: 12", "Token vào: 1,12 triệu (92% từ cache)", "Token mới: 87 nghìn", "Token ra: 2,5 nghìn"];
+const legacyRows = ["Lần gọi tool: 12", "Token vào: 1.120.000", "Token ra: 2.500"];
+
+describe("số liệu cache trong tooltip", () => {
+  it("hiện nội dung thật và chỉ tô hậu tố cache", () => {
+    const { node } = openTooltip(withStats(stats()));
+    assertStats(node, cachedRows, "ok");
+    expect(statRows(node)[1].children[0].textContent).toBe(" (92% từ cache)");
+  });
+
+  it("có → mất → có và hỏng → hồi phục không giữ dòng hoặc màu cũ", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { tooltip, node } = openTooltip(withStats(stats()));
+      let tick = 0;
+      for (const cached of [undefined, 1_033_000, "hỏng", 1_033_000, null, 1_033_000, -1, 1_033_000, Infinity, 1_033_000]) {
+        tooltip.update([withStats({ ...stats(), tokens_cached: cached })], 100, now + ++tick * 1000);
+        const valid = cached === 1_033_000;
+        assertStats(node, valid ? cachedRows : legacyRows, valid ? "ok" : null);
+      }
+    } finally { warn.mockRestore(); }
+  });
+
+  it("token tăng/giảm/reset, vượt đầu vào và qua ngưỡng màu mỗi giây", () => {
+    const { tooltip, node } = openTooltip(withStats(stats()));
+    const cases: [number, number, string, string, string | null][] = [
+      [2000, 1400, "2 nghìn (70% từ cache)", "600", "ok"],
+      [1000, 695, "1 nghìn (70% từ cache)", "305", "warn"],
+      [1000, 400, "1 nghìn (40% từ cache)", "600", "warn"],
+      [1000, 399, "1 nghìn (40% từ cache)", "601", "crit"],
+      [1000, 0, "1 nghìn (0% từ cache)", "1 nghìn", "crit"],
+      [1000, 1200, "1 nghìn (100% từ cache)", "0", "ok"],
+      [0, 0, "0", "0", null],
+      [1_120_000, 1_033_000, "1,12 triệu (92% từ cache)", "87 nghìn", "ok"],
+    ];
+    cases.forEach(([input, cached, label, fresh, level], index) => {
+      tooltip.update([withStats(stats(input, cached))], 100, now + index * 1000 + 999);
+      if (index === 0) assertStats(node, cachedRows, "ok");
+      tooltip.update([withStats(stats(input, cached))], 100, now + (index + 1) * 1000);
+      assertStats(node, ["Lần gọi tool: 12", `Token vào: ${label}`, `Token mới: ${fresh}`, "Token ra: 2,5 nghìn"], level);
+    });
+  });
+
+  it("đổi agent tức thì, số agent 1 → 2 → 1 không lẫn số liệu", () => {
+    const first = withStats(stats());
+    const second = withStats(stats(100, 20), "b", 70);
+    const { tooltip, node } = openTooltip(first);
+    tooltip.update([first, second], 100, now + 1);
+    canvas.listeners.get("pointermove")!({ pointerType: "mouse", clientX: 70, clientY: 40 });
+    assertStats(node, ["Lần gọi tool: 12", "Token vào: 100 (20% từ cache)", "Token mới: 80", "Token ra: 2,5 nghìn"], "crit");
+    tooltip.update([first], 100, now + 2);
+    expect(node.hidden).toBe(true);
+    tooltip.update([first, second], 100, now + 1000);
+    expect(node.hidden).toBe(true);
+    canvas.listeners.get("pointermove")!({ pointerType: "mouse", clientX: 30, clientY: 40 });
+    assertStats(node, cachedRows, "ok");
+    config = JSON.stringify({ baseUrl: "https://new", token: "new" });
+    tooltip.update([first], 100, now + 1001);
+    expect(node.hidden).toBe(true);
+    tooltip.update([withStats(stats(0, 0))], 100, now + 2000);
+    expect(node.hidden).toBe(true);
+    canvas.listeners.get("pointermove")!({ pointerType: "mouse", clientX: 30, clientY: 40 });
+    assertStats(node, ["Lần gọi tool: 12", "Token vào: 0", "Token mới: 0", "Token ra: 2,5 nghìn"], null);
+  });
+
+  it("giữ hover, chạm và định vị trong màn hình hẹp", () => {
+    vi.stubGlobal("window", { innerWidth: 120, innerHeight: 120 });
+    const { tooltip, node } = openTooltip(withStats(stats()));
+    expect(node.style).toEqual({ left: "8px", top: "8px" });
+    canvas.listeners.get("pointerleave")!({});
+    expect(node.hidden).toBe(true);
+    documentListeners.get("pointerdown")!({ pointerType: "touch", target: canvas, clientX: 30, clientY: 40 });
+    expect(node.hidden).toBe(false);
+    canvas.listeners.get("pointerleave")!({});
+    expect(node.hidden).toBe(false);
+    tooltip.update([withStats(stats(100, 70))], 100, now + 1000);
+    expect(statRows(node)[1].textContent).toBe("Token vào: 100 (70% từ cache)");
+    documentListeners.get("pointerdown")!({ pointerType: "touch", target: body });
     expect(node.hidden).toBe(true);
   });
 });
