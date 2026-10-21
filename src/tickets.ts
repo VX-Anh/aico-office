@@ -1,5 +1,6 @@
-// Logic thuần cho bảng ticket escalated: đọc phòng thủ dữ liệu /tickets và /events, chọn nút bật/tắt,
-// dựng request POST /tickets/{id}/escalation, dữ liệu demo. Không DOM, không fetch, không đọc giờ thật.
+// Logic thuần cho ticket cần người (duyệt kế hoạch, duyệt merge, escalated): đọc phòng thủ /tickets và
+// /events, chọn nút bật/tắt, ghi chú bắt buộc, dựng request /escalation và /decisions, dữ liệu demo.
+// Không DOM, không fetch, không đọc giờ thật.
 
 import type { ApiConfig, EscalationAction, Ticket, TicketArtifact } from "./api";
 
@@ -92,6 +93,43 @@ export function escalatedOnly(tickets: Ticket[]): Ticket[] {
   return tickets.filter((t) => t.status === "escalated");
 }
 
+export type NeedKind = "plan" | "merge" | "escalated";
+
+const NEED_STATUS: Record<string, NeedKind> = {
+  awaiting_plan_approval: "plan",
+  awaiting_merge_approval: "merge",
+  escalated: "escalated",
+};
+
+export const NEED_LABEL: Record<NeedKind, string> = {
+  plan: "duyệt kế hoạch",
+  merge: "duyệt merge",
+  escalated: "escalated",
+};
+
+export function needKind(status: string): NeedKind | null {
+  return Object.hasOwn(NEED_STATUS, status) ? NEED_STATUS[status] : null;
+}
+
+function updatedMs(ticket: Ticket): number {
+  return ticket.updated_at ? Date.parse(ticket.updated_at) : NaN;
+}
+
+// Mới nhất lên đầu; giờ thiếu hoặc hỏng xếp cuối. Bằng giờ thì theo id để thứ tự không nhảy qua các lần poll.
+export function needsYou<T extends Ticket>(tickets: T[]): T[] {
+  return tickets
+    .filter((t) => needKind(t.status) !== null)
+    .map((t) => ({ t, ms: updatedMs(t) }))
+    .sort((a, b) => {
+      const aOk = Number.isFinite(a.ms);
+      const bOk = Number.isFinite(b.ms);
+      if (aOk !== bOk) return aOk ? -1 : 1;
+      if (aOk && a.ms !== b.ms) return b.ms - a.ms;
+      return a.t.id < b.t.id ? -1 : a.t.id > b.t.id ? 1 : 0;
+    })
+    .map(({ t }) => t);
+}
+
 // Lý do chỉ tải lại khi ticket đổi: khoá theo id + updated_at.
 export function reasonKey(ticket: Ticket): string {
   return `${ticket.id}@${ticket.updated_at ?? ""}`;
@@ -170,6 +208,12 @@ export function mergeRequest(ticket: Ticket): { present: boolean; url: string | 
   return { present: mrs.length > 0, url };
 }
 
+export function previewLink(ticket: Ticket): string | null {
+  let url: string | null = null;
+  for (const a of ticket.artifacts) if (a.kind === "preview") url = safeUrl(a.url) ?? url;
+  return url;
+}
+
 export function actionAvailability(reason: string | null, ticket: Ticket): Record<EscalationAction, boolean> {
   return {
     retry_push: reason?.trimStart().startsWith(RETRY_PUSH_PREFIX) ?? false,
@@ -179,9 +223,51 @@ export function actionAvailability(reason: string | null, ticket: Ticket): Recor
   };
 }
 
-// Đẩy lại không mất gì nên gửi ngay; merge, đóng, đánh dấu lỗi khó quay lại nên hỏi trước.
+export type PlanDecision = "approved" | "revise" | "rejected";
+export type MergeDecision = "approved" | "changes_requested" | "rejected";
+export type Decision = PlanDecision | MergeDecision;
+export type NeedAction = Decision | EscalationAction;
+
+export const NEED_ACTIONS: { plan: PlanDecision[]; merge: MergeDecision[]; escalated: EscalationAction[] } = {
+  plan: ["approved", "revise", "rejected"],
+  merge: ["approved", "changes_requested", "rejected"],
+  escalated: ESCALATION_ACTIONS,
+};
+
+// Hành động có thuộc loại ticket không: thẻ cũ sau khi ticket đổi loại không được gửi nhầm endpoint.
+export function isActionOf(kind: "escalated", action: NeedAction): action is EscalationAction;
+export function isActionOf(kind: "plan" | "merge", action: NeedAction): action is Decision;
+export function isActionOf(kind: NeedKind, action: NeedAction): boolean;
+export function isActionOf(kind: NeedKind, action: NeedAction): boolean {
+  return (NEED_ACTIONS[kind] as NeedAction[]).includes(action);
+}
+
+// Duyệt kế hoạch/merge luôn bấm được (aico tự từ chối nếu trạng thái đã đổi); escalated theo lý do và MR.
+export function actionsFor(kind: NeedKind, reason: string | null, ticket: Ticket): { action: NeedAction; enabled: boolean }[] {
+  if (kind === "escalated") {
+    const available = actionAvailability(reason, ticket);
+    return ESCALATION_ACTIONS.map((action) => ({ action, enabled: available[action] }));
+  }
+  return NEED_ACTIONS[kind].map((action) => ({ action, enabled: true }));
+}
+
+// Trả về hay từ chối mà không nói lý do thì agent không biết sửa gì.
+export function commentRequired(action: NeedAction): boolean {
+  return action === "revise" || action === "changes_requested" || action === "rejected";
+}
+
+export function canSubmit(action: NeedAction, comment: string): boolean {
+  return !commentRequired(action) || comment.trim() !== "";
+}
+
+// Từ chối, merge, đóng, đánh dấu lỗi không quay lại được nên xác nhận trước; duyệt, yêu cầu sửa, đẩy lại thì gửi ngay.
+export function irreversible(action: NeedAction): boolean {
+  return action === "rejected" || action === "close" || action === "fail" || action === "merge";
+}
+
+/** @deprecated dùng `irreversible`; giữ cho escalation-panel.ts tới khi bỏ panel cũ */
 export function needsConfirm(action: EscalationAction): boolean {
-  return action !== "retry_push";
+  return irreversible(action);
 }
 
 export function apiUrl(config: ApiConfig, path: string): string {
@@ -197,6 +283,17 @@ export interface EscalationRequest {
   init: { method: "POST"; headers: Record<string, string>; body: string };
 }
 
+function postRequest(config: ApiConfig, path: string, body: unknown): EscalationRequest {
+  return {
+    url: apiUrl(config, path),
+    init: {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  };
+}
+
 export function buildEscalationRequest(
   config: ApiConfig,
   id: string,
@@ -204,23 +301,46 @@ export function buildEscalationRequest(
   actor: string,
   comment: string,
 ): EscalationRequest {
-  return {
-    url: apiUrl(config, ticketPath(id, "escalation")),
-    init: {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ action, actor, comment }),
-    },
-  };
+  return postRequest(config, ticketPath(id, "escalation"), { action, actor, comment });
 }
 
-// 409 (trạng thái không cho phép) và 501 (aico chưa hỗ trợ) có `detail` đọc được cho người dùng.
-export function escalationError(status: number, body: unknown): string {
+export function buildDecisionRequest(config: ApiConfig, id: string, decision: Decision, comment: string): EscalationRequest {
+  return postRequest(config, ticketPath(id, "decisions"), { decision, actor: "owner", comment });
+}
+
+// `detail` của aico là chuỗi (HTTPException) hoặc mảng {msg} (FastAPI 422); body khác thì chỉ báo mã.
+function detailText(body: unknown): string | null {
+  if (!isRecord(body)) return null;
+  const { detail } = body;
+  if (typeof detail === "string") return detail.trim() ? detail : null;
+  if (!Array.isArray(detail)) return null;
+  const msgs = detail
+    .map((d) => (isRecord(d) && typeof d.msg === "string" ? d.msg.trim() : ""))
+    .filter((m) => m);
+  return msgs.length ? msgs.join("; ") : null;
+}
+
+export function actionError(status: number, body: unknown): string {
   if (status === 401) return "Sai API token";
-  if ((status === 409 || status === 501) && isRecord(body) && typeof body.detail === "string" && body.detail.trim()) {
-    return body.detail;
+  const detail = status >= 400 ? detailText(body) : null;
+  return detail ?? `aico trả ${status}`;
+}
+
+/** @deprecated dùng `actionError` */
+export const escalationError = actionError;
+
+// Thời gian chờ tính từ lần đổi trạng thái gần nhất; giờ tương lai (lệch đồng hồ) coi như vừa xong.
+export function waitedLabel(updatedAt: string | null, now: number): string {
+  const ms = updatedAt ? Date.parse(updatedAt) : NaN;
+  if (!Number.isFinite(ms) || !Number.isFinite(now)) return "chưa rõ";
+  const s = Math.max(0, Math.floor((now - ms) / 1000));
+  if (s < 60) return `chờ ${s} giây`;
+  if (s < 3600) return `chờ ${Math.floor(s / 60)} phút`;
+  if (s < 86_400) {
+    const m = Math.floor((s % 3600) / 60);
+    return `chờ ${Math.floor(s / 3600)} giờ${m ? ` ${m} phút` : ""}`;
   }
-  return `aico trả ${status}`;
+  return `chờ ${Math.floor(s / 86_400)} ngày`;
 }
 
 // Demo: ticket kèm lý do có sẵn, vì không có /events để hỏi.
@@ -251,14 +371,64 @@ export function demoTickets(): DemoTicket[] {
   ];
 }
 
-const DEMO_RESULT: Record<EscalationAction, string> = {
-  retry_push: "in_progress",
-  merge: "done",
-  close: "closed",
-  fail: "failed",
+// Đủ 3 loại cần người. `now` cho trước thì giờ cập nhật tính lùi từ đó để "đã chờ" trông như thật.
+export function demoNeedTickets(now?: number): DemoTicket[] {
+  const at = (iso: string, minutesAgo: number) =>
+    now === undefined ? iso : new Date(now - minutesAgo * 60_000).toISOString();
+  const [push, merge] = demoTickets();
+  return [
+    {
+      id: "T-demo-plan",
+      title: "Cột Cần bạn thay bảng nổi",
+      status: "awaiting_plan_approval",
+      project: "aico-office",
+      artifacts: [],
+      updated_at: at("2026-10-21T08:20:00Z", 2),
+      reason: null,
+    },
+    {
+      id: "T-demo-review",
+      title: "Toast báo ticket cần người",
+      status: "awaiting_merge_approval",
+      project: "aico-office",
+      artifacts: [
+        { kind: "branch", ref: "aico/T-demo-review", url: null },
+        { kind: "merge_request", ref: "!57", url: "https://example.com/aico-office/merge_requests/57" },
+        { kind: "preview", ref: null, url: "https://example.com/aico-office/preview/57" },
+      ],
+      updated_at: at("2026-10-21T08:10:00Z", 12),
+      reason: null,
+    },
+    { ...push, updated_at: at(push.updated_at!, 45) },
+    { ...merge, updated_at: at(merge.updated_at!, 30) },
+  ];
+}
+
+const DEMO_RESULT: { plan: Record<PlanDecision, string>; merge: Record<MergeDecision, string>; escalated: Record<EscalationAction, string> } = {
+  plan: { approved: "in_progress", revise: "planning", rejected: "rejected" },
+  merge: { approved: "done", changes_requested: "in_progress", rejected: "rejected" },
+  escalated: { retry_push: "in_progress", merge: "done", close: "closed", fail: "failed" },
 };
 
-// Đổi trạng thái giả tại chỗ: ticket rời danh sách escalated như khi aico xử lý xong.
-export function applyDemoAction<T extends Ticket>(list: T[], id: string, action: EscalationAction): T[] {
-  return list.map((t) => (t.id === id ? { ...t, status: DEMO_RESULT[action] } : t));
+function demoResult(kind: NeedKind, action: NeedAction): string | null {
+  if (!isActionOf(kind, action)) return null;
+  return (DEMO_RESULT[kind] as Record<string, string>)[action];
+}
+
+// Đổi trạng thái giả tại chỗ: ticket rời danh sách cần người như khi aico xử lý xong.
+// Ticket đã đổi loại (thẻ cũ) hoặc hành động không thuộc loại thì không đổi gì, như aico trả 409.
+export function applyDemoAction<T extends Ticket>(list: T[], id: string, kind: NeedKind, action: NeedAction): T[];
+/** @deprecated dạng cũ chỉ cho escalated; giữ cho main.ts tới khi ghép cột "Cần bạn" */
+export function applyDemoAction<T extends Ticket>(list: T[], id: string, action: EscalationAction): T[];
+export function applyDemoAction<T extends Ticket>(
+  list: T[],
+  id: string,
+  kindOrAction: NeedKind | EscalationAction,
+  maybeAction?: NeedAction,
+): T[] {
+  const [kind, action]: [NeedKind, NeedAction] =
+    maybeAction === undefined ? ["escalated", kindOrAction as EscalationAction] : [kindOrAction as NeedKind, maybeAction];
+  const status = demoResult(kind, action);
+  if (status === null) return list;
+  return list.map((t) => (t.id === id && needKind(t.status) === kind ? { ...t, status } : t));
 }

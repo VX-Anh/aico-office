@@ -1,13 +1,19 @@
 // Đọc trạng thái worker từ aico: GET /workers (Bearer API token).
 // Không có cấu hình thì chạy chế độ demo với dữ liệu giả để xem giao diện.
-// Ticket escalated: GET /tickets, GET /tickets/{id}/events, POST /tickets/{id}/escalation.
+// Ticket cần người: GET /tickets, GET /tickets/{id}/events, POST /tickets/{id}/escalation (escalated),
+// POST /tickets/{id}/decisions (duyệt kế hoạch, duyệt merge).
 
 import {
+  type Decision,
+  type NeedAction,
+  type NeedKind,
+  actionError,
   apiUrl,
+  buildDecisionRequest,
   buildEscalationRequest,
-  escalatedOnly,
-  escalationError,
+  isActionOf,
   latestEscalationReason,
+  needsYou,
   parseTickets,
   ticketPath,
 } from "./tickets";
@@ -127,7 +133,7 @@ async function getJson(config: ApiConfig, path: string): Promise<unknown> {
 export async function fetchTickets(config: ApiConfig): Promise<Ticket[]> {
   const tickets = parseTickets(await getJson(config, "/tickets"), "/tickets");
   if (!tickets) throw new Error("aico trả danh sách ticket hỏng");
-  return escalatedOnly(tickets);
+  return needsYou(tickets);
 }
 
 // Danh sách event hỏng thì ném lỗi (không trả null) để cache lý do không giữ kết quả hỏng.
@@ -138,19 +144,42 @@ export async function fetchEscalationReason(config: ApiConfig, id: string): Prom
   return reason;
 }
 
-// Lỗi 409/501 ném Error mang `detail` của aico để panel hiện nguyên văn.
-export async function escalationAction(
+// Lỗi 4xx/5xx ném Error mang `detail` của aico để thẻ hiện nguyên văn.
+async function post(req: { url: string; init: RequestInit }): Promise<void> {
+  const resp = await fetch(req.url, req.init);
+  if (resp.ok) return;
+  const body: unknown = await resp.json().catch(() => null);
+  throw new Error(actionError(resp.status, body));
+}
+
+export function escalationAction(
   config: ApiConfig,
   ticketId: string,
   action: EscalationAction,
   actor: string,
   comment: string,
 ): Promise<void> {
-  const { url, init } = buildEscalationRequest(config, ticketId, action, actor, comment);
-  const resp = await fetch(url, init);
-  if (resp.ok) return;
-  const body: unknown = await resp.json().catch(() => null);
-  throw new Error(escalationError(resp.status, body));
+  return post(buildEscalationRequest(config, ticketId, action, actor, comment));
+}
+
+export function decisionAction(config: ApiConfig, ticketId: string, decision: Decision, comment: string): Promise<void> {
+  return post(buildDecisionRequest(config, ticketId, decision, comment));
+}
+
+// Một cửa cho cột "Cần bạn": escalated đi /escalation, duyệt kế hoạch/merge đi /decisions.
+// Hành động không thuộc loại (thẻ cũ sau khi ticket đổi loại) thì từ chối, không gửi nhầm endpoint.
+export async function needAction(
+  config: ApiConfig,
+  kind: NeedKind,
+  ticketId: string,
+  action: NeedAction,
+  comment: string,
+): Promise<void> {
+  if (kind === "escalated" && isActionOf("escalated", action)) {
+    return escalationAction(config, ticketId, action, "owner", comment);
+  }
+  if (kind !== "escalated" && isActionOf(kind, action)) return decisionAction(config, ticketId, action, comment);
+  throw new Error(`hành động ${action} không dùng được cho ticket ${kind}`);
 }
 
 // Agent con và số chỗ của phòng. aico bản cũ chỉ có `current` thì dựng lại từ đó.
