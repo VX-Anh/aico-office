@@ -367,13 +367,14 @@ export function demoTickets(): DemoTicket[] {
 }
 
 // Đủ 3 loại cần người. `now` cho trước thì giờ cập nhật tính lùi từ đó để "đã chờ" trông như thật.
+// Id kế hoạch trùng ticket_id của agent claude chạy lâu nhất, để chấm "cần bạn" gắn đúng người.
 export function demoNeedTickets(now?: number): DemoTicket[] {
   const at = (iso: string, minutesAgo: number) =>
     now === undefined ? iso : new Date(now - minutesAgo * 60_000).toISOString();
   const [push, merge] = demoTickets();
   return [
     {
-      id: "T-demo-plan",
+      id: "T-demo00",
       title: "Cột Cần bạn thay bảng nổi",
       status: "awaiting_plan_approval",
       project: "aico-office",

@@ -1,30 +1,37 @@
 import { withDemoActivity } from "./activity";
-import { createOverlay } from "./overlay";
-import { createAgentTooltip } from "./agent-tooltip";
-import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
-import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
-import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
-import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
+import { hitFigure, createAgentTooltip } from "./agent-tooltip";
+import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, saveConfig } from "./api";
 import { isShortcut, nextAttention, tabTitle } from "./attention";
-import { createToasts } from "./toasts";
 import { createLatestGate } from "./latest";
+import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
+import { createOverlay } from "./overlay";
+import { type SceneFigure, drawScene, resetActors, sceneSize } from "./scene/index";
 import { applyDemoAction, createReasonCache, demoNeedTickets, needKind, needsYou, NEED_LABEL } from "./tickets";
-import { relativeTime } from "./time";
+import { createToasts } from "./toasts";
+import { createDrawer } from "./ui/drawer";
+import { createFeed } from "./ui/feed";
+import { createFeedState, reduceFeed, resetFeed, type FeedState } from "./ui/feed-model";
+import { agentKey, drawerView, resolveSelection, type SelectedAgent } from "./ui/selection";
+import { createSidebar, type Sidebar } from "./ui/sidebar";
+import { createTopbar } from "./ui/topbar";
+import { computeInsets, fitScene, type Rect } from "./ui/viewport";
 import "./style.css";
 
 const POLL_MS = 3000;
-const STATE_LABEL: Record<WorkerStatus["state"], string> = {
-  idle: "Đang rảnh",
-  working: "Đang làm",
-  limited: "Hết hạn mức",
-  offline: "Mất kết nối",
-};
+const NARROW_QUERY = "(max-width: 899px)";
+// Trùng --gap và minFree mà viewport.test dùng: vùng trống không bị panel che, vẫn còn chỗ vẽ.
+const GAP = 10;
+const MIN_FREE = 100;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#office")!;
-const cards = document.querySelector<HTMLDivElement>("#cards")!;
+const stage = document.querySelector<HTMLElement>("#stage")!;
+const topbarRoot = document.querySelector<HTMLElement>("#topbar")!;
+const sidebarRoot = document.querySelector<HTMLElement>("#sidebar")!;
+const drawerRoot = document.querySelector<HTMLElement>("#drawer")!;
+const feedRoot = document.querySelector<HTMLElement>("#feed")!;
 const status = document.querySelector<HTMLSpanElement>("#conn")!;
 const form = document.querySelector<HTMLFormElement>("#settings")!;
-const legend = document.querySelector<HTMLDivElement>("#legend")!;
+const demoButton = document.querySelector<HTMLButtonElement>("#demo")!;
 const ctx = canvas.getContext("2d")!;
 const overlay = createOverlay(canvas);
 const tooltip = createAgentTooltip(canvas);
@@ -33,13 +40,27 @@ let config: ApiConfig | null = loadConfig();
 const initialNow = Date.now();
 let workers: WorkerStatus[] = withDemoActivity(demoWorkers(initialNow), initialNow);
 const workerGate = createLatestGate();
+// Đổi nguồn giữa chừng: poll cũ không được ghi feed hay mở lại ngăn.
+let sourceEpoch = 0;
 
-const agentsCount = document.querySelector<HTMLElement>("#agents-count")!;
 const needsCount = document.querySelector<HTMLButtonElement>("#needs-count")!;
 const ticketsError = document.querySelector<HTMLElement>("#tickets-error")!;
 let needItems: NeedItem[] = [];
 let focusedTicket: string | null = null;
-const workspace = document.querySelector<HTMLElement>(".workspace")!;
+let selectedKey: string | null = null;
+// null: theo drawerView. "needs": người dùng mở tab Cần bạn dù đang chọn agent.
+let tab: "agent" | "needs" | null = null;
+let needsDismissed = false;
+let previousNeedsCount = 0;
+let narrow = false;
+let feedState: FeedState = createFeedState();
+let free: Rect = { left: 0, top: 0, width: 0, height: 0 };
+let figures: SceneFigure[] = [];
+
+const shell: {
+  sidebar?: Sidebar;
+  feed?: ReturnType<typeof createFeed>;
+} = {};
 
 function ticketSource(current: ApiConfig | null): NeedSource {
   let tickets = demoNeedTickets(Date.now());
@@ -64,31 +85,142 @@ function ticketSource(current: ApiConfig | null): NeedSource {
   };
 }
 
-function focusTicket(id: string): void {
+function needIds(): Set<string> {
+  return new Set(needItems.map((item) => item.ticket.id));
+}
+
+function selectedAgent(): SelectedAgent | null {
+  return resolveSelection(selectedKey, workers);
+}
+
+// Agent biến mất, đổi started_at, hoặc phòng offline/limited: bỏ khoá để lần sau không tự mở.
+function dropMissingSelection(): boolean {
+  if (!selectedKey || selectedAgent()) return false;
+  selectedKey = null;
+  if (tab === "agent") tab = null;
+  return true;
+}
+
+function publish(): void {
+  const now = Date.now();
+  dropMissingSelection();
+  const selected = selectedAgent();
+  if (needItems.length === 0 && tab === "needs") tab = selected ? "agent" : null;
+  const showAgent = tab !== "needs" && selected !== null;
+  const view = drawerView({
+    selected: showAgent ? selected : null,
+    needsCount: needItems.length,
+    needsDismissed,
+    narrow,
+    previousNeedsCount,
+  });
+  // 0→1 sau khi đã đóng: drawerView mở lại, và phải xoá cờ kẻo lần publish sau đóng mất.
+  if (view.open && view.tab === "needs") {
+    needsDismissed = false;
+    tab = "needs";
+  }
+  drawer.render(
+    { ...view, needsCount: needItems.length },
+    selected ? { ...selected, needItems } : null,
+    now,
+  );
+  const ids = needIds();
+  topbar.update(workers, needItems.length, now, ids);
+  shell.sidebar?.update(workers, ids, selected?.key ?? null, now);
+}
+
+function absorbFeed(): void {
+  feedState = reduceFeed(feedState, workers, needItems, Date.now());
+  shell.feed?.render(feedState.lines);
+}
+
+function showNeeds(id: string): void {
+  needsDismissed = false;
+  tab = "needs";
+  publish();
   if (panel.focus(id)) focusedTicket = id;
 }
 
-const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
-const needsRoot = document.querySelector<HTMLElement>("#needs")!;
-const panel = createNeedsColumn(needsRoot, ticketSource(config), (items) => {
+function selectAgent(key: string): void {
+  selectedKey = key;
+  tab = "agent";
+  publish();
+}
+
+function closeDrawer(): void {
+  selectedKey = null;
+  tab = null;
+  needsDismissed = true;
+  publish();
+}
+
+function onNeedItems(items: NeedItem[]): void {
+  previousNeedsCount = needItems.length;
   needItems = items;
-  workspace.classList.toggle("has-needs", items.length > 0);
-  needsCount.classList.toggle("hot", items.length > 0);
-  needsCount.textContent = `Cần bạn: ${items.length}`;
-  needsCount.disabled = items.length === 0;
+  absorbFeed();
+  publish();
+  previousNeedsCount = items.length;
   document.title = tabTitle(items.length);
   if (!items.some((item) => item.ticket.id === focusedTicket)) focusedTicket = null;
   toasts.update(items.map((item) => ({ id: item.ticket.id, kind: item.kind, label: NEED_LABEL[item.kind] })));
-}, (error) => {
+}
+
+const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: showNeeds });
+const needsRoot = document.querySelector<HTMLElement>("#needs")!;
+const panel = createNeedsColumn(needsRoot, ticketSource(config), onNeedItems, (error) => {
   ticketsError.hidden = !error;
   ticketsError.title = error ?? "";
   ticketsError.setAttribute("aria-label", error ?? "");
 });
 
-// Bộ đếm luôn tới ticket đầu; phím P đi tiếp từ thẻ đang chọn (kể cả thẻ người dùng tự bấm/Tab tới).
+const topbar = createTopbar(topbarRoot, { onSettings: () => relayout() });
+const sidebar = createSidebar(sidebarRoot, { onSelect: selectAgent, shortcut: false });
+shell.sidebar = sidebar;
+
+function typing(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || !!target.closest("input, textarea, select"));
+}
+
+// Bubble, đăng ký trước feed/drawer để stopImmediatePropagation chặn lần thu/đóng thứ hai.
+// Popover cài đặt nghe Esc trên chính nó và stopPropagation, nên không tới đây.
+document.addEventListener("keydown", (event) => {
+  const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !typing(event.target);
+  if ((event.key === "[" || event.key === "]" || event.key === "Escape") && plain && !event.repeat) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (event.key === "[") shell.sidebar?.toggle();
+    else if (event.key === "]") shell.feed?.setCollapsed(!feedRoot.classList.contains("is-collapsed"));
+    else closeDrawer();
+    relayout();
+    return;
+  }
+  // Bộ đếm luôn tới ticket đầu; phím P đi tiếp từ thẻ đang chọn (kể cả thẻ người dùng tự bấm/Tab tới).
+  if (!isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable: typing(event.target) })) return;
+  const next = nextAttention(needItems.map((item) => item.ticket.id), focusedTicket);
+  if (!next) return;
+  event.preventDefault();
+  showNeeds(next);
+});
+
+const drawer = createDrawer(drawerRoot, needsRoot, {
+  onClose: closeDrawer,
+  onTab(next) {
+    if (next === "needs") {
+      needsDismissed = false;
+      tab = "needs";
+    } else tab = "agent";
+    publish();
+  },
+});
+const feed = createFeed(feedRoot);
+shell.feed = feed;
+sidebar.onLayout(relayout);
+drawer.onLayout(relayout);
+feed.onLayout(relayout);
+
 needsCount.addEventListener("click", () => {
   const first = needItems[0];
-  if (first) focusTicket(first.ticket.id);
+  if (first) showNeeds(first.ticket.id);
 });
 needsRoot.addEventListener("focusin", (event) => {
   const target = event.target;
@@ -96,143 +228,97 @@ needsRoot.addEventListener("focusin", (event) => {
     focusedTicket = target.closest<HTMLElement>("[data-ticket-id]")?.dataset.ticketId ?? focusedTicket;
   }
 });
-document.addEventListener("keydown", (event) => {
-  const target = event.target;
-  const editable = target instanceof HTMLElement && (target.isContentEditable
-    || !!target.closest("input, textarea, select"));
-  if (!isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) return;
-  const next = nextAttention(needItems.map((item) => item.ticket.id), focusedTicket);
-  if (next) {
-    event.preventDefault();
-    focusTicket(next);
-  }
-});
 
 function changeSource(): void {
+  sourceEpoch += 1;
   workerGate.reset();
-  workspace.classList.toggle("has-needs", false);
-  needsCount.classList.toggle("hot", false);
-  const now = Date.now();
-  overlay.draw([], sceneSize(workers).width, now);
-  tooltip.update([], sceneSize(workers).width, now);
+  selectedKey = null;
+  tab = null;
+  needsDismissed = false;
+  previousNeedsCount = 0;
   needItems = [];
   focusedTicket = null;
-  needsCount.textContent = "Cần bạn: 0";
-  needsCount.disabled = true;
+  figures = [];
+  feedState = resetFeed();
+  shell.feed?.render([]);
+  const now = Date.now();
+  const width = sceneSize(workers).width;
+  overlay.draw([], width, now);
+  tooltip.update([], width, now);
   document.title = tabTitle(0);
   ticketsError.hidden = true;
   ticketsError.title = "";
+  ticketsError.setAttribute("aria-label", "");
   toasts.reset();
   panel.setSource(ticketSource(config));
+  publish();
 }
 
-
-function fmtNumber(n: number | undefined): string {
-  return new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(n ?? 0);
+function panelRect(el: HTMLElement): Rect | null {
+  // hidden: ngăn đóng không chiếm vùng trống. Thu gọn vẫn đo vì còn một dải hẹp.
+  if (el.hidden) return null;
+  const box = el.getBoundingClientRect();
+  if (box.width <= 0 || box.height <= 0) return null;
+  return { left: box.left, top: box.top, width: box.width, height: box.height };
 }
 
-function fmtAgo(iso: string | null | undefined, now: number): string {
-  // Thiếu mốc: phòng chưa từng chạy. Có iso thì cùng chuỗi với tooltip (floor, tương lai là "vừa xong").
-  if (!iso) return "chưa chạy";
-  return relativeTime(iso, now);
-}
-
-function fmtElapsed(iso: string, now: number): string {
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return `${s} giây`;
-  if (s < 3600) return `${Math.floor(s / 60)} phút ${s % 60} giây`;
-  return `${Math.floor(s / 3600)} giờ ${Math.floor((s % 3600) / 60)} phút`;
-}
-
-function el(tag: string, cls: string, text?: string): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = cls;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function row(label: string, value: string): HTMLElement {
-  const r = el("div", "row");
-  r.append(el("span", "label", label), el("span", "value", value));
-  return r;
-}
-
-function renderCards(now: number): void {
-  const count = workers.filter((w) => w.state !== "offline").reduce((sum, w) => sum + roomAgents(w).agents.length, 0);
-  agentsCount.textContent = `Đang làm: ${count} agent`;
-  cards.replaceChildren(
-    ...workers.map((w) => {
-      const card = el("article", `card state-${w.state}`);
-      const head = el("header", "card-head");
-      head.append(el("h2", "name", `Phòng ${w.name}`), el("span", "badge", STATE_LABEL[w.state]));
-      card.append(head);
-      card.append(el("p", "roles", w.roles.length ? `Vai trò: ${w.roles.join(", ")}` : "Chưa giao vai trò"));
-
-      const { agents, slots } = roomAgents(w);
-      card.append(row("Agent con", `${agents.length}/${slots}`));
-      if (agents.length) {
-        const list = el("ul", "agents");
-        for (const a of agents) {
-          const style = roleStyle(a.role);
-          const item = el("li", "agent-row");
-          const dot = el("span", "swatch");
-          dot.style.background = style.shirt;
-          item.append(
-            dot,
-            el("span", "agent-role", style.label),
-            el("span", "value", `${a.ticket_id ?? "?"} · ${a.mode} · ${fmtElapsed(a.started_at, now)}`),
-          );
-          list.append(item);
-        }
-        card.append(list);
-      }
-      if (w.state === "limited" && w.limit) {
-        const box = el("div", "limit");
-        box.append(
-          el("strong", "", w.limit.resets_at ? `Mở lại sau ${shortCountdown(w.limit.resets_at, now)}` : "Chưa rõ giờ mở lại"),
-          el("p", "", w.limit.message),
-          el("p", "", "Hạn mức chung cho cả phòng"),
-        );
-        card.append(box);
-      }
-      const usage = parseUsage(w.usage, w.name);
-      if (usage) {
-        const box = el("section", "usage");
-        box.append(el("h3", "usage-title", "Hạn mức"));
-        for (const window of usage.windows) {
-          const item = el("div", "usage-window");
-          const dot = el("span", "swatch");
-          dot.style.background = USAGE[usageLevel(window.used_percent)];
-          item.append(
-            dot,
-            el("span", "", `${window.name}: ${usagePercent(window.used_percent)}% · reset sau ${shortCountdown(window.resets_at, now)}`),
-          );
-          box.append(item);
-        }
-        if (usage.plan) box.append(row("Gói", usage.plan));
-        if (usage.source) box.append(row("Nguồn số liệu", usage.source));
-        if (usage.note) box.append(el("p", "usage-note", usage.note));
-        if (usage.error) box.append(el("p", "error", `Lỗi hạn mức: ${usage.error}`));
-        if (isStale(usage.checked_at, now)) {
-          const minutes = Math.floor((now - Date.parse(usage.checked_at)) / 60_000);
-          box.append(el("p", "usage-stale", `số liệu cũ (${minutes} phút trước)`));
-        }
-        card.append(box);
-      }
-      const total = (w.runs_ok ?? 0) + (w.runs_failed ?? 0);
-      card.append(
-        row("Hôm nay", `${w.runs_today ?? 0} lượt · ${fmtNumber(w.tokens_today)} token`),
-        row("Tổng", `${total} lượt (${w.runs_failed ?? 0} lỗi) · ${fmtNumber((w.input_tokens ?? 0) + (w.output_tokens ?? 0))} token`),
-        row("Lần cuối", `${fmtAgo(w.last_run_at, now)}${w.last_duration_seconds ? ` · ${w.last_duration_seconds}s` : ""}`),
-      );
-      if (w.last_error && w.state !== "limited") card.append(el("p", "error", w.last_error));
-      if (w.state === "offline") card.append(el("p", "error", `Không gọi được phòng${w.error ? ` (${w.error})` : ""}`));
-      return card;
-    }),
+function relayout(): void {
+  narrow = typeof matchMedia === "function" && matchMedia(NARROW_QUERY).matches;
+  const width = document.documentElement.clientWidth || globalThis.innerWidth || 0;
+  const height = document.documentElement.clientHeight || globalThis.innerHeight || 0;
+  const insets = computeInsets(
+    { width, height },
+    { topbar: panelRect(topbarRoot), sidebar: panelRect(sidebarRoot), drawer: panelRect(drawerRoot), feed: panelRect(feedRoot) },
+    { gap: GAP, narrow, minFree: MIN_FREE },
   );
+  const style = document.documentElement.style;
+  style.setProperty("--free-top", `${insets.top}px`);
+  style.setProperty("--free-right", `${insets.right}px`);
+  style.setProperty("--free-bottom", `${insets.bottom}px`);
+  style.setProperty("--free-left", `${insets.left}px`);
+  free = {
+    left: insets.left,
+    top: insets.top,
+    width: Math.max(0, width - insets.left - insets.right),
+    height: Math.max(0, height - insets.top - insets.bottom),
+  };
 }
 
-async function pollWorkers(): Promise<void> {
+function focusOf(list: readonly SceneFigure[]): { x: number; y: number } | undefined {
+  const selected = selectedAgent();
+  if (!selected) return undefined;
+  const figure = list.find((item) => item.room === selected.worker.name
+    && item.agent.id === selected.agent.id
+    && item.agent.started_at === selected.agent.started_at);
+  if (!figure) return undefined;
+  return { x: figure.x, y: (figure.headY + figure.footY) / 2 };
+}
+
+// Cùng phép đổi toạ độ với tooltip để bấm trúng đúng nhân vật đang hiện.
+function scenePoint(event: PointerEvent): { x: number; y: number } | null {
+  const rect = canvas.getBoundingClientRect();
+  const width = canvas.clientWidth;
+  const sceneW = sceneSize(workers).width;
+  if (sceneW <= 0 || width <= 0 || rect.width <= 0) return null;
+  const scale = rect.width / (canvas.offsetWidth || rect.width);
+  const x = (event.clientX - rect.left - canvas.clientLeft * scale) / scale;
+  const y = (event.clientY - rect.top - canvas.clientTop * scale) / scale;
+  if (x < 0 || y < 0 || x > width || y > canvas.clientHeight) return null;
+  return { x: x * sceneW / width, y: y * sceneW / width };
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (event.button) return;
+  const point = scenePoint(event);
+  if (!point) return;
+  const figure = hitFigure(figures, point.x, point.y);
+  if (!figure) return;
+  selectAgent(agentKey(figure.room, figure.agent));
+});
+
+type PollOutcome = "applied" | "error" | "stale";
+
+async function pollWorkers(): Promise<PollOutcome> {
   const current = config;
   const request = workerGate.start();
   if (!current) {
@@ -240,23 +326,33 @@ async function pollWorkers(): Promise<void> {
     workers = withDemoActivity(demoWorkers(now), now);
     status.textContent = "Chế độ demo (dữ liệu giả)";
     status.className = "conn demo";
-    return;
+    return "applied";
   }
   try {
     const next = await fetchWorkers(current);
-    if (!workerGate.accept(request)) return;
+    if (!workerGate.accept(request)) return "stale";
     workers = next;
     status.textContent = `Đã nối ${current.baseUrl}`;
     status.className = "conn ok";
+    return "applied";
   } catch (exc) {
-    if (!workerGate.accept(request)) return;
+    if (!workerGate.accept(request)) return "stale";
     status.textContent = `Lỗi: ${(exc as Error).message}`;
     status.className = "conn bad";
+    return "error";
   }
 }
 
 async function poll(): Promise<void> {
-  await Promise.allSettled([pollWorkers(), panel.refresh()]);
+  const epoch = sourceEpoch;
+  // Ticket và worker chạy cùng lúc như trước; kết quả worker cũ bị gate bỏ.
+  const workersTask = pollWorkers();
+  await Promise.allSettled([workersTask, panel.refresh()]);
+  if (epoch !== sourceEpoch) return;
+  // Lỗi hoặc kết quả cũ: giữ feed và ngăn. onItems của ticket (nếu có) đã cập nhật riêng.
+  if (await workersTask !== "applied") return;
+  absorbFeed();
+  publish();
 }
 
 form.addEventListener("submit", (event) => {
@@ -266,13 +362,13 @@ form.addEventListener("submit", (event) => {
   const token = String(data.get("token") ?? "").trim();
   config = baseUrl && token ? { baseUrl, token } : null;
   saveConfig(config);
-  changeSource();
-  // đổi nguồn dữ liệu: xoá cảnh cũ, agent của nguồn mới được đặt thẳng vào ghế
+  // Nguồn thật chưa kịp poll: đừng giữ agent demo trên thanh bên.
   if (config) workers = [];
+  changeSource();
   resetActors();
   void poll();
 });
-form.querySelector<HTMLButtonElement>("#demo")!.addEventListener("click", () => {
+demoButton.addEventListener("click", () => {
   config = null;
   saveConfig(null);
   changeSource();
@@ -281,44 +377,47 @@ form.querySelector<HTMLButtonElement>("#demo")!.addEventListener("click", () => 
 });
 if (config) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = config.baseUrl;
 
-function renderLegend(): void {
-  legend.replaceChildren(
-    ...Object.values(ROLE_STYLES).map((style) => {
-      const item = el("span", "legend-item");
-      const dot = el("span", "swatch");
-      dot.style.background = style.shirt;
-      item.append(dot, document.createTextNode(`${style.label} (${style.accessory})`));
-      return item;
-    }),
-  );
-}
-
 function frame(t: number): void {
   // demo tính lại mỗi frame để nhân vật bắt đầu đi ngay khi kịch bản đổi pha, không trễ theo nhịp polling 3 giây
   const now = Date.now();
   if (!config) workers = withDemoActivity(demoWorkers(now), now);
+  // Biến mất giữa hai lần poll (demo đổi pha): đóng ngăn ngay frame này.
+  if (dropMissingSelection()) publish();
   const size = sceneSize(workers);
-  // vẽ với hệ số phóng nguyên: pixel đều nhau và vẫn sắc khi phóng to hoặc trên màn hình HiDPI
-  const k = Math.min(8, Math.max(1, Math.ceil((canvas.clientWidth * devicePixelRatio) / size.width)));
-  if (canvas.width !== size.width * k || canvas.height !== size.height * k) {
-    canvas.width = size.width * k;
-    canvas.height = size.height * k;
+  // Focus lấy từ frame trước: frame này mới biết nhân vật đang đứng đâu sau khi cảnh đổi.
+  const fit = fitScene(free, size, globalThis.devicePixelRatio || 1, focusOf(figures));
+  const backingW = size.width * fit.k;
+  const backingH = size.height * fit.k;
+  if (canvas.width !== backingW || canvas.height !== backingH) {
+    canvas.width = backingW;
+    canvas.height = backingH;
   }
-  ctx.setTransform(k, 0, 0, k, 0, 0);
-  const figures = drawScene(ctx, workers, t, now);
+  canvas.style.left = `${fit.left}px`;
+  canvas.style.top = `${fit.top}px`;
+  canvas.style.width = `${fit.cssW}px`;
+  canvas.style.height = `${fit.cssH}px`;
+  ctx.setTransform(fit.k, 0, 0, fit.k, 0, 0);
+  figures = drawScene(ctx, workers, t, now);
   overlay.draw(figures, size.width, now);
   // Agent đi ra hoặc phòng tắt thì đóng tooltip cùng lúc với bong bóng.
   tooltip.update(figures.filter((figure) => figure.working), size.width, now);
   requestAnimationFrame(frame);
 }
 
+if (typeof ResizeObserver === "function") {
+  const observer = new ResizeObserver(() => relayout());
+  for (const el of [document.documentElement, stage, topbarRoot, sidebarRoot, drawerRoot, feedRoot]) observer.observe(el);
+}
+if (typeof matchMedia === "function") {
+  matchMedia(NARROW_QUERY).addEventListener("change", () => relayout());
+}
+
+relayout();
+publish();
 void poll();
 setInterval(() => void poll(), POLL_MS);
 setInterval(() => {
-  const now = Date.now();
-  renderCards(now);
-  panel.tick(now);
+  publish();
+  panel.tick(Date.now());
 }, 1000);
-renderCards(Date.now());
-renderLegend();
 requestAnimationFrame(frame);

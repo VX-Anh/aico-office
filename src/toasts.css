@@ -1,15 +1,16 @@
-/* Góc dưới phải phần tử cha (.stage đã position: relative). Không bắt chuột để khỏi che canvas. */
+/* Góc dưới phải vùng trống (main.ts ghi --free-*) để không đè panel. Khung không bắt chuột
+   để khỏi che canvas, chỉ từng toast nhận bấm. */
 #toasts,
 .toast-stack {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 1;
-  width: min(260px, calc(100% - 16px));
-  max-width: 260px;
+  position: fixed;
+  right: calc(var(--free-right) + var(--gap));
+  bottom: calc(var(--free-bottom) + var(--gap));
+  z-index: 30;
+  width: 300px;
+  max-width: calc(100vw - var(--free-left) - var(--free-right) - 2 * var(--gap));
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -20,33 +21,60 @@
 .toast {
   pointer-events: auto;
   width: 100%;
-  max-width: 260px;
   box-sizing: border-box;
-  background: var(--panel);
+  /* Nền đặc: toast nằm trên cảnh động, nền kính làm chữ khó đọc. */
+  background: var(--panel-solid);
   color: var(--text);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 3px 0 0 var(--st-need), var(--shadow);
+  padding: 10px 12px 10px 14px;
   font-size: 13px;
   overflow-wrap: anywhere;
+  animation: toast-in 0.25s var(--ease);
 }
 
-.toast p { margin: 0 0 6px; }
+.toast p { margin: 0 0 8px; }
 
 .toast-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   justify-content: flex-end;
 }
 
 .toast button {
-  font: inherit;
   font-size: 12px;
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--muted);
-  border-radius: 4px;
-  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
   cursor: pointer;
+}
+/* Nút hành động chính ("Xử lý") là nút đầu tiên. */
+.toast-actions button:first-child {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Màn hẹp: toast chiếm hết bề ngang vùng trống. */
+@media (max-width: 899px) {
+  #toasts,
+  .toast-stack {
+    left: calc(var(--free-left) + var(--gap));
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
 }

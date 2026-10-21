@@ -6,32 +6,27 @@
     <title>AICO Office</title>
   </head>
   <body>
-    <header class="top">
-      <h1>AICO Office</h1>
+    <div id="stage">
+      <canvas id="office" aria-label="Văn phòng agent"></canvas>
+    </div>
+    <header id="topbar" class="topbar glass">
       <span id="conn" class="conn">…</span>
-      <span id="agents-count">Đang làm: 0 agent</span>
-      <span class="needs-summary">
-        <button type="button" id="needs-count" disabled>Cần bạn: 0</button>
-        <span id="tickets-error" role="status" hidden>!</span>
-      </span>
+      <div id="agents-count"></div>
+      <button type="button" id="needs-count" disabled></button>
+      <span id="tickets-error" role="status" hidden>!</span>
       <form id="settings" autocomplete="off">
         <input name="baseUrl" placeholder="http://localhost:8000" aria-label="Địa chỉ aico" autocomplete="off" />
         <input name="token" type="password" placeholder="API token" aria-label="API token" autocomplete="new-password" />
         <button type="submit">Kết nối</button>
-        <button type="button" id="demo">Demo</button>
       </form>
+      <button type="button" id="demo">Demo</button>
     </header>
-    <main>
-      <div class="workspace">
-        <div class="stage">
-          <canvas id="office" aria-label="Văn phòng agent"></canvas>
-          <div id="toasts"></div>
-        </div>
-        <aside id="needs" aria-label="Cần bạn" hidden></aside>
-      </div>
-      <div id="legend" class="legend" aria-label="Chú thích vai trò agent con"></div>
-      <section id="cards" class="cards"></section>
-    </main>
+    <aside id="sidebar" class="sidebar glass" aria-label="Phòng và agent"></aside>
+    <aside id="drawer" class="drawer glass" hidden>
+      <aside id="needs" aria-label="Cần bạn" hidden></aside>
+    </aside>
+    <section id="feed" class="feed glass" aria-label="Hoạt động"></section>
+    <div id="toasts"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

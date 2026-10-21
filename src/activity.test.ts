@@ -468,4 +468,47 @@ describe("withDemoActivity", () => {
     expect(out.slice(0, 3)).toEqual(odd.slice(0, 3));
     expect(bubbleFor((out[3] as { agents: unknown[] }).agents[1], NOW)).not.toBeNull();
   });
+
+  it("claude 3/3 rồi +1 và cursor cuối chu kỳ đều có activity; agent đầu vẫn stale", () => {
+    const three = sample(20);
+    const claude = three.workers[0].agents ?? [];
+    expect(claude).toHaveLength(3);
+    for (const a of claude) {
+      expect(readAgentActivity(a).activity).not.toBeNull();
+      expect(bubbleFor(a, three.now)?.stale).toBe(false);
+    }
+    const over = sample(36);
+    const crew = over.workers[0].agents ?? [];
+    expect(crew).toHaveLength(4);
+    expect(bubbleFor(crew[0], over.now)?.stale).toBe(true);
+    for (const a of crew.slice(1)) {
+      expect(readAgentActivity(a).recent?.length).toBeGreaterThan(0);
+      expect(bubbleFor(a, over.now)?.stale).toBe(false);
+    }
+    const idle = sample(44);
+    const cursor = idle.workers[2].agents ?? [];
+    expect(idle.workers[2].state).toBe("idle");
+    expect(cursor).toHaveLength(1);
+    const rich = readAgentActivity(cursor[0]);
+    expect(rich.activity).not.toBeNull();
+    expect(rich.recent?.length).toBeGreaterThan(0);
+    expect(rich.tasks).toHaveLength(7);
+    expect(rich.stats?.tool_calls).not.toBeNull();
+    expect(sample(30).workers[2].agents).toEqual([]);
+    expect(sample(38).workers[2].agents).toEqual([]);
+  });
+
+  it("qua biên 40 giây theo cả hai hướng: claude hết agent, cursor bắt đầu có activity", () => {
+    const before = sample(39.5);
+    const after = sample(40);
+    const back = sample(39.5);
+    expect(before.workers[0].agents).toHaveLength(4);
+    expect(after.workers[0].agents).toEqual([]);
+    expect(back.workers[0].agents?.map((a) => a.id)).toEqual(before.workers[0].agents?.map((a) => a.id));
+    expect(before.workers[2].agents).toEqual([]);
+    expect(after.workers[2].agents).toHaveLength(1);
+    expect(readAgentActivity(after.workers[2].agents![0]).activity?.text).toBeTruthy();
+    expect(sample(47.5).workers[2].agents).toHaveLength(1);
+    expect(sample(0).workers[2].agents).toEqual([]);
+  });
 });

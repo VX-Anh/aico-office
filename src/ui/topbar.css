@@ -1,0 +1,209 @@
+/* Thanh trên 64px nổi trên cảnh. Màu lấy từ tokens.css. */
+.topbar {
+  position: fixed;
+  top: var(--gap);
+  left: var(--gap);
+  right: var(--gap);
+  z-index: 20;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+}
+
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.topbar .brand-logo {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 18px;
+}
+.topbar .brand-text { display: flex; flex-direction: column; min-width: 0; }
+.topbar .brand-name { font-size: 17px; line-height: 1.1; white-space: nowrap; }
+.topbar .conn {
+  font-size: 12px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ô số: số to, nhãn nhỏ. */
+.topbar .counters { display: flex; align-items: stretch; gap: 6px; flex: 0 0 auto; }
+.topbar .tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 46px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--text);
+  line-height: 1;
+}
+.topbar .tile-value { font-family: var(--font-pixel); font-weight: 600; font-size: 20px; font-variant-numeric: tabular-nums; }
+.topbar .tile-label { margin-top: 3px; font-size: 10.5px; color: var(--text-dim); text-transform: lowercase; white-space: nowrap; }
+.topbar .tile-working .tile-value { color: var(--st-working); }
+
+.topbar .tile-need-wrap { position: relative; display: flex; }
+.topbar button.tile { cursor: pointer; transition: border-color .18s var(--ease), background .18s var(--ease); }
+.topbar button.tile:disabled { cursor: default; }
+.topbar button.tile:not(:disabled):hover { border-color: var(--line-strong); }
+.topbar .tile-need.hot { border-color: var(--st-need); background: var(--need-soft); }
+.topbar .tile-need.hot .tile-value,
+.topbar .tile-need.hot .tile-label { color: var(--st-need); }
+.topbar .tickets-error {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lvl-crit);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+}
+.topbar .tickets-error[hidden] { display: none; }
+
+/* Thẻ hạn mức: ô chữ cái màu provider + 2 dòng cửa sổ. */
+.topbar .usage-cards {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.topbar .usage-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 46px;
+  padding: 0 8px 0 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  flex: 0 0 auto;
+}
+.topbar .usage-card[data-state="offline"] { opacity: .55; }
+.topbar .usage-card[data-state="limited"] { border-color: var(--lvl-crit); background: var(--crit-soft); }
+.topbar .prov-letter {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 15px;
+  text-shadow: 0 1px 0 var(--bg);
+}
+.topbar .usage-lines { display: flex; flex-direction: column; gap: 3px; }
+.topbar .usage-row {
+  display: grid;
+  grid-template-columns: 18px 46px 32px 38px;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1;
+}
+.topbar .usage-label { color: var(--text-dim); }
+.topbar .usage-bar { height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.topbar .usage-fill { display: block; height: 100%; border-radius: 3px; background: var(--lvl-ok); transition: width .4s var(--ease); }
+.topbar .usage-row[data-level="warn"] .usage-fill { background: var(--lvl-warn); }
+.topbar .usage-row[data-level="crit"] .usage-fill { background: var(--lvl-crit); }
+.topbar .usage-row[data-level="crit"] .usage-pct { color: var(--lvl-crit); }
+.topbar .usage-pct { text-align: right; }
+.topbar .usage-reset { color: var(--text-dim); }
+.topbar .usage-plan { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.topbar .usage-compact { display: none; font-size: 11px; }
+.topbar .usage-compact[data-level="warn"] { color: var(--lvl-warn); }
+.topbar .usage-compact[data-level="crit"] { color: var(--lvl-crit); }
+
+/* Bên phải: cài đặt (popover) và Demo. */
+.topbar .topbar-actions { position: relative; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+.topbar .settings-toggle,
+.topbar .demo-button {
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.topbar .settings-toggle { width: 34px; padding: 0; font-size: 16px; }
+.topbar .settings-toggle:hover,
+.topbar .demo-button:hover,
+.topbar .settings-toggle.active { background: var(--hover); border-color: var(--accent); }
+.topbar .settings-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 40;
+  width: 300px;
+  padding: 12px;
+  background: var(--panel-solid);
+}
+.topbar .settings-popover[hidden] { display: none; }
+.topbar .settings-hint { margin: 0 0 8px; font-size: 12px; color: var(--text-dim); }
+.topbar .settings-popover form { display: flex; flex-direction: column; gap: 8px; }
+.topbar .settings-popover input {
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.topbar .settings-popover button[type="submit"] {
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Màn vừa: bỏ tên + reset để thẻ hạn mức không bị cắt. */
+@media (max-width: 1279px) {
+  .topbar .conn { max-width: 150px; }
+  .topbar .usage-row { grid-template-columns: 18px 36px 32px; }
+  .topbar .usage-reset { display: none; }
+}
+
+/* Màn hẹp: chỉ giữ cần bạn, đang làm và hạn mức gọn. */
+@media (max-width: 899px) {
+  .topbar { gap: 6px; padding: 0 8px; height: 52px; top: 6px; left: 6px; right: 6px; }
+  .topbar .brand-text,
+  .topbar .tile-agents { display: none; }
+  .topbar .brand-logo { width: 28px; height: 28px; font-size: 15px; }
+  .topbar .tile { min-width: 46px; height: 40px; padding: 2px 5px; }
+  .topbar .tile-value { font-size: 17px; }
+  .topbar .tile-label { font-size: 9.5px; }
+  .topbar .usage-card { height: 40px; gap: 4px; padding: 0 6px 0 4px; }
+  .topbar .usage-lines { display: none; }
+  .topbar .usage-compact { display: inline; }
+  .topbar .prov-letter { width: 22px; height: 22px; font-size: 13px; }
+  .topbar .settings-toggle { width: 30px; height: 30px; }
+  .topbar .demo-button { height: 30px; padding: 0 7px; font-size: 12px; }
+  .topbar .settings-popover { position: fixed; top: 64px; left: 6px; right: 6px; width: auto; }
+}

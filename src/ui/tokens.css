@@ -1,0 +1,87 @@
+/* Token giao diện dùng chung. Ý tưởng và giá trị theo Habblaud client/src/ui/styles.css
+   (MIT, Copyright (c) 2026 Márcio Junior); nguồn ghi ở public/assets/CREDITS.md.
+   Mã màu chỉ đặt ở file này, CSS khác dùng biến. */
+@import "@fontsource/pixelify-sans/400.css";
+@import "@fontsource/pixelify-sans/600.css";
+
+:root {
+  --bg: #0e1016;
+  --panel: rgba(18, 21, 29, 0.85);
+  --panel-solid: rgba(20, 24, 33, 0.97);
+  --line: rgba(160, 176, 210, 0.13);
+  /* Viền đậm hơn cho ô nhập, nút và mép đang được trỏ. */
+  --line-strong: rgba(160, 176, 210, 0.28);
+  --hover: rgba(160, 176, 210, 0.08);
+  --text: #e8ecf5;
+  --text-dim: #9aa4b8;
+  --accent: #7cc8ff;
+  /* Chữ trên nền màu nhấn hoặc màu trạng thái. */
+  --on-accent: #0e1016;
+
+  --st-working: #4fd18b;
+  --st-need: #ffb547;
+  --st-idle: #8b98b3;
+  --st-done: #6aa8ff;
+  --st-offline: #6b7280;
+  --st-limited: var(--lvl-crit);
+
+  --lvl-ok: #4fd18b;
+  --lvl-warn: #ffb547;
+  --lvl-crit: #ff6b6b;
+
+  /* Nền nhạt theo màu trạng thái (khối cảnh báo, thẻ đang nháy). */
+  --need-soft: rgba(255, 181, 71, 0.14);
+  --crit-soft: rgba(255, 107, 107, 0.12);
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --gap: 10px;
+  --ease: cubic-bezier(.22, .8, .24, 1);
+  --glass: blur(14px) saturate(1.25);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(6, 8, 12, 0.55);
+
+  --font-pixel: "Pixelify Sans", ui-monospace, monospace;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --topbar-h: 64px;
+  --sidebar-w: 304px;
+  --drawer-w: 380px;
+  --feed-h: 200px;
+  --feed-h-min: 38px;
+
+  /* main.ts ghi lại lúc chạy theo kích thước panel thật. */
+  --free-top: var(--topbar-h);
+  --free-right: 0px;
+  --free-bottom: 0px;
+  --free-left: 0px;
+}
+
+/* Panel nổi trên cảnh: nền bán trong suốt, làm mờ phần cảnh phía sau. */
+.glass {
+  background: var(--panel);
+  -webkit-backdrop-filter: var(--glass);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Trình duyệt không làm mờ được thì dùng nền đặc để chữ vẫn đọc rõ. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--panel-solid); }
+}
+
+/* Pixelify Sans không có dấu tiếng Việt (ộ, ầ, ư, ơ... vỡ thành chữ khác): chỉ dùng cho chữ ASCII
+   như logo, số, chữ cái phòng. Tiêu đề tiếng Việt dùng --font-ui đậm. */
+.title-pixel {
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

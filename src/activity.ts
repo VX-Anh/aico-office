@@ -283,7 +283,7 @@ export function resolveBubbles(items: { key: string; x: number; y: number; w: nu
 const DEMO_CYCLE = 48_000;
 const DEMO_STEP = 3_000;
 const DEMO_TASKS = 7;
-// Đủ 16 kind: agent đầu của claude (32 giây) đi 11 bước đầu, agent thứ hai (16 giây) lệch pha 11 đi nốt.
+// Đủ 16 kind: agent đầu của claude (giây 8–40) đi 11 bước đầu, agent thứ hai (từ giây 16, lệch pha 11) đi nốt.
 const DEMO_SEQ: { kind: ActivityKind; text: string; tool?: string; detail?: string }[] = [
   { kind: "think", text: "Đang suy nghĩ cách chia việc" },
   { kind: "read", text: "Đọc src/scene/layout.ts", tool: "Read" },

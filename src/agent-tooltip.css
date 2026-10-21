@@ -1,5 +1,6 @@
 .agent-tooltip {
   position: fixed;
+  z-index: 40;
   pointer-events: none;
   box-sizing: border-box;
   width: max-content;
@@ -7,12 +8,13 @@
   max-height: calc(100vh - 16px);
   overflow: hidden;
   padding: 10px 12px;
-  border: 1px solid currentColor;
-  border-radius: 8px;
-  background: Canvas;
-  color: CanvasText;
-  box-shadow: 0 3px 12px #0003;
-  font: 13px/1.5 system-ui, sans-serif;
+  /* Nền đặc: tooltip nổi trên cảnh động, nền kính làm chữ khó đọc. */
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font: 13px/1.5 var(--font-ui);
   overflow-wrap: anywhere;
 }
 
@@ -25,6 +27,12 @@
   font-weight: 600;
 }
 
+.agent-tooltip-title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
 .agent-tooltip-heading {
   margin-top: 6px;
+  color: var(--text-dim);
 }
