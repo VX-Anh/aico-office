@@ -97,6 +97,38 @@ export function reasonKey(ticket: Ticket): string {
   return `${ticket.id}@${ticket.updated_at ?? ""}`;
 }
 
+export interface TicketWithReason {
+  ticket: Ticket;
+  reason: string | null;
+}
+
+// Cache lý do theo reasonKey; `load` là lời gọi /events được tiêm vào. Chỉ cache kết quả thành công:
+// lỗi mạng, HTTP lỗi hay /events hỏng thì lượt đó trả null và lượt poll sau hỏi lại, nếu không
+// Đẩy lại sẽ tắt mãi tới khi ticket đổi updated_at. Các lượt chồng nhau dùng chung một request.
+export function createReasonCache(load: (id: string) => Promise<string | null>) {
+  const entries = new Map<string, Promise<string | null>>();
+  return {
+    resolve(tickets: Ticket[]): Promise<TicketWithReason[]> {
+      const keys = new Set(tickets.map(reasonKey));
+      for (const key of entries.keys()) if (!keys.has(key)) entries.delete(key);
+      return Promise.all(tickets.map(async (ticket) => {
+        const key = reasonKey(ticket);
+        let entry = entries.get(key);
+        if (!entry) {
+          const pending = load(ticket.id);
+          entries.set(key, pending);
+          // request cũ lỗi muộn không được xoá request mới hơn của cùng khoá
+          pending.catch(() => {
+            if (entries.get(key) === pending) entries.delete(key);
+          });
+          entry = pending;
+        }
+        return { ticket, reason: await entry.catch(() => null) };
+      }));
+    },
+  };
+}
+
 // Lý do của lần escalate mới nhất. Mọi event escalated đều có created_at hợp lệ thì chọn theo giờ
 // (bằng giờ thì lấy cái sau trong mảng); thiếu giờ thì tin thứ tự của aico (cuối mảng là mới nhất).
 // Lần mới nhất không có data.reason dạng chuỗi thì trả null, không lùi về lý do cũ.

@@ -6,6 +6,7 @@ import {
   actionAvailability,
   applyDemoAction,
   buildEscalationRequest,
+  createReasonCache,
   demoTickets,
   escalatedOnly,
   escalationError,
@@ -307,6 +308,13 @@ describe("gọi API", () => {
     expect(calls[0][0]).toBe("http://aico.local:8000/tickets/T%201/events");
   });
 
+  it("fetchEscalationReason: /events hỏng cấu trúc ném lỗi (để không cache null); không có lý do thì null", async () => {
+    stubFetch(json({ events: [] }), json([event("done", "x")]), json({}, 500));
+    await expect(fetchEscalationReason(CONFIG, "T-hỏng")).rejects.toThrow("aico trả danh sách event hỏng");
+    await expect(fetchEscalationReason(CONFIG, "T-hỏng")).resolves.toBeNull();
+    await expect(fetchEscalationReason(CONFIG, "T-hỏng")).rejects.toThrow("aico trả 500");
+  });
+
   it("escalationAction: POST đúng body; 409/501 ném detail; 401 sai token; body không phải JSON", async () => {
     const calls = stubFetch(
       json({ ok: true }),
@@ -323,6 +331,103 @@ describe("gọi API", () => {
     await expect(escalationAction(CONFIG, "T-1", "merge", "owner", "")).rejects.toThrow("chưa hỗ trợ");
     await expect(escalationAction(CONFIG, "T-1", "fail", "owner", "")).rejects.toThrow("Sai API token");
     await expect(escalationAction(CONFIG, "T-1", "fail", "owner", "")).rejects.toThrow("aico trả 502");
+  });
+});
+
+// Promise điều khiển được từ test để dựng các request chồng nhau.
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("createReasonCache", () => {
+  const T1 = () => parseTickets([ticket("T-1")], who())![0];
+  const reasons = async (cache: ReturnType<typeof createReasonCache>, list: Ticket[]) =>
+    (await cache.resolve(list)).map((r) => r.reason);
+
+  it("lỗi mạng lần đầu: lượt đó null, lượt sau cùng id + updated_at hỏi lại rồi mới cache", async () => {
+    const load = vi.fn<(id: string) => Promise<string | null>>()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(PUSH_REASON);
+    const cache = createReasonCache(load);
+    expect(await reasons(cache, [T1()])).toEqual([null]);
+    expect(await reasons(cache, [T1()])).toEqual([PUSH_REASON]);
+    expect(await reasons(cache, [T1()])).toEqual([PUSH_REASON]);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("HTTP 500 và /events hỏng cấu trúc qua fetchEscalationReason: không cache, hồi phục khi aico lành", async () => {
+    const calls = stubFetch(json({}, 500), json({ events: [] }), json([event("escalated", PUSH_REASON)]));
+    const cache = createReasonCache((id) => fetchEscalationReason(CONFIG, id));
+    const t = T1();
+    const seen = [];
+    for (let i = 0; i < 4; i++) {
+      const reason = (await reasons(cache, [t]))[0];
+      seen.push(actionAvailability(reason, t).retry_push);
+    }
+    expect(seen).toEqual([false, false, true, true]);
+    expect(calls).toHaveLength(3);
+  });
+
+  it("thành công mà không có lý do (null hợp lệ) thì cache, không hỏi lại", async () => {
+    const load = vi.fn(async () => null);
+    const cache = createReasonCache(load);
+    await reasons(cache, [T1()]);
+    expect(await reasons(cache, [T1()])).toEqual([null]);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("hai lượt poll chồng nhau dùng chung một request; request lỗi thì cả hai null và lượt sau hỏi lại", async () => {
+    const first = deferred<string | null>();
+    const load = vi.fn<(id: string) => Promise<string | null>>()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce(PUSH_REASON);
+    const cache = createReasonCache(load);
+    const a = reasons(cache, [T1()]);
+    const b = reasons(cache, [T1()]);
+    first.reject(new Error("aico trả 502"));
+    expect(await Promise.all([a, b])).toEqual([[null], [null]]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(await reasons(cache, [T1()])).toEqual([PUSH_REASON]);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("request cũ lỗi muộn không xoá kết quả của request mới cùng khoá", async () => {
+    const old = deferred<string | null>();
+    const load = vi.fn<(id: string) => Promise<string | null>>()
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(PUSH_REASON);
+    const cache = createReasonCache(load);
+    const stale = reasons(cache, [T1()]);
+    // ticket rời danh sách rồi quay lại khi request đầu chưa về: khoá được hỏi lại bằng request mới
+    await reasons(cache, []);
+    expect(await reasons(cache, [T1()])).toEqual([PUSH_REASON]);
+    old.reject(new Error("Failed to fetch"));
+    expect(await stale).toEqual([null]);
+    expect(await reasons(cache, [T1()])).toEqual([PUSH_REASON]);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("updated_at đổi hoặc ticket mất rồi quay lại thì hỏi lại; lỗi của khoá này không ảnh hưởng ticket khác", async () => {
+    const load = vi.fn(async (id: string) => {
+      if (id === "T-2") throw new Error("aico trả 500");
+      return PUSH_REASON;
+    });
+    const cache = createReasonCache(load);
+    const t2 = parseTickets([ticket("T-2")], who())![0];
+    expect(await reasons(cache, [T1(), t2])).toEqual([PUSH_REASON, null]);
+    expect(await reasons(cache, [T1(), t2])).toEqual([PUSH_REASON, null]);
+    expect(load.mock.calls.map(([id]) => id)).toEqual(["T-1", "T-2", "T-2"]);
+    const moved = parseTickets([ticket("T-1", { updated_at: "2026-10-21T09:00:00Z" })], who())![0];
+    await reasons(cache, [moved]);
+    await reasons(cache, []);
+    await reasons(cache, [moved]);
+    expect(load.mock.calls.map(([id]) => id)).toEqual(["T-1", "T-2", "T-2", "T-1", "T-1"]);
   });
 });
 

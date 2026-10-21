@@ -3,7 +3,7 @@ import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
 import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
 import { createLatestGate } from "./latest";
-import { applyDemoAction, demoTickets, reasonKey } from "./tickets";
+import { applyDemoAction, createReasonCache, demoTickets } from "./tickets";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -33,22 +33,9 @@ function ticketSource(current: ApiConfig | null): EscalationSource {
       async act(id, action) { tickets = applyDemoAction(tickets, id, action); },
     };
   }
-  const reasons = new Map<string, Promise<string | null>>();
+  const reasons = createReasonCache((id) => fetchEscalationReason(current, id));
   return {
-    async list() {
-      const tickets = await fetchTickets(current);
-      const keys = new Set(tickets.map(reasonKey));
-      for (const key of reasons.keys()) if (!keys.has(key)) reasons.delete(key);
-      return Promise.all(tickets.map(async (ticket) => {
-        const key = reasonKey(ticket);
-        let reason = reasons.get(key);
-        if (!reason) {
-          reason = fetchEscalationReason(current, ticket.id).catch(() => null);
-          reasons.set(key, reason);
-        }
-        return { ticket, reason: await reason };
-      }));
-    },
+    async list() { return reasons.resolve(await fetchTickets(current)); },
     act(id, action, comment) { return escalationAction(current, id, action, "owner", comment); },
   };
 }

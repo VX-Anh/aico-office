@@ -130,8 +130,12 @@ export async function fetchTickets(config: ApiConfig): Promise<Ticket[]> {
   return escalatedOnly(tickets);
 }
 
+// Danh sách event hỏng thì ném lỗi (không trả null) để cache lý do không giữ kết quả hỏng.
 export async function fetchEscalationReason(config: ApiConfig, id: string): Promise<string | null> {
-  return latestEscalationReason(await getJson(config, ticketPath(id, "events")), `/tickets/${id}/events`);
+  const events = await getJson(config, ticketPath(id, "events"));
+  const reason = latestEscalationReason(events, `/tickets/${id}/events`);
+  if (!Array.isArray(events)) throw new Error("aico trả danh sách event hỏng");
+  return reason;
 }
 
 // Lỗi 409/501 ném Error mang `detail` của aico để panel hiện nguyên văn.
