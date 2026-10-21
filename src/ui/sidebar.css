@@ -1,0 +1,198 @@
+/* Thanh bên trái ~304px dưới thanh trên; thu gọn thành dải hẹp chỉ còn nút mở. */
+.sidebar {
+  position: fixed;
+  top: calc(var(--gap) + var(--topbar-h) + var(--gap));
+  left: var(--gap);
+  bottom: var(--gap);
+  z-index: 15;
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width .24s var(--ease), transform .24s var(--ease);
+}
+/* Feed ở đáy chiếm chỗ: thanh bên dừng phía trên nếu main ghi --free-bottom. */
+.sidebar:not(.narrow) { bottom: max(var(--gap), var(--free-bottom)); }
+.sidebar.collapsed:not(.narrow) { width: 44px; }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px 14px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.sidebar-title { margin: 0; font-size: 15px; flex: 1 1 auto; white-space: nowrap; }
+.sidebar-toggle {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+.sidebar-toggle:hover { background: var(--hover); border-color: var(--accent); }
+.sidebar.collapsed:not(.narrow) .sidebar-head { padding: 8px; border-bottom: 0; justify-content: center; }
+.sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .sidebar-scroll,
+.sidebar.collapsed .sidebar-legend { display: none; }
+
+.sidebar-scroll { flex: 1 1 auto; overflow-y: auto; padding: 8px; }
+.sidebar-rooms { display: flex; flex-direction: column; gap: var(--gap); }
+.sidebar-empty,
+.room-empty { margin: 4px 6px; font-size: 12px; color: var(--text-dim); }
+.sidebar-empty[hidden],
+.room-empty[hidden] { display: none; }
+
+/* Khối phòng. */
+.room {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  padding: 6px;
+}
+.room[data-state="offline"] { opacity: .6; }
+.room[data-state="offline"] .room-state { color: var(--st-offline); }
+.room[data-state="limited"] { border-color: var(--lvl-crit); background: var(--crit-soft); }
+.room[data-state="limited"] .room-state { color: var(--st-limited); }
+.room[data-state="working"] .room-state { color: var(--st-working); }
+.room[data-state="idle"] .room-state { color: var(--st-idle); }
+
+.room-head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 4px; }
+.room-letter {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  font-size: 14px;
+  text-shadow: 0 1px 0 var(--bg);
+}
+.room-title { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.15; }
+.room-name { font-size: 14px; text-transform: capitalize; }
+.room-state { font-size: 11px; color: var(--text-dim); }
+.room-count { font-size: 12px; color: var(--text-dim); }
+.room-count.over { color: var(--st-need); }
+.room-alert {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--lvl-crit);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+}
+.room-alert[hidden] { display: none; }
+
+/* Dòng agent con. */
+.room-agents { display: flex; flex-direction: column; gap: 2px; }
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s var(--ease), border-color .15s var(--ease);
+}
+.agent-row:hover { background: var(--hover); }
+.agent-row.selected { border-color: var(--accent); background: var(--hover); }
+.agent-row.need { box-shadow: inset 2px 0 0 var(--st-need); }
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: var(--line);
+  image-rendering: pixelated;
+}
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  color: var(--text);
+  text-shadow: 0 1px 0 var(--bg);
+}
+
+.agent-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.25; }
+.agent-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.agent-role { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.agent-ticket { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--st-idle);
+}
+.status-dot[data-state="working"] { background: var(--st-working); }
+.status-dot[data-state="need"] { background: var(--st-need); }
+.status-dot[data-state="offline"] { background: var(--st-offline); }
+.status-dot[data-state="limited"] { background: var(--st-limited); }
+.status-dot.error { box-shadow: 0 0 0 2px var(--lvl-crit); }
+
+/* Chú thích vai trò ở cuối. */
+.sidebar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-item .swatch { width: 9px; height: 9px; border-radius: 2px; }
+
+/* Màn hẹp: ngăn kéo phủ lên cảnh, có nền mờ; đóng thì chỉ còn nút tròn. */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.sidebar-scrim[hidden] { display: none; }
+
+@media (max-width: 899px) {
+  .sidebar {
+    top: 64px;
+    left: 6px;
+    bottom: 6px;
+    z-index: 25;
+    width: min(86vw, var(--sidebar-w));
+  }
+  .sidebar.collapsed {
+    bottom: auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+  .sidebar.collapsed .sidebar-head { padding: 6px; border-bottom: 0; justify-content: center; }
+  .sidebar.collapsed .sidebar-toggle { border: 0; }
+  .sidebar-scrim { z-index: 24; }
+}
