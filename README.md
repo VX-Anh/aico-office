@@ -39,6 +39,8 @@ aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc địn
 
 `GET /workers` của aico trả mỗi phòng: `state`, `roles`, `slots` (số agent con tối đa chạy song song), `agents` (danh sách agent con đang chạy: `id`, `role`, `ticket_id`, `mode`, `started_at`), `runs_today`, `tokens_today`, tổng lượt và token, `last_error`, `limit` (`message`, `resets_at`), và `usage`.
 
+Mỗi agent có thể có thêm `activity` (`kind`, `icon`, `text`, `detail`, `tool`, `at`, `error`), `recent` (tối đa 20 hoạt động), `tasks` (`id`, `title`, `status`), `tasks_done` và `stats` (`tool_calls`, `tokens_in`, `tokens_out`). Các trường đều có thể thiếu ở aico cũ; dữ liệu sai kiểu bị từ chối để cảnh tiếp tục chạy. Agent đang làm có bong bóng hoạt động (quá 60 giây thì chỉ còn icon mờ), lỗi có viền đỏ; màn hình bàn đổi theo loại việc, thiếu activity thì giữ màn hình code. Thanh tiến độ task nằm dưới chân; rê chuột hoặc chạm nhân vật để xem ticket, vai trò, hoạt động gần nhất, task và thống kê. Demo có hoạt động đổi vòng, lỗi, stale và task tăng dần.
+
 `current` (agent đầu tiên) đã deprecated; GUI chỉ dùng khi aico bản cũ chưa trả `agents`.
 
 `usage` có thể `null` (worker chưa đọc xong hoặc aico bản cũ). Khi có, gồm `checked_at` (lúc đọc), `source` (nguồn số liệu), `plan` (gói), `windows` (mỗi cửa sổ: `name`, `window_minutes`, `used_percent`, `resets_at`), `note` và `error`. `plan`, `note` và `error` có thể vắng.
@@ -49,28 +51,27 @@ aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc địn
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
-Cột HTML “Cần bạn” nằm cạnh canvas, xuống dưới trên màn hẹp và ẩn khi không có ticket. Cột gom duyệt kế hoạch, duyệt merge và escalated; có ghi chú, link MR/xem trước và xác nhận ngay trong thẻ. Thanh trên đếm agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm bộ đếm để tới ticket đầu, phím P để tới ticket kế tiếp (khi không gõ trong ô nhập). Ticket mới có toast ở góc dưới phải canvas, nút “Xử lý” đưa tới thẻ; có thể đóng toast.
-
-Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú qua các lần poll; lỗi tải giữ thẻ, bộ đếm và toast cũ, báo dấu ! cạnh bộ đếm. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại. Đổi nguồn sẽ xoá toast và bỏ kết quả request của nguồn cũ; lần tải đầu nguồn mới không bật toast.
+Panel HTML ở góc phải canvas liệt kê ticket `escalated`, có thể thu gọn và hiện số ticket. Mỗi ticket có lý do lần escalate mới nhất, link MR, ghi chú và nút Đẩy lại/Merge/Đóng/Đánh dấu lỗi (actor `owner`). Merge, Đóng và Đánh dấu lỗi xác nhận ngay trong panel. Danh sách làm mới cùng worker mỗi 3 giây, giữ ghi chú và xác nhận qua các lần poll; lỗi tải giữ danh sách cũ. Demo có hai ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
 
 ## Cấu trúc
 
 ```text
 src/api.ts                 gọi aico, kiểu dữ liệu, dữ liệu demo
+src/activity.ts            đọc activity/recent/tasks/stats phòng thủ, chọn màn hình, bong bóng và demo (thuần)
+src/activity.test.ts       test activity, stale, task, chồng bong bóng và dữ liệu đổi giữa chừng
+src/overlay.ts             canvas chữ phủ: bong bóng hoạt động và tiến độ task
+src/agent-tooltip.ts       tooltip chuột/chạm: ticket, vai trò, hoạt động, task, stats
+src/agent-tooltip.css      kiểu hiển thị tooltip nhân vật
+src/agent-tooltip.test.ts  test vùng chạm và nhân vật chồng nhau
 src/usage.ts               đọc usage phòng thủ, mức màu, đếm ngược, số liệu cũ (hàm thuần)
 src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
-src/attention.ts           tiêu đề tab, phím P, gộp/huỷ toast (hàm thuần)
-src/attention.test.ts      test chú ý, phím tắt và vòng đời toast
-src/needs-column.ts        cột Cần bạn, thẻ duyệt/escalated, ghi chú và xác nhận
-src/needs-column.css       kiểu thẻ và trạng thái trong cột Cần bạn
-src/toasts.ts              toast HTML cần người, nút Xử lý và đóng
-src/toasts.css             toast góc dưới phải canvas
+src/escalation-panel.ts    panel ticket HTML, ghi chú, xác nhận và cập nhật theo id
 src/latest.ts              chọn kết quả poll mới nhất khi request chồng nhau (hàm thuần)
 src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
 src/main.ts                vòng lặp animation, polling worker + ticket, thẻ trạng thái
-src/scene/index.ts         ghép cảnh: drawScene, sceneSize
+src/scene/index.ts         ghép cảnh, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ; giữ chỗ ngồi theo id (hàm thuần)
 src/scene/pathing.ts       đường đi ngang/dọc qua cửa, vị trí theo thời gian (hàm thuần)
 src/scene/actors.ts        nhân vật đi vào/ra theo thay đổi của agents[]

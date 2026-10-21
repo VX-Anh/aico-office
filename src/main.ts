@@ -1,11 +1,12 @@
-import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
+import { withDemoActivity } from "./activity";
+import { createOverlay } from "./overlay";
+import { createAgentTooltip } from "./agent-tooltip";
+import { type ApiConfig, type WorkerStatus, demoWorkers, escalationAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, roomAgents, saveConfig } from "./api";
 import { ROLE_STYLES, USAGE, drawScene, resetActors, roleStyle, sceneSize } from "./scene/index";
 import { isStale, parseUsage, shortCountdown, usageLevel, usagePercent } from "./usage";
-import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
-import { isShortcut, nextAttention, tabTitle } from "./attention";
-import { createToasts } from "./toasts";
+import { createEscalationPanel, type EscalationSource } from "./escalation-panel";
 import { createLatestGate } from "./latest";
-import { applyDemoAction, createReasonCache, demoNeedTickets, NEED_LABEL, needKind, needsYou } from "./tickets";
+import { applyDemoAction, createReasonCache, demoTickets } from "./tickets";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -22,105 +23,37 @@ const status = document.querySelector<HTMLSpanElement>("#conn")!;
 const form = document.querySelector<HTMLFormElement>("#settings")!;
 const legend = document.querySelector<HTMLDivElement>("#legend")!;
 const ctx = canvas.getContext("2d")!;
+const overlay = createOverlay(canvas);
+const tooltip = createAgentTooltip(canvas);
 
 let config: ApiConfig | null = loadConfig();
-let workers: WorkerStatus[] = demoWorkers(Date.now());
+const initialNow = Date.now();
+let workers: WorkerStatus[] = withDemoActivity(demoWorkers(initialNow), initialNow);
 const workerGate = createLatestGate();
 
-const workspace = document.querySelector<HTMLElement>(".workspace")!;
-const needsRoot = document.querySelector<HTMLElement>("#needs")!;
-const needsCount = document.querySelector<HTMLButtonElement>("#needs-count")!;
-const agentsCount = document.querySelector<HTMLElement>("#agents-count")!;
-const ticketError = document.querySelector<HTMLElement>("#tickets-error")!;
-let attentionItems: NeedItem[] = [];
-let currentAttention: string | null = null;
-
-function ticketSource(current: ApiConfig | null): NeedSource {
+function ticketSource(current: ApiConfig | null): EscalationSource {
   if (!current) {
-    let tickets = demoNeedTickets(Date.now());
+    let tickets = demoTickets();
     return {
-      async list() {
-        return needsYou(tickets).map((ticket) => ({
-          ticket, kind: needKind(ticket.status)!, reason: ticket.reason,
-        }));
-      },
-      async act(item, action) {
-        tickets = applyDemoAction(tickets, item.ticket.id, item.kind, action);
-      },
+      async list() { return tickets.filter((ticket) => ticket.status === "escalated").map((ticket) => ({ ticket, reason: ticket.reason })); },
+      async act(id, action) { tickets = applyDemoAction(tickets, id, action); },
     };
   }
   const reasons = createReasonCache((id) => fetchEscalationReason(current, id));
   return {
-    async list() {
-      const tickets = await fetchTickets(current);
-      const resolved = await reasons.resolve(tickets.filter((ticket) => needKind(ticket.status) === "escalated"));
-      const byId = new Map(resolved.map((item) => [item.ticket.id, item.reason]));
-      return tickets.map((ticket) => ({
-        ticket, kind: needKind(ticket.status)!, reason: byId.get(ticket.id) ?? null,
-      }));
-    },
-    act(item, action, comment) { return needAction(current, item.kind, item.ticket.id, action, comment); },
+    async list() { return reasons.resolve(await fetchTickets(current)); },
+    act(id, action, comment) { return escalationAction(current, id, action, "owner", comment); },
   };
 }
 
-function focusTicket(id: string): void {
-  if (column.focus(id)) currentAttention = id;
-}
-
-const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
-
-function onItems(items: NeedItem[]): void {
-  attentionItems = items;
-  const n = items.length;
-  needsCount.textContent = `Cần bạn: ${n}`;
-  needsCount.disabled = n === 0;
-  needsCount.classList.toggle("hot", n > 0);
-  document.title = tabTitle(n);
-  workspace.classList.toggle("has-needs", n > 0);
-  toasts.update(items.map(({ ticket, kind }) => ({ id: ticket.id, kind, label: NEED_LABEL[kind] })));
-}
-
-const column = createNeedsColumn(needsRoot, ticketSource(config), onItems);
-// Cột đã gate kết quả tải: đọc dòng lỗi này để request cũ không báo lỗi sang nguồn mới.
-new MutationObserver(() => {
-  const message = needsRoot.querySelector(".needs-error")?.textContent ?? "";
-  ticketError.hidden = !message;
-  ticketError.title = message;
-  ticketError.setAttribute("aria-label", message);
-}).observe(needsRoot.querySelector(".needs-error")!, { childList: true, characterData: true, subtree: true });
-
-needsCount.addEventListener("click", () => {
-  const first = attentionItems[0];
-  if (first) focusTicket(first.ticket.id);
-});
-needsRoot.addEventListener("focusin", (event) => {
-  const target = event.target;
-  if (target instanceof Element) currentAttention = target.closest<HTMLElement>("[data-ticket-id]")?.dataset.ticketId ?? currentAttention;
-});
-document.addEventListener("keydown", (event) => {
-  const target = event.target;
-  const editable = target instanceof Element && (
-    !!target.closest("input, textarea, select") ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-  if (!isShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editable })) return;
-  const next = nextAttention(attentionItems.map((item) => item.ticket.id), currentAttention);
-  if (next) {
-    event.preventDefault();
-    focusTicket(next);
-  }
-});
+const panel = createEscalationPanel(document.querySelector<HTMLElement>("#escalations")!, ticketSource(config));
 
 function changeSource(): void {
   workerGate.reset();
-  column.setSource(ticketSource(config));
-  currentAttention = null;
-  onItems([]);
-  // Nguồn mới cần được primed bằng lần tải thành công đầu, kể cả khi nguồn cũ đang tải.
-  toasts.reset();
-  ticketError.hidden = true;
-  ticketError.title = "";
-  ticketError.setAttribute("aria-label", "");
+  const now = Date.now();
+  overlay.draw([], sceneSize(workers).width, now);
+  tooltip.update([], sceneSize(workers).width, now);
+  panel.setSource(ticketSource(config));
 }
 
 
@@ -157,9 +90,6 @@ function row(label: string, value: string): HTMLElement {
 }
 
 function renderCards(now: number): void {
-  column.tick(now);
-  const count = workers.filter((w) => w.state !== "offline").reduce((sum, w) => sum + roomAgents(w).agents.length, 0);
-  agentsCount.textContent = `Đang làm: ${count} agent`;
   cards.replaceChildren(
     ...workers.map((w) => {
       const card = el("article", `card state-${w.state}`);
@@ -236,7 +166,8 @@ async function pollWorkers(): Promise<void> {
   const current = config;
   const request = workerGate.start();
   if (!current) {
-    workers = demoWorkers(Date.now());
+    const now = Date.now();
+    workers = withDemoActivity(demoWorkers(now), now);
     status.textContent = "Chế độ demo (dữ liệu giả)";
     status.className = "conn demo";
     return;
@@ -255,7 +186,7 @@ async function pollWorkers(): Promise<void> {
 }
 
 async function poll(): Promise<void> {
-  await Promise.allSettled([pollWorkers(), column.refresh()]);
+  await Promise.allSettled([pollWorkers(), panel.refresh()]);
 }
 
 form.addEventListener("submit", (event) => {
@@ -294,7 +225,8 @@ function renderLegend(): void {
 
 function frame(t: number): void {
   // demo tính lại mỗi frame để nhân vật bắt đầu đi ngay khi kịch bản đổi pha, không trễ theo nhịp polling 3 giây
-  if (!config) workers = demoWorkers(Date.now());
+  const now = Date.now();
+  if (!config) workers = withDemoActivity(demoWorkers(now), now);
   const size = sceneSize(workers);
   // vẽ với hệ số phóng nguyên: pixel đều nhau và vẫn sắc khi phóng to hoặc trên màn hình HiDPI
   const k = Math.min(8, Math.max(1, Math.ceil((canvas.clientWidth * devicePixelRatio) / size.width)));
@@ -303,7 +235,10 @@ function frame(t: number): void {
     canvas.height = size.height * k;
   }
   ctx.setTransform(k, 0, 0, k, 0, 0);
-  drawScene(ctx, workers, t, Date.now());
+  const figures = drawScene(ctx, workers, t, now);
+  overlay.draw(figures, size.width, now);
+  // Agent đi ra hoặc phòng tắt thì đóng tooltip cùng lúc với bong bóng.
+  tooltip.update(figures.filter((figure) => figure.working), size.width, now);
   requestAnimationFrame(frame);
 }
 

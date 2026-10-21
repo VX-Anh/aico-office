@@ -1,7 +1,8 @@
 // Văn phòng pixel nhìn từ trên xuống góc 3/4: mỗi provider một phòng làm việc có `slots` bàn,
 // phía dưới là phòng nghỉ chung nối bằng ô cửa. Agent con ngồi bàn trong phòng provider của nó.
 
-import type { WorkerStatus } from "../api";
+import { readAgentActivity, screenFor } from "../activity";
+import type { WorkerAgent, WorkerStatus } from "../api";
 import { parseUsage } from "../usage";
 import { type Crew, actorPose, syncActors } from "./actors";
 import { drawSeatedBack, drawSleeper, drawSofaSitter, drawWalker, drawZ, residentLook } from "./characters";
@@ -31,6 +32,17 @@ export { resetActors } from "./actors";
 export { sceneSize } from "./layout";
 export { ROLE_STYLES, USAGE, roleStyle } from "./palette";
 
+export interface SceneFigure {
+  key: string;
+  agent: WorkerAgent;
+  room: string;
+  working: boolean;
+  x: number;
+  headY: number;
+  footY: number;
+  seated: boolean;
+}
+
 function drawRoomFurniture(ctx: Ctx, room: RoomBox, crew: Crew["rooms"][number], t: number, now: number): void {
   const { worker } = room;
   drawShelf(ctx, room.shelf.x, room.shelf.y);
@@ -44,7 +56,8 @@ function drawRoomFurniture(ctx: Ctx, room: RoomBox, crew: Crew["rooms"][number],
   room.desks.forEach((desk, k) => {
     const actor = crew.seats[k];
     const seated = actor?.phase === "seated" ? actor : null;
-    const screen: Screen = off ? "off" : seated ? "code" : "cursor";
+    const mode = seated ? screenFor(readAgentActivity(seated.agent, seated.key).activity?.kind) : "idle";
+    const screen: Screen = off ? "off" : seated ? (mode === "idle" ? "code" : mode) : "cursor";
     drawDesk(ctx, desk, screen, seated?.agent.mode ?? "", t);
     drawStool(ctx, desk);
     if (seated) drawSeatedBack(ctx, seated.look, desk.seat.x, desk.y + 29, t, hashPhase(seated.agent.id));
@@ -85,10 +98,23 @@ function drawSigns(ctx: Ctx, room: RoomBox, overflow: number, t: number): void {
 }
 
 // t: thời gian animation (requestAnimationFrame), now: giờ thực (đồng hồ, đếm ngược).
-export function drawScene(ctx: Ctx, workers: WorkerStatus[], t: number, now: number): void {
+export function drawScene(ctx: Ctx, workers: WorkerStatus[], t: number, now: number): SceneFigure[] {
   ctx.imageSmoothingEnabled = false;
   const layout = computeLayout(workers);
   const crew = syncActors(layout, t);
+
+  const figures: SceneFigure[] = [];
+  layout.rooms.forEach((room, i) => {
+    crew.rooms[i].seats.forEach((actor, k) => {
+      if (actor?.phase !== "seated") return;
+      const desk = room.desks[k];
+      figures.push({
+        key: actor.key, agent: actor.agent, room: actor.room,
+        working: room.worker.state === "working",
+        x: desk.seat.x, headY: desk.y + 12, footY: desk.y + 34, seated: true,
+      });
+    });
+  });
 
   drawBackdrop(ctx, layout);
   if (layout.storage) drawStorage(ctx, layout.storage);
@@ -109,8 +135,16 @@ export function drawScene(ctx: Ctx, workers: WorkerStatus[], t: number, now: num
   crew.walkers
     .map((a) => ({ a, pose: actorPose(a, t) }))
     .sort((p, q) => p.pose.y - q.pose.y)
-    .forEach(({ a, pose }) => drawWalker(ctx, a.look, pose.x, pose.y, pose.dir, pose.frame, pose.alpha));
+    .forEach(({ a, pose }) => {
+      drawWalker(ctx, a.look, pose.x, pose.y, pose.dir, pose.frame, pose.alpha);
+      figures.push({
+        key: a.key, agent: a.agent, room: a.room,
+        working: a.phase === "in" && layout.rooms.some((room) => room.worker.name === a.room && room.worker.state === "working"),
+        x: pose.x, headY: pose.y - 22, footY: pose.y, seated: false,
+      });
+    });
 
   layout.rooms.forEach((room) => room.worker.state === "offline" && drawDarkness(ctx, room));
   layout.rooms.forEach((room, i) => drawSigns(ctx, room, crew.rooms[i].overflow, t));
+  return figures;
 }
