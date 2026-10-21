@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { brightnessAt, createLightmapCache, lightingKey, monitorLight, parseHour, type LightingInput } from "./lighting";
+import { brightnessAt, createLightmapCache, lightingKey, lightingMinutes, monitorLight, parseHour, type LightingInput } from "./lighting";
 
 function input(): LightingInput {
   return { width: 400, height: 240, minutes: 1290,
@@ -36,6 +36,15 @@ describe("giờ địa phương", () => {
     for (const value of [null, undefined, "", "24:00", "12:60", "-1:00", "1:00", "12:1", " 12:00", "12:00x", "NaN"]) {
       expect(parseHour(value)).toBeNull();
     }
+  });
+  it("?hour ghi đè ánh sáng; chuỗi sai dùng giờ địa phương", () => {
+    const morning = new Date(2026, 5, 2, 6, 15, 45).getTime();
+    expect(lightingMinutes(morning, null)).toBe(6 * 60 + 15);
+    expect(lightingMinutes(morning, undefined)).toBe(6 * 60 + 15);
+    expect(lightingMinutes(morning, "21:30")).toBe(21 * 60 + 30);
+    expect(lightingMinutes(morning, "24:00")).toBe(6 * 60 + 15);
+    expect(lightingMinutes(Number.NaN, "nope")).toBe(0);
+    expect(lightingMinutes(morning, "00:00")).toBe(0);
   });
 });
 

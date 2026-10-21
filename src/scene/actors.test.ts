@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkerAgent, WorkerState, WorkerStatus } from "../api";
 import { type Actor, actorPose, resetActors, syncActors } from "./actors";
-import { computeLayout } from "./layout";
+import { WALL, YARD, computeLayout } from "./layout";
 import { pathLength } from "./pathing";
 
 const agent: WorkerAgent = {
@@ -201,4 +201,29 @@ describe("actors khi dữ liệu đổi giữa đường", () => {
       s.exit();
     });
   }
+
+  it("ghế seated và lối ra nằm trong sân đã dịch, đi vào rồi đi ra vẫn đúng ghế hiện tại", () => {
+    const s = scenario();
+    s.present(true);
+    s.seated();
+    const room = s.layout().rooms[1];
+    const sitting = s.active();
+    const seat = room.desks[sitting.seat].seat;
+    expect(room.y).toBe(YARD.top + WALL);
+    expect(room.x).toBeGreaterThanOrEqual(YARD.left + WALL);
+    expect(sitting.path[sitting.path.length - 1]).toEqual(seat);
+    expect(seat.x).toBeGreaterThanOrEqual(room.x);
+    expect(seat.x).toBeLessThanOrEqual(room.x + room.w);
+    expect(s.layout().lounge.exitSpot.y).toBeGreaterThan(room.y + room.h);
+    s.present(false);
+    s.exit();
+    s.frontSlots(4);
+    s.present(true);
+    s.seated();
+    const again = s.active();
+    expect(again.path[again.path.length - 1]).toEqual(s.layout().rooms[1].desks[again.seat].seat);
+    s.frontSlots(1);
+    s.present(false);
+    s.exit();
+  });
 });

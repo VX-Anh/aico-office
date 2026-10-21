@@ -51,9 +51,10 @@ function loungeWall(ctx: Ctx, l: LoungeBox): void {
   rect(ctx, l.x, l.y + wallH - 2, l.w, 2, C.woodFace);
 }
 
-export function drawBackdrop(ctx: Ctx, layout: Layout): void {
+export function drawBackdrop(ctx: Ctx, layout: Layout, outdoor = outdoorLayout(layout)): void {
   // Sân trước, tường sau: tô tường cả scene sẽ che cỏ. Xe không nằm ở đây vì nó chạy theo thời gian.
-  drawOutdoorStatic(ctx, outdoorLayout(layout));
+  // `outdoor` để cache dùng đúng seed; mặc định vẫn sinh từ layout.
+  drawOutdoorStatic(ctx, outdoor);
   const b = layout.building;
   rect(ctx, b.x, b.y, b.w, b.h, C.wall);
   rect(ctx, b.x, b.y, b.w, 1, C.wallLight);

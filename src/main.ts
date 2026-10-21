@@ -1,11 +1,15 @@
 import { withDemoActivity } from "./activity";
 import { hitFigure, createAgentTooltip } from "./agent-tooltip";
-import { type ApiConfig, type WorkerStatus, demoWorkers, needAction, fetchEscalationReason, fetchTickets, fetchWorkers, loadConfig, saveConfig } from "./api";
+import { type ApiConfig, type Ticket, type WorkerStatus, demoWorkers, fetchEscalationReason, fetchTicketSnapshot, fetchWorkers, loadConfig, needAction, roomAgents, saveConfig } from "./api";
 import { isShortcut, nextAttention, tabTitle } from "./attention";
 import { createLatestGate } from "./latest";
 import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
 import { createOverlay } from "./overlay";
-import { type SceneFigure, drawScene, resetActors, sceneSize } from "./scene/index";
+import { demoEventAssignments, demoEventTickets } from "./scene/demo-events";
+import { type SceneFigure, drawScene, resetActors, resetSceneCache, sceneSize } from "./scene/index";
+import { computeLayout, roomSigns } from "./scene/layout";
+import { lightingMinutes } from "./scene/lighting";
+import { type RoomBanner, createRoomEvents } from "./scene/room-events";
 import { applyDemoAction, createReasonCache, demoNeedTickets, needKind, needsYou, NEED_LABEL } from "./tickets";
 import { createToasts } from "./toasts";
 import { createDrawer } from "./ui/drawer";
@@ -56,27 +60,62 @@ let narrow = false;
 let feedState: FeedState = createFeedState();
 let free: Rect = { left: 0, top: 0, width: 0, height: 0 };
 let figures: SceneFigure[] = [];
+const roomEvents = createRoomEvents();
+let banners: RoomBanner[] = [];
+let pendingSnapshot: Ticket[] | null = null;
+let snapshotSeq = 0;
+let appliedSnapshot = 0;
 
 const shell: {
   sidebar?: Sidebar;
   feed?: ReturnType<typeof createFeed>;
 } = {};
 
+function readHour(): string | null {
+  const search = globalThis.location?.search;
+  if (typeof search !== "string" || !search) return null;
+  return new URLSearchParams(search).get("hour");
+}
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function assignmentsAt(now: number): { ticketId: string; provider: string }[] {
+  const list: { ticketId: string; provider: string }[] = [];
+  for (const worker of workers) {
+    for (const agent of roomAgents(worker).agents) {
+      if (typeof agent.ticket_id === "string" && agent.ticket_id) list.push({ ticketId: agent.ticket_id, provider: worker.name });
+    }
+  }
+  if (!config) list.push(...demoEventAssignments(now));
+  return list;
+}
+
+function onSnapshot(tickets: Ticket[]): void {
+  pendingSnapshot = tickets;
+  snapshotSeq += 1;
+}
+
 function ticketSource(current: ApiConfig | null): NeedSource {
   let tickets = demoNeedTickets(Date.now());
   const reasons = current ? createReasonCache((id) => fetchEscalationReason(current, id)) : null;
   return {
     async list() {
-      const list = needsYou(current ? await fetchTickets(current) : tickets);
+      const now = Date.now();
+      // Một request. Demo giữ 4 thẻ cần người; snapshot thêm ticket sự kiện cho banner.
+      const full = current ? await fetchTicketSnapshot(current) : [...tickets, ...demoEventTickets(now)];
+      const list = needsYou(current ? full : tickets);
       const escalated = list.filter((ticket) => needKind(ticket.status) === "escalated");
       const resolved = reasons ? await reasons.resolve(escalated) : [];
-      return list.map((ticket) => ({
+      const items = list.map((ticket) => ({
         ticket,
         kind: needKind(ticket.status)!,
         reason: current
           ? resolved.find((item) => item.ticket.id === ticket.id)?.reason ?? null
           : tickets.find((item) => item.id === ticket.id)?.reason ?? null,
       }));
+      return Object.assign(items, { tickets: full });
     },
     async act(item, action, comment) {
       if (current) await needAction(current, item.kind, item.ticket.id, action, comment);
@@ -171,7 +210,7 @@ const panel = createNeedsColumn(needsRoot, ticketSource(config), onNeedItems, (e
   ticketsError.hidden = !error;
   ticketsError.title = error ?? "";
   ticketsError.setAttribute("aria-label", error ?? "");
-});
+}, onSnapshot);
 
 const topbar = createTopbar(topbarRoot, { onSettings: () => relayout() });
 const sidebar = createSidebar(sidebarRoot, { onSelect: selectAgent, shortcut: false });
@@ -232,6 +271,11 @@ needsRoot.addEventListener("focusin", (event) => {
 function changeSource(): void {
   sourceEpoch += 1;
   workerGate.reset();
+  roomEvents.reset();
+  banners = [];
+  pendingSnapshot = null;
+  appliedSnapshot = snapshotSeq;
+  resetSceneCache();
   selectedKey = null;
   tab = null;
   needsDismissed = false;
@@ -243,7 +287,7 @@ function changeSource(): void {
   shell.feed?.render([]);
   const now = Date.now();
   const width = sceneSize(workers).width;
-  overlay.draw([], width, now);
+  overlay.draw([], width, now, { signs: [], banners: [], reducedMotion: reducedMotion() });
   tooltip.update([], width, now);
   document.title = tabTitle(0);
   ticketsError.hidden = true;
@@ -349,6 +393,14 @@ async function poll(): Promise<void> {
   const workersTask = pollWorkers();
   await Promise.allSettled([workersTask, panel.refresh()]);
   if (epoch !== sourceEpoch) return;
+  if (snapshotSeq !== appliedSnapshot) {
+    appliedSnapshot = snapshotSeq;
+    if (pendingSnapshot) {
+      const now = Date.now();
+      banners = roomEvents.observe({ tickets: pendingSnapshot, assignments: assignmentsAt(now), now });
+      pendingSnapshot = null;
+    }
+  }
   // Lỗi hoặc kết quả cũ: giữ feed và ngăn. onItems của ticket (nếu có) đã cập nhật riêng.
   if (await workersTask !== "applied") return;
   absorbFeed();
@@ -383,6 +435,8 @@ function frame(t: number): void {
   if (!config) workers = withDemoActivity(demoWorkers(now), now);
   // Biến mất giữa hai lần poll (demo đổi pha): đóng ngăn ngay frame này.
   if (dropMissingSelection()) publish();
+  banners = roomEvents.tick(now);
+  const reduced = reducedMotion();
   const size = sceneSize(workers);
   // Focus lấy từ frame trước: frame này mới biết nhân vật đang đứng đâu sau khi cảnh đổi.
   const fit = fitScene(free, size, globalThis.devicePixelRatio || 1, focusOf(figures));
@@ -397,8 +451,8 @@ function frame(t: number): void {
   canvas.style.width = `${fit.cssW}px`;
   canvas.style.height = `${fit.cssH}px`;
   ctx.setTransform(fit.k, 0, 0, fit.k, 0, 0);
-  figures = drawScene(ctx, workers, t, now);
-  overlay.draw(figures, size.width, now);
+  figures = drawScene(ctx, workers, t, now, { minutes: lightingMinutes(now, readHour()), reducedMotion: reduced });
+  overlay.draw(figures, size.width, now, { signs: roomSigns(computeLayout(workers)), banners, reducedMotion: reduced });
   // Agent đi ra hoặc phòng tắt thì đóng tooltip cùng lúc với bong bóng.
   tooltip.update(figures.filter((figure) => figure.working), size.width, now);
   requestAnimationFrame(frame);

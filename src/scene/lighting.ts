@@ -11,6 +11,15 @@ export function parseHour(hour: string | null | undefined): number | null {
   return h < 24 && m < 60 ? h * 60 + m : null;
 }
 
+// `hour` hợp lệ thì ghi đè; sai hoặc vắng thì lấy giờ địa phương của `now`. Không đụng đồng hồ cảnh.
+export function lightingMinutes(now: number, hour: string | null | undefined): number {
+  const parsed = parseHour(hour ?? null);
+  if (parsed !== null) return parsed;
+  const date = new Date(now);
+  if (Number.isNaN(date.getTime())) return 0;
+  return date.getHours() * 60 + date.getMinutes();
+}
+
 export function normalizeMinutes(minutes: number): number {
   if (!Number.isFinite(minutes)) throw new RangeError("Phút địa phương phải hữu hạn");
   return ((minutes % 1440) + 1440) % 1440;

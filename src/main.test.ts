@@ -8,8 +8,10 @@ const h = vi.hoisted(() => ({
   column: vi.fn(), source: vi.fn(), items: vi.fn(), refresh: vi.fn(async () => {}),
   reset: vi.fn(), update: vi.fn(), focus: vi.fn(), tick: vi.fn(),
   fetchTickets: vi.fn(), needAction: vi.fn(),
+  overlayDraw: vi.fn(),
   fetchWorkers: vi.fn(async (): Promise<import("./api").WorkerStatus[]> => []),
   tooltipUpdate: vi.fn(),
+  onSnapshot: undefined as ((tickets: unknown[]) => void) | undefined,
   drawScene: vi.fn(() => [] as Record<string, unknown>[]),
   topbarUpdate: vi.fn(),
   sidebarUpdate: vi.fn(),
@@ -23,7 +25,8 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock("./api", async (original) => ({
   ...await original<typeof import("./api")>(), loadConfig: () => h.config,
-  demoWorkers: () => [], saveConfig: vi.fn(), fetchWorkers: h.fetchWorkers, fetchTickets: h.fetchTickets, needAction: h.needAction,
+  demoWorkers: () => [], saveConfig: vi.fn(), fetchWorkers: h.fetchWorkers, fetchTickets: h.fetchTickets,
+  fetchTicketSnapshot: h.fetchTickets, needAction: h.needAction,
 }));
 vi.mock("./needs-column", async (original) => {
   const actual = await original<typeof import("./needs-column")>();
@@ -31,13 +34,13 @@ vi.mock("./needs-column", async (original) => {
     h.realColumn ? actual.createNeedsColumn(...args) : h.column(...args) };
 });
 vi.mock("./toasts", () => ({ createToasts: () => ({ reset: h.reset, update: h.update }) }));
-vi.mock("./overlay", () => ({ createOverlay: () => ({ draw: vi.fn() }) }));
+vi.mock("./overlay", () => ({ createOverlay: () => ({ draw: h.overlayDraw }) }));
 vi.mock("./agent-tooltip", async (original) => {
   const actual = await original<typeof import("./agent-tooltip")>();
   return { ...actual, createAgentTooltip: () => ({ update: h.tooltipUpdate }) };
 });
 vi.mock("./scene/index", () => ({
-  ROLE_STYLES: {}, USAGE: {}, drawScene: h.drawScene, resetActors: vi.fn(),
+  ROLE_STYLES: {}, USAGE: {}, drawScene: h.drawScene, resetActors: vi.fn(), resetSceneCache: vi.fn(),
   roleStyle: () => ({ shirt: "#000", label: "Coder", accessory: "" }), sceneSize: () => ({ width: 100, height: 100 }),
 }));
 vi.mock("./ui/topbar", () => ({
@@ -174,7 +177,8 @@ beforeEach(() => {
   h.fetchWorkers.mockReset();
   h.fetchWorkers.mockImplementation(async () => []);
   h.tooltipUpdate.mockClear();
-  h.column.mockImplementation((_root, source, items) => {
+  h.column.mockImplementation((_root, source, items, _onError, onSnapshot) => {
+    h.onSnapshot = onSnapshot;
     h.source.mockImplementation(() => source);
     h.items.mockImplementation(items);
     return { refresh: h.refresh, setSource: h.source, tick: h.tick, focus: h.focus };
@@ -521,5 +525,90 @@ describe("chọn agent, feed và lỗi poll", () => {
     expect(h.feedSetCollapsed).toHaveBeenLastCalledWith(false);
     press("Escape");
     expect(drawerOf().open).toBe(false);
+  });
+});
+
+describe("ánh sáng, snapshot và banner demo", () => {
+  it("snapshot nguồn thật giữ done, panel chỉ lấy ticket cần người", async () => {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    const done = { id: "T-done", title: "Xong", status: "done", project: null, updated_at: null, artifacts: [] };
+    const plan = { id: "T-1", title: "Kế hoạch", status: "awaiting_plan_approval", project: null, updated_at: null, artifacts: [] };
+    h.fetchTickets.mockResolvedValue([done, plan]);
+    await import("./main");
+    const listed = await h.source().list();
+    expect(listed.map((item: { ticket: { id: string } }) => item.ticket.id)).toEqual(["T-1"]);
+    expect(listed.tickets.map((ticket: { status: string }) => ticket.status)).toEqual(["done", "awaiting_plan_approval"]);
+  });
+
+  it("demo giữ 4 thẻ và đưa ticket sự kiện vào snapshot", async () => {
+    await import("./main");
+    const listed = await h.source().list();
+    expect(listed).toHaveLength(4);
+    expect(listed.some((item: { ticket: { id: string } }) => item.ticket.id.startsWith("T-ev-"))).toBe(false);
+    expect(listed.tickets.some((ticket: { id: string }) => String(ticket.id).startsWith("T-ev-"))).toBe(true);
+  });
+
+  it("?hour chỉ điều khiển phút ánh sáng; reduced motion đổi theo từng frame", async () => {
+    vi.stubGlobal("location", { search: "?hour=21:30" });
+    const epoch = 1_761_048_730_000;
+    vi.spyOn(Date, "now").mockReturnValue(epoch);
+    vi.stubGlobal("devicePixelRatio", 1);
+    let reduce = false;
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: String(query).includes("reduced-motion") ? reduce : false,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    await import("./main");
+    const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
+    frame(10);
+    const call = h.drawScene.mock.calls.at(-1) as unknown as unknown[];
+    expect(call[3]).toBe(epoch);
+    expect(call[4]).toMatchObject({ minutes: 21 * 60 + 30, reducedMotion: false });
+    expect(h.overlayDraw.mock.calls.at(-1)?.[2]).toBe(epoch);
+    expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners).toEqual([]);
+    expect(Array.isArray(h.overlayDraw.mock.calls.at(-1)?.[3].signs)).toBe(true);
+    reduce = true;
+    frame(20);
+    const next = h.drawScene.mock.calls.at(-1) as unknown as unknown[];
+    expect(next[4]).toMatchObject({ minutes: 21 * 60 + 30, reducedMotion: true });
+    expect(next[3]).toBe(epoch);
+  });
+
+  it("demo phát MR sau baseline và xoá banner khi đổi nguồn", async () => {
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(0);
+    await import("./main");
+    let polls = 0;
+    h.refresh.mockImplementation(async () => {
+      const listed = await h.source().list();
+      if (Array.isArray(listed.tickets)) h.onSnapshot?.(listed.tickets);
+      polls += 1;
+    });
+    const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
+    const poll = vi.mocked(setInterval).mock.calls[0][0] as () => void;
+    try {
+      poll();
+      await vi.waitFor(() => expect(polls).toBe(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      frame(0);
+      expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners).toEqual([]);
+      now.mockReturnValue(12_000);
+      poll();
+      await vi.waitFor(() => expect(polls).toBe(2));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      frame(16);
+      const banners = h.overlayDraw.mock.calls.at(-1)?.[3].banners as { kind: string; provider: string }[];
+      expect(banners.some((banner) => banner.kind === "mr" && banner.provider === "claude")).toBe(true);
+      getNode("#demo").listeners.get("click")!({});
+      await vi.waitFor(() => expect(polls).toBeGreaterThanOrEqual(3));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      frame(32);
+      expect(h.overlayDraw.mock.calls.at(-1)?.[3].banners).toEqual([]);
+    } finally {
+      h.refresh.mockReset();
+      h.refresh.mockImplementation(async () => {});
+      now.mockRestore();
+    }
   });
 });

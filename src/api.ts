@@ -129,11 +129,16 @@ async function getJson(config: ApiConfig, path: string): Promise<unknown> {
   return resp.json();
 }
 
-// Danh sách hỏng thì ném lỗi để nơi gọi giữ danh sách cũ, không coi là "không còn ticket".
-export async function fetchTickets(config: ApiConfig): Promise<Ticket[]> {
+// Cùng một GET /tickets. Snapshot giữ mọi trạng thái (kể cả done); fetchTickets lọc cần người cho caller cũ.
+export async function fetchTicketSnapshot(config: ApiConfig): Promise<Ticket[]> {
   const tickets = parseTickets(await getJson(config, "/tickets"), "/tickets");
   if (!tickets) throw new Error("aico trả danh sách ticket hỏng");
-  return needsYou(tickets);
+  return tickets;
+}
+
+// Danh sách hỏng thì ném lỗi để nơi gọi giữ danh sách cũ, không coi là "không còn ticket".
+export async function fetchTickets(config: ApiConfig): Promise<Ticket[]> {
+  return needsYou(await fetchTicketSnapshot(config));
 }
 
 // Danh sách event hỏng thì ném lỗi (không trả null) để cache lý do không giữ kết quả hỏng.

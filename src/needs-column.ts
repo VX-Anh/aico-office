@@ -23,9 +23,25 @@ export interface NeedItem {
   reason: string | null;
 }
 
+/** Mảng cũ chỉ là thẻ cột. `{ items, tickets }` hoặc mảng có thêm `tickets` là snapshot đầy đủ. */
+export type NeedList = NeedItem[] | { items: NeedItem[]; tickets: Ticket[] };
+
 export interface NeedSource {
-  list(): Promise<NeedItem[]>;
+  list(): Promise<NeedList>;
   act(item: NeedItem, action: NeedAction, comment: string): Promise<void>;
+}
+
+function needItemsOf(raw: NeedList): NeedItem[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && Array.isArray(raw.items)) return raw.items;
+  return [];
+}
+
+function needSnapshotOf(raw: NeedList): Ticket[] | null {
+  const tickets = Array.isArray(raw)
+    ? (raw as NeedItem[] & { tickets?: unknown }).tickets
+    : raw && Array.isArray(raw.tickets) ? raw.tickets : null;
+  return Array.isArray(tickets) ? tickets : null;
 }
 
 const LABELS: Record<NeedKind, Partial<Record<NeedAction, string>>> = {
@@ -70,7 +86,13 @@ interface Card {
   focus(): void;
 }
 
-export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, onItems: (items: NeedItem[]) => void, onError: (error: string | null) => void = () => {}) {
+export function createNeedsColumn(
+  root: HTMLElement,
+  initialSource: NeedSource,
+  onItems: (items: NeedItem[]) => void,
+  onError: (error: string | null) => void = () => {},
+  onSnapshot: (tickets: Ticket[]) => void = () => {},
+) {
   let source = initialSource;
   let generation = 0;
   let now = Date.now();
@@ -285,8 +307,10 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
     const request = gate.start();
     const requestSource = source;
     try {
-      const next = ordered(await requestSource.list());
+      const raw = await requestSource.list();
       if (!gate.accept(request)) return;
+      const next = ordered(needItemsOf(raw));
+      const tickets = needSnapshotOf(raw);
       items = new Map(next.map((item) => [keyOf(item), item]));
       for (const [key, card] of cards) {
         if (!items.has(key)) { card.root.remove(); cards.delete(key); }
@@ -301,6 +325,8 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
       onError(null);
       layout();
       onItems(next);
+      // Lỗi và request bị gate bỏ không tới đây, nên không phát snapshot cũ.
+      if (tickets) onSnapshot(tickets);
     } catch (exc) {
       if (!gate.accept(request)) return;
       // Giữ thẻ cũ: mất mạng một lượt không được xoá ghi chú đang gõ.

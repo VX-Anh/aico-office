@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createNeedsColumn, type NeedItem } from "./needs-column";
+import type { Ticket } from "./api";
+import { createNeedsColumn, type NeedItem, type NeedList } from "./needs-column";
 
 // DOM nhỏ chạy trong node; click tôn trọng nút bị khoá như trình duyệt.
 const dom = { activeElement: null as Node | null };
@@ -192,5 +193,68 @@ describe("xác nhận trong thẻ Cần bạn", () => {
     expect(act).toHaveBeenCalledTimes(1);
     button(target, "Xác nhận").click();
     expect(act).toHaveBeenCalledTimes(2);
+  });
+});
+
+function doneTicket(id = "T-done"): Ticket {
+  return { id, title: id, status: "done", project: null, updated_at: null, artifacts: [{ kind: "merge_request", ref: "!1", url: "https://example.com/mr/1" }] };
+}
+
+describe("snapshot ticket sau gate", () => {
+  it("mảng cũ không phát snapshot; mảng kèm tickets và object thì phát, kể cả done", async () => {
+    const root = new Node();
+    const onItems = vi.fn();
+    const onSnapshot = vi.fn();
+    const plain = vi.fn(async () => [item("T-plan", "plan")]);
+    const column = createNeedsColumn(root as unknown as HTMLElement, { list: plain, act: vi.fn() }, onItems, () => {}, onSnapshot);
+    await column.refresh();
+    expect(onSnapshot).not.toHaveBeenCalled();
+    expect(onItems).toHaveBeenCalledOnce();
+
+    const withDone = Object.assign([item()], { tickets: [doneTicket(), item().ticket] });
+    plain.mockResolvedValueOnce(withDone);
+    await column.refresh();
+    expect(onSnapshot).toHaveBeenLastCalledWith(withDone.tickets);
+    expect(card(root).dataset.ticketId).toBe("T-merge");
+
+    const packed: NeedList = { items: [item("T-new", "escalated")], tickets: [doneTicket("T-xong"), item("T-new", "escalated").ticket] };
+    plain.mockResolvedValueOnce(packed as unknown as NeedItem[]);
+    await column.refresh();
+    expect(onSnapshot).toHaveBeenLastCalledWith(packed.tickets);
+    expect(() => card(root, "T-xong")).toThrow();
+    expect(card(root, "T-new").dataset.kind).toBe("escalated");
+  });
+
+  it("lỗi tải, request cũ và đổi nguồn không phát snapshot", async () => {
+    const root = new Node();
+    const onSnapshot = vi.fn();
+    let resolveOld!: (value: NeedList) => void;
+    const old = new Promise<NeedList>((resolve) => { resolveOld = resolve; });
+    const list = vi.fn<() => Promise<NeedList>>()
+      .mockReturnValueOnce(old)
+      .mockResolvedValueOnce({ items: [item("T-2", "plan")], tickets: [doneTicket()] });
+    const column = createNeedsColumn(root as unknown as HTMLElement, { list, act: vi.fn() }, vi.fn(), () => {}, onSnapshot);
+    const first = column.refresh();
+    await column.refresh();
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(onSnapshot).toHaveBeenCalledWith([doneTicket()]);
+    resolveOld({ items: [item()], tickets: [doneTicket("T-cũ")] });
+    await first;
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+
+    list.mockRejectedValueOnce(new Error("mất mạng"));
+    await column.refresh();
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(byClass(root, "needs-error").textContent).toContain("mất mạng");
+    expect(card(root, "T-2")).toBeTruthy();
+
+    let resolveLate!: (value: NeedList) => void;
+    list.mockReturnValueOnce(new Promise<NeedList>((resolve) => { resolveLate = resolve; }));
+    const late = column.refresh();
+    column.setSource({ list: vi.fn(async () => [item("T-3", "merge")]), act: vi.fn() });
+    resolveLate({ items: [item()], tickets: [doneTicket("T-nguồn-cũ")] });
+    await late;
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(() => card(root, "T-2")).toThrow();
   });
 });

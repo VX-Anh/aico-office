@@ -106,6 +106,9 @@ export interface RoomSign {
   state: WorkerStatus["state"];
   agents: number;
   slots: number;
+  overflow: number;
+  /** Lỗi chạy gần nhất, trừ offline/limited (hai trạng thái đó không gắn dấu !). */
+  error: boolean;
 }
 
 function roomBox(worker: WorkerStatus, index: number, x: number, y: number): RoomBox {
@@ -228,6 +231,8 @@ export function roomSigns(layout: Layout): RoomSign[] {
     state: room.worker.state,
     agents: room.agents.length,
     slots: room.slots,
+    overflow: Math.max(0, room.agents.length - room.slots),
+    error: Boolean(room.worker.last_error) && room.worker.state !== "limited" && room.worker.state !== "offline",
   }));
 }
 

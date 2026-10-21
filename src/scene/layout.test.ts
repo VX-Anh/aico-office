@@ -176,7 +176,21 @@ describe("computeLayout", () => {
     expect(gone[1].agents).toBe(0);
     expect(back[1]).toEqual(seated[1]);
     expect(roomSigns(codex(2, 2, "offline"))[1]).toMatchObject({ state: "offline", anchor: seated[1].anchor, agents: 2 });
-    expect(roomSigns(codex(2, 0, "limited"))[1]).toMatchObject({ state: "limited", agents: 0, slots: 2 });
+    expect(roomSigns(codex(2, 0, "limited"))[1]).toMatchObject({ state: "limited", agents: 0, slots: 2, overflow: 0, error: false });
+    expect(roomSigns(codex(1, 4))[1]).toMatchObject({ agents: 4, slots: 1, overflow: 3, error: false });
+    const erred = computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "working", slots: 2, agents: [agent("a")], last_error: "CLI lỗi" }),
+    ]);
+    expect(roomSigns(erred)[1].error).toBe(true);
+    expect(roomSigns(computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "offline", slots: 2, agents: [agent("a")], last_error: "CLI lỗi" }),
+    ]))[1].error).toBe(false);
+    expect(roomSigns(computeLayout([
+      w("front", { slots: 1 }),
+      w("codex", { state: "limited", slots: 2, agents: [], last_error: "hết hạn" }),
+    ]))[1].error).toBe(false);
     // slots 1 và 2 đều chạm ROOM_MIN_W nên tâm phòng không nhảy; slots 4 mới nới rộng.
     const wideRoom = roomSigns(codex(4, 4));
     expect(wideRoom[1].anchor.x).toBeGreaterThan(seated[1].anchor.x);
