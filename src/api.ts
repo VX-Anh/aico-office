@@ -1,5 +1,16 @@
 // Đọc trạng thái worker từ aico: GET /workers (Bearer API token).
 // Không có cấu hình thì chạy chế độ demo với dữ liệu giả để xem giao diện.
+// Ticket escalated: GET /tickets, GET /tickets/{id}/events, POST /tickets/{id}/escalation.
+
+import {
+  apiUrl,
+  buildEscalationRequest,
+  escalatedOnly,
+  escalationError,
+  latestEscalationReason,
+  parseTickets,
+  ticketPath,
+} from "./tickets";
 
 export type WorkerState = "idle" | "working" | "limited" | "offline";
 
@@ -77,6 +88,69 @@ export async function fetchWorkers(config: ApiConfig): Promise<WorkerStatus[]> {
   if (resp.status === 401) throw new Error("Sai API token");
   if (!resp.ok) throw new Error(`aico trả ${resp.status}`);
   return (await resp.json()) as WorkerStatus[];
+}
+
+export interface TicketArtifact {
+  kind: string;
+  ref: string | null;
+  url: string | null;
+}
+
+export interface Ticket {
+  id: string;
+  title: string;
+  status: string;
+  project: string | null;
+  artifacts: TicketArtifact[];
+  updated_at: string | null;
+}
+
+// Một dòng của GET /tickets/{id}/events; đọc qua `latestEscalationReason` (src/tickets.ts).
+export interface TicketEvent {
+  to_status?: string | null;
+  data?: unknown;
+  created_at?: string;
+}
+
+export type EscalationAction = "retry_push" | "merge" | "close" | "fail";
+
+async function getJson(config: ApiConfig, path: string): Promise<unknown> {
+  const resp = await fetch(apiUrl(config, path), {
+    headers: { Authorization: `Bearer ${config.token}` },
+  });
+  if (resp.status === 401) throw new Error("Sai API token");
+  if (!resp.ok) throw new Error(`aico trả ${resp.status}`);
+  return resp.json();
+}
+
+// Danh sách hỏng thì ném lỗi để nơi gọi giữ danh sách cũ, không coi là "không còn ticket".
+export async function fetchTickets(config: ApiConfig): Promise<Ticket[]> {
+  const tickets = parseTickets(await getJson(config, "/tickets"), "/tickets");
+  if (!tickets) throw new Error("aico trả danh sách ticket hỏng");
+  return escalatedOnly(tickets);
+}
+
+// Danh sách event hỏng thì ném lỗi (không trả null) để cache lý do không giữ kết quả hỏng.
+export async function fetchEscalationReason(config: ApiConfig, id: string): Promise<string | null> {
+  const events = await getJson(config, ticketPath(id, "events"));
+  const reason = latestEscalationReason(events, `/tickets/${id}/events`);
+  if (!Array.isArray(events)) throw new Error("aico trả danh sách event hỏng");
+  return reason;
+}
+
+// Lỗi 409/501 ném Error mang `detail` của aico để panel hiện nguyên văn.
+export async function escalationAction(
+  config: ApiConfig,
+  ticketId: string,
+  action: EscalationAction,
+  actor: string,
+  comment: string,
+): Promise<void> {
+  const { url, init } = buildEscalationRequest(config, ticketId, action, actor, comment);
+  const resp = await fetch(url, init);
+  if (resp.ok) return;
+  const body: unknown = await resp.json().catch(() => null);
+  throw new Error(escalationError(resp.status, body));
 }
 
 // Agent con và số chỗ của phòng. aico bản cũ chỉ có `current` thì dựng lại từ đó.

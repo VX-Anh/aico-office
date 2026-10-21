@@ -1,17 +1,22 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-deb535b0). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-87b2140f). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data
-    API["src/api.ts<br/>gọi aico /workers, dữ liệu demo (có usage)"]
+    API["src/api.ts<br/>gọi aico /workers, /tickets, /tickets/{id}/events,<br/>POST /tickets/{id}/escalation; dữ liệu demo (có usage)"]
     USG["src/usage.ts<br/>parseUsage (từ chối usage hỏng → null),<br/>usageWindows, usageLevel, shortCountdown, isStale (thuần)"]
+    TK["src/tickets.ts<br/>parseTickets, escalatedOnly, latestEscalationReason,<br/>mergeRequest, actionAvailability, needsConfirm,<br/>buildEscalationRequest, escalationError, demoTickets (thuần)"]
   end
-  MAIN["src/main.ts<br/>vòng lặp animation, polling, thẻ trạng thái<br/>(cửa sổ hạn mức, reset, gói, nguồn, số liệu cũ), chú thích"]
+  API --> TK
+  MAIN["src/main.ts<br/>vòng lặp animation, polling (worker + ticket cùng chu kỳ),<br/>thẻ trạng thái, chú thích, nguồn ticket thật/demo"]
   API --> MAIN
   USG --> MAIN
+  MAIN -->|refresh mỗi POLL_MS, nguồn list/act| PANEL["src/escalation-panel.ts<br/>panel HTML phủ góc phải canvas, thu gọn được;<br/>ghi chú + Đẩy lại/Merge/Đóng/Đánh dấu lỗi,<br/>xác nhận trong panel, khoá nút khi gửi"]
+  PANEL --> TK
+  PANEL --> OVERLAY[["#escalations trong .stage<br/>(phủ trên canvas)"]]
   MAIN -->|drawScene, sceneSize, resetActors, USAGE| IDX["src/scene/index.ts<br/>ghép cảnh"]
 
   IDX --> LAYOUT["layout.ts<br/>bố cục phòng, bàn, cửa, chỗ ngồi, usageBoard (thuần)"]
@@ -49,6 +54,7 @@ flowchart TD
     T_PB["pixelbolt.test.ts / characters.test.ts<br/>công thức hỏng + mọi file art/"]
     T_USG["usage.test.ts<br/>ngưỡng màu, đếm ngược, usage hỏng, số liệu cũ"]
     T_FONT["font.test.ts<br/>glyph % và ?"]
+    T_TK["tickets.test.ts<br/>lọc escalated, lý do mới nhất, nút bật/tắt,<br/>dựng request, lỗi 409/501, dữ liệu đổi giữa chừng"]
   end
   T_PATH -.-> PATH
   T_PATH -.-> LAYOUT
@@ -58,4 +64,5 @@ flowchart TD
   T_PB -.-> ART
   T_USG -.-> USG
   T_FONT -.-> FONT
+  T_TK -.-> TK
 ```
