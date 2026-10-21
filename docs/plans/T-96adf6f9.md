@@ -1,6 +1,6 @@
 # T-96adf6f9: GUI: bong bóng hoạt động trên nhân vật, màn hình bàn theo việc, tiến độ task (dữ liệu activity của /workers)
 
-Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 3. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
