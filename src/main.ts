@@ -38,36 +38,23 @@ const needsCount = document.querySelector<HTMLButtonElement>("#needs-count")!;
 const ticketsError = document.querySelector<HTMLElement>("#tickets-error")!;
 let needItems: NeedItem[] = [];
 let focusedTicket: string | null = null;
-let sourceGeneration = 0;
+const workspace = document.querySelector<HTMLElement>(".workspace")!;
 
 function ticketSource(current: ApiConfig | null): NeedSource {
-  const generation = sourceGeneration;
   let tickets = demoNeedTickets(Date.now());
   const reasons = current ? createReasonCache((id) => fetchEscalationReason(current, id)) : null;
   return {
     async list() {
-      try {
-        const list = needsYou(current ? await fetchTickets(current) : tickets);
-        const escalated = list.filter((ticket) => needKind(ticket.status) === "escalated");
-        const resolved = reasons ? await reasons.resolve(escalated) : [];
-        if (generation === sourceGeneration) {
-          ticketsError.hidden = true;
-          ticketsError.title = "";
-        }
-        return list.map((ticket) => ({
-          ticket,
-          kind: needKind(ticket.status)!,
-          reason: current
-            ? resolved.find((item) => item.ticket.id === ticket.id)?.reason ?? null
-            : tickets.find((item) => item.id === ticket.id)?.reason ?? null,
-        }));
-      } catch (exc) {
-        if (generation === sourceGeneration) {
-          ticketsError.hidden = false;
-          ticketsError.title = `Lỗi tải ticket: ${exc instanceof Error ? exc.message : String(exc)}`;
-        }
-        throw exc;
-      }
+      const list = needsYou(current ? await fetchTickets(current) : tickets);
+      const escalated = list.filter((ticket) => needKind(ticket.status) === "escalated");
+      const resolved = reasons ? await reasons.resolve(escalated) : [];
+      return list.map((ticket) => ({
+        ticket,
+        kind: needKind(ticket.status)!,
+        reason: current
+          ? resolved.find((item) => item.ticket.id === ticket.id)?.reason ?? null
+          : tickets.find((item) => item.id === ticket.id)?.reason ?? null,
+      }));
     },
     async act(item, action, comment) {
       if (current) await needAction(current, item.kind, item.ticket.id, action, comment);
@@ -83,11 +70,16 @@ function focusTicket(id: string): void {
 const toasts = createToasts(document.querySelector<HTMLElement>("#toasts")!, { onOpen: focusTicket });
 const panel = createNeedsColumn(document.querySelector<HTMLElement>("#needs")!, ticketSource(config), (items) => {
   needItems = items;
+  workspace.classList.toggle("has-needs", items.length > 0);
+  needsCount.classList.toggle("hot", items.length > 0);
   needsCount.textContent = `Cần bạn: ${items.length}`;
   needsCount.disabled = items.length === 0;
   document.title = tabTitle(items.length);
   if (!items.some((item) => item.ticket.id === focusedTicket)) focusedTicket = null;
   toasts.update(items.map((item) => ({ id: item.ticket.id, kind: item.kind, label: NEED_LABEL[item.kind] })));
+}, (error) => {
+  ticketsError.hidden = !error;
+  ticketsError.title = error ?? "";
 });
 
 function focusNext(): void {
@@ -107,7 +99,8 @@ document.addEventListener("keydown", (event) => {
 
 function changeSource(): void {
   workerGate.reset();
-  sourceGeneration++;
+  workspace.classList.toggle("has-needs", false);
+  needsCount.classList.toggle("hot", false);
   const now = Date.now();
   overlay.draw([], sceneSize(workers).width, now);
   tooltip.update([], sceneSize(workers).width, now);

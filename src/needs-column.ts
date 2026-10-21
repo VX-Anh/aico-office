@@ -70,7 +70,7 @@ interface Card {
   focus(): void;
 }
 
-export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, onItems: (items: NeedItem[]) => void) {
+export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, onItems: (items: NeedItem[]) => void, onError: (error: string | null) => void = () => {}) {
   let source = initialSource;
   let generation = 0;
   let now = Date.now();
@@ -293,12 +293,14 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
       }
       place(next);
       error.textContent = "";
+      onError(null);
       layout();
       onItems(next);
     } catch (exc) {
       if (!gate.accept(request)) return;
       // Giữ thẻ cũ: mất mạng một lượt không được xoá ghi chú đang gõ.
       error.textContent = `Lỗi tải ticket: ${exc instanceof Error ? exc.message : String(exc)}`;
+      onError(error.textContent);
     }
   }
 
@@ -314,6 +316,7 @@ export function createNeedsColumn(root: HTMLElement, initialSource: NeedSource, 
       pending.clear();
       list.replaceChildren();
       error.textContent = "";
+      onError(null);
       layout();
     },
     /** Cuộn tới thẻ đầu tiên của ticket, focus ô ghi chú và nháy viền; false nếu không có thẻ. */
