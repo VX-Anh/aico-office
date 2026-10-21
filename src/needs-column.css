@@ -7,9 +7,9 @@
 .needs-column[hidden] { display: none; }
 .needs-column h2 {
   margin: 0 0 4px;
-  font-family: var(--font-pixel);
+  font-family: var(--font-ui);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .needs-error { margin: 4px 0; color: var(--lvl-crit); }
 .needs-error:empty { display: none; }

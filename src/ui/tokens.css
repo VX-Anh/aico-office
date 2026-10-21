@@ -73,6 +73,8 @@
   .glass { background: var(--panel-solid); }
 }
 
+/* Pixelify Sans không có dấu tiếng Việt (ộ, ầ, ư, ơ... vỡ thành chữ khác): chỉ dùng cho chữ ASCII
+   như logo, số, chữ cái phòng. Tiêu đề tiếng Việt dùng --font-ui đậm. */
 .title-pixel {
   font-family: var(--font-pixel);
   font-weight: 600;

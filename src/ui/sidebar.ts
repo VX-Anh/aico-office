@@ -201,7 +201,7 @@ export function createSidebar(root: HTMLElement, options: SidebarOptions): Sideb
   root.setAttribute("aria-label", root.getAttribute("aria-label") ?? "Phòng và agent");
 
   const head = el("div", "sidebar-head");
-  const title = el("h2", "sidebar-title title-pixel", "Phòng");
+  const title = el("h2", "sidebar-title", "Phòng");
   const toggleButton = el("button", "sidebar-toggle");
   toggleButton.type = "button";
   head.append(title, toggleButton);

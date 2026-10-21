@@ -23,7 +23,7 @@
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
 }
-.sidebar-title { margin: 0; font-size: 15px; flex: 1 1 auto; white-space: nowrap; }
+.sidebar-title { margin: 0; font-size: 15px; font-weight: 700; flex: 1 1 auto; white-space: nowrap; }
 .sidebar-toggle {
   width: 26px;
   height: 26px;

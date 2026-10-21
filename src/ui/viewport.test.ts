@@ -58,6 +58,17 @@ describe("fitScene", () => {
   it("co không nguyên khi k=1 vẫn không lọt", () => {
     expect(fitScene({ left: 0, top: 0, width: 70, height: 70 }, scene, 2)).toEqual({ k: 1, cssW: 70, cssH: 35, left: 0, top: 17.5, crisp: false });
   });
+  it("dpr 1: hệ số nguyên phủ quá ít thì phóng lấp đầy vùng trống", () => {
+    // Cảnh 430x180 trong vùng 720x600 (màn 1440x900 có thanh bên và ngăn chi tiết): trước chỉ 430px.
+    const fit = fitScene({ left: 0, top: 0, width: 720, height: 600 }, { width: 430, height: 180 }, 1);
+    expect(fit.crisp).toBe(false);
+    expect(fit.k).toBe(2);
+    expect(fit.cssW).toBeCloseTo(720);
+  });
+  it("hệ số nguyên phủ gần đủ (>= 85%) thì giữ pixel đều", () => {
+    const fit = fitScene({ left: 0, top: 0, width: 420, height: 400 }, scene, 1);
+    expect(fit).toMatchObject({ k: 2, cssW: 400, crisp: true });
+  });
   it("vùng trống bằng 0 và dpr hỏng không gây NaN", () => {
     expect(fitScene({ left: 0, top: 0, width: 0, height: 0 }, scene, NaN)).toMatchObject({ k: 1, cssW: 0, cssH: 0, crisp: false });
   });

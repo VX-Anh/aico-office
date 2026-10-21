@@ -28,7 +28,8 @@
 }
 
 .agent-tooltip-title {
-  font-family: var(--font-pixel);
+  font-family: var(--font-ui);
+  font-weight: 700;
 }
 
 .agent-tooltip-heading {

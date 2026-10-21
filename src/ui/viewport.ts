@@ -25,6 +25,8 @@ export function computeInsets(view: Size, panels: Panels, opts: InsetOptions): I
   return { top: safeTop, right, bottom, left };
 }
 
+/** Tỉ lệ vùng trống tối thiểu hệ số nguyên phải phủ, dưới mức này thì phóng lấp đầy. */
+export const FILL_MIN = 0.85;
 export interface SceneFit { k: number; cssW: number; cssH: number; left: number; top: number; crisp: boolean }
 export function fitScene(free: Rect, scene: Size, dpr: number, focus?: { x: number; y: number }): SceneFit {
   const ratio = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
@@ -32,9 +34,13 @@ export function fitScene(free: Rect, scene: Size, dpr: number, focus?: { x: numb
   const sw = positive(scene.width), sh = positive(scene.height);
   if (!sw || !sh) return { k: 1, cssW: 0, cssH: 0, left: free.left + w / 2, top: free.top + h / 2, crisp: false };
   const available = Math.min(w / sw, h / sh);
-  const k = Math.max(1, Math.floor(available * ratio));
-  const crisp = available * ratio >= 1;
-  const scale = crisp ? k / ratio : available;
+  // Hệ số nguyên cho pixel đều nhất, nhưng ở dpr 1 có thể chỉ dùng ~60% vùng trống (cảnh 430px
+  // trong vùng 720px). Hệ số nguyên phủ dưới 85% thì phóng lấp đầy: backing vẽ ở hệ số nguyên
+  // lớn hơn rồi CSS thu nhẹ, pixel lệch không đáng kể với image-rendering: pixelated.
+  const crispK = Math.floor(available * ratio);
+  const crisp = crispK >= 1 && crispK / (available * ratio) >= FILL_MIN;
+  const k = crisp ? crispK : Math.max(1, Math.ceil(available * ratio));
+  const scale = crisp ? crispK / ratio : available;
   const cssW = sw * scale, cssH = sh * scale;
   const place = (start: number, span: number, extent: number, point: number | undefined) => {
     if (point === undefined || !Number.isFinite(point)) return start + (span - extent) / 2;

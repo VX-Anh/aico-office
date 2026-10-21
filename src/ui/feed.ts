@@ -24,7 +24,8 @@ export function createFeed(root: HTMLElement) {
     const changed = collapsed !== value;
     collapsed = value;
     root.classList.toggle("is-collapsed", collapsed);
-    toggle.textContent = collapsed ? "Hoạt động · ] mở" : "Hoạt động · ] thu gọn";
+    toggle.textContent = collapsed ? "Hoạt động ▴" : "Hoạt động ▾";
+    toggle.title = collapsed ? "Mở (phím ])" : "Thu gọn (phím ])";
     toggle.setAttribute("aria-expanded", String(!collapsed));
     if (follow) list.scrollTop = list.scrollHeight;
     if (changed) layout();
