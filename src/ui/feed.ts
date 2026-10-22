@@ -119,9 +119,11 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
         const color = worker ? paletteOf(worker).shirt : "var(--line-strong)";
         const signature = JSON.stringify([line, gone, color, agent ? avatarIdentity(agent) : null]);
         if (row.dataset.content !== signature) {
-          row.className = ["feed-line", line.tone ? `tone-${line.tone}` : "", gone ? "is-gone" : ""].filter(Boolean).join(" ");
+          // Dòng ticket đã hiện mã ở cột tên; ô ticket để trống nhưng vẫn giữ để lưới thẳng hàng.
+          const dup = !!line.ticket && line.ticket === line.name;
+          row.className = ["feed-line", line.tone ? `tone-${line.tone}` : "", gone ? "is-gone" : "", dup ? "is-ticket" : ""].filter(Boolean).join(" ");
           row.replaceChildren();
-          const content = [clock(line.at), "", line.name, line.room ? providerLetter(line.room) : "", line.ticket ?? "", line.icon, line.text];
+          const content = [clock(line.at), "", line.name, line.room ? providerLetter(line.room) : "", dup ? "" : line.ticket ?? "", line.icon, line.text];
           content.forEach((text, i) => {
             const cell = make(i === 0 ? "time" : "span", ["feed-time", "feed-avatar", "feed-name", "feed-room", "feed-ticket", "feed-icon", "feed-text"][i]);
             cell.textContent = text;
@@ -134,7 +136,7 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
             row!.append(cell);
           });
           row.dataset.content = signature;
-          row.title = [clock(line.at), line.name, line.room, line.ticket, line.text].filter(Boolean).join(" · ");
+          row.title = [clock(line.at), line.name, line.room, dup ? null : line.ticket, line.text].filter(Boolean).join(" · ");
           row.onclick = () => {
             if (line.agentId) actions.onAgent?.(line.room, line.agentId);
             else if (line.ticket) actions.onTicket?.(line.ticket);
