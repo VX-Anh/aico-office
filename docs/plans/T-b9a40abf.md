@@ -1,15 +1,16 @@
 # T-b9a40abf: GUI: hiện ảnh giao diện Reviewer chụp trong thẻ Cần bạn
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | latestScreenshots và dữ liệu demo ảnh trong tickets.ts | coder | `src/tickets.ts`, `src/tickets.test.ts`, `src/main.ts` | - | xong (claude) |
-| W2 | Ảnh pixel art demo cho hàng ảnh review | designer | `art/demo-shots/`, `public/demo-shots/` | - | xong (codex) |
-| W3 | Lightbox xem ảnh lớn src/shot-viewer.ts | coder | `src/shot-viewer.ts`, `src/shot-viewer.css`, `src/shot-viewer.test.ts` | - | xong (claude) |
-| W4 | Hàng ảnh thu nhỏ trong thẻ Cần bạn và ghép lightbox | coder | `src/needs-column.ts`, `src/needs-column.css`, `src/needs-column.test.ts`, `README.md` | W1, W3 | xong (claude) |
+| W1 | latestScreenshots và dữ liệu demo ảnh trong tickets.ts | coder | `src/tickets.ts`, `src/tickets.test.ts`, `src/main.ts` | - | chưa chạy |
+| W2 | Ảnh pixel art demo cho hàng ảnh review | designer | `art/demo-shots/`, `public/demo-shots/` | - | chưa chạy |
+| W3 | Lightbox xem ảnh lớn src/shot-viewer.ts | coder | `src/shot-viewer.ts`, `src/shot-viewer.css`, `src/shot-viewer.test.ts` | - | chưa chạy |
+| W4 | Hàng ảnh thu nhỏ trong thẻ Cần bạn và ghép lightbox | coder | `src/needs-column.ts`, `src/needs-column.css`, `src/needs-column.test.ts`, `README.md` | W1, W3 | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
