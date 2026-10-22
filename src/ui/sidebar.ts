@@ -105,14 +105,12 @@ interface RoomBlock {
 function createRoom(): RoomBlock {
   const root = el("section", "room");
   const head = el("header", "room-head");
-  const line = el("div", "room-line");
   const letter = el("span", "room-letter title-pixel");
   const name = el("span", "room-name");
   const count = el("span", "room-count");
   const alert = el("span", "room-alert", "!");
   alert.hidden = true;
   alert.setAttribute("role", "img");
-  line.append(letter, name, count, alert);
   const state = el("span", "room-state");
   const slots = el("div", "room-slots");
   const bar = el("span", "room-slots-bar");
@@ -120,7 +118,7 @@ function createRoom(): RoomBlock {
   bar.append(slotsFill);
   const slotsText = el("span", "room-slots-text");
   slots.append(bar, slotsText);
-  head.append(line, state, slots);
+  head.append(letter, name, count, alert, state, slots);
   const list = el("div", "room-agents");
   const empty = el("p", "room-empty", "Không có agent");
   root.append(head, list, empty);
@@ -248,7 +246,7 @@ interface RoomChip {
 function createChip(name: string, onToggle: (name: string) => void): RoomChip {
   const root = el("button", "room-chip");
   root.type = "button";
-  const letter = el("span", "room-chip-letter title-pixel");
+  const letter = el("span", "room-chip-letter room-letter title-pixel");
   const label = el("span", "room-chip-name");
   root.append(letter, label);
   root.addEventListener("click", () => onToggle(name));

@@ -196,6 +196,31 @@ function setup(workers: WorkerStatus[] = [claude(), codex()], options: { shortcu
 }
 const roles = (rows: Node[]) => rows.map((r) => r.find("agent-role").textContent);
 
+describe("bố cục đầu phòng và chữ cái chip", () => {
+  it.each(["working", "offline", "limited"] as const)("các ô dòng đầu nằm trực tiếp trong grid đầu phòng: %s", (state) => {
+    const v = setup([claude({ state, last_error: "Lỗi thử" }), codex({ state })]);
+    for (const room of v.rooms()) {
+      const head = room.find("room-head");
+      expect(head.children.map((node) => node.className)).toEqual([
+        "room-letter title-pixel", "room-name", "room-count",
+        "room-alert", "room-state", "room-slots",
+      ]);
+    }
+  });
+
+  it("mọi chip dùng kiểu room-letter ở cả trạng thái bật, tắt rồi bật lại", () => {
+    const v = setup();
+    for (const chip of v.chips()) {
+      const letter = chip.find("room-chip-letter");
+      for (const pressed of ["true", "false", "true"]) {
+        expect(chip.getAttribute("aria-pressed")).toBe(pressed);
+        expect(letter.classList.contains("room-letter")).toBe(true);
+        chip.fire("click");
+      }
+    }
+  });
+});
+
 describe("giữ hành vi cũ", () => {
   it("thứ tự phòng, nút « », chú thích vai trò, bấm dòng gọi onSelect", () => {
     const v = setup([codex(), claude()]);
