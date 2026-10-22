@@ -9,8 +9,10 @@
 .drawer-content { overflow-y: auto; min-height: 0; padding: 14px; overscroll-behavior: contain; overflow-wrap: anywhere; }
 /* Tiêu đề có dấu dùng font UI vì Pixelify không đủ dấu tiếng Việt. */
 .drawer-hero { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
-.drawer-hero-avatar { flex: 0 0 64px; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg); }
-.drawer-hero-avatar .avatar, .drawer-hero-avatar .avatar-fallback { display: block; width: 64px; height: 64px; image-rendering: pixelated; }
+/* content-box: viền nằm ngoài 64px, canvas 16px phóng đúng ×4 (×3 ở màn hẹp), không bị cắt. */
+.drawer-hero-avatar { box-sizing: content-box; flex: 0 0 64px; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg); }
+.drawer-hero-avatar .avatar, .drawer-hero-avatar .avatar-fallback { display: block; width: 64px; height: 64px; border-radius: 0; image-rendering: pixelated; }
+.drawer-hero-avatar .avatar-fallback { display: grid; font-size: 32px; }
 .drawer-hero-body { flex: 1; min-width: 0; }
 .drawer-hero-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .drawer-role { flex-shrink: 0; font: 700 21px/1.2 var(--font-ui); }
@@ -69,6 +71,7 @@
 .drawer-stat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--gap); padding: 4px 0; line-height: 1.4; }
 .drawer-stat dt { min-width: 0; color: var(--text-dim); }
 .drawer-stat dd { min-width: 0; margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.drawer-stat-value { color: var(--text); font-weight: 600; }
 .drawer-cache { font-size: 11px; }
 .drawer-cache.ok { color: var(--lvl-ok); }
 .drawer-cache.warn { color: var(--lvl-warn); }
@@ -84,4 +87,5 @@
   .drawer-content:not(.drawer-needs) { overflow-x: hidden; }
   .drawer-hero-avatar { flex-basis: 48px; width: 48px; height: 48px; }
   .drawer-hero-avatar .avatar, .drawer-hero-avatar .avatar-fallback { width: 48px; height: 48px; }
+  .drawer-hero-avatar .avatar-fallback { font-size: 24px; }
 }
