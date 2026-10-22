@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-d36e23da). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-2536d85d). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
@@ -46,7 +46,7 @@ flowchart TD
     SIDE["ui/sidebar.ts + CSS"]
     AV["ui/avatar.ts"]
     DRW["ui/drawer.ts + CSS"]
-    FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>tự cuộn, viên N mới, phím ]"]
+    FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>dòng ticket is-ticket: ô ticket rỗng, title không lặp<br/>màn hẹp: cột tên fit-content, mã ticket đủ<br/>tự cuộn, viên N mới, phím ]"]
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
   end
@@ -147,7 +147,7 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>feed: dòng ticket không lặp mã, dòng agent giữ mã<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
