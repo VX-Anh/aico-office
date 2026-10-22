@@ -2,7 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ticket } from "./api";
 import { createNeedsColumn, type NeedItem, type NeedList } from "./needs-column";
 
-// DOM nhỏ chạy trong node; click tôn trọng nút bị khoá như trình duyệt.
+// DOM nhỏ chạy trong node; click tôn trọng nút bị khoá như trình duyệt. Sự kiện nổi bọt lên tới
+// document, isConnected theo cây thật (lightbox gắn vào body).
+interface FakeEvent {
+  type: string;
+  target: Node;
+  key?: string;
+  stopped: boolean;
+  defaultPrevented: boolean;
+  preventDefault(): void;
+  stopPropagation(): void;
+}
 const dom = { activeElement: null as Node | null };
 class Node {
   children: Node[] = [];
@@ -20,8 +30,13 @@ class Node {
   disabled = false;
   readOnly = false;
   value = "";
-  listeners = new Map<string, (() => void)[]>();
+  href = "";
+  target = "";
+  rel = "";
+  listeners = new Map<string, ((event: FakeEvent) => void)[]>();
   constructor(readonly tag = "div") {}
+  get isConnected(): boolean { return this === docNode || (this.parent !== null && this.parent.isConnected); }
+  get firstElementChild(): Node | null { return this.children[0] ?? null; }
   append(...children: Node[]) { for (const child of children) this.insertBefore(child, null); }
   insertBefore(child: Node, at: Node | null) {
     child.remove();
@@ -33,17 +48,37 @@ class Node {
     if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1);
     this.parent = null;
   }
+  replaceWith(other: Node) {
+    const parent = this.parent;
+    if (!parent) return;
+    parent.insertBefore(other, this);
+    this.remove();
+  }
   replaceChildren(...children: Node[]) { for (const child of [...this.children]) child.remove(); this.append(...children); }
-  contains(child: Node): boolean { return child === this || this.children.some((c) => c.contains(child)); }
+  contains(child: Node | null): boolean { return child === this || this.children.some((c) => c.contains(child)); }
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
+  getAttribute(name: string) { return this.attributes.get(name) ?? null; }
   removeAttribute(name: string) { this.attributes.delete(name); }
   focus() { dom.activeElement = this; }
   scrollIntoView() {}
-  addEventListener(type: string, listener: () => void) {
+  addEventListener(type: string, listener: (event: FakeEvent) => void) {
     this.listeners.set(type, [...this.listeners.get(type) ?? [], listener]);
   }
-  click() { if (!this.disabled) for (const listener of this.listeners.get("click") ?? []) listener(); }
+  dispatch(type: string, init: Partial<FakeEvent> = {}): FakeEvent {
+    const event: FakeEvent = {
+      type, target: this, stopped: false, defaultPrevented: false, ...init,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+    };
+    for (let at: Node | null = this; at && !event.stopped; at = at.parent) {
+      for (const listener of at.listeners.get(type) ?? []) listener(event);
+    }
+    return event;
+  }
+  click() { if (!this.disabled) this.dispatch("click"); }
 }
+let docNode: Node;
+let body: Node;
 
 function find(root: Node, predicate: (node: Node) => boolean): Node {
   if (predicate(root)) return root;
@@ -83,7 +118,10 @@ function confirm(root: Node) {
 beforeEach(() => {
   vi.stubGlobal("HTMLElement", Node);
   dom.activeElement = null;
-  vi.stubGlobal("document", { createElement: (tag: string) => new Node(tag), get activeElement() { return dom.activeElement; } });
+  docNode = new Node("#document");
+  body = new Node("body");
+  docNode.append(body);
+  vi.stubGlobal("document", { createElement: (tag: string) => new Node(tag), body, get activeElement() { return dom.activeElement; } });
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -256,5 +294,193 @@ describe("snapshot ticket sau gate", () => {
     await late;
     expect(onSnapshot).toHaveBeenCalledTimes(1);
     expect(() => card(root, "T-2")).toThrow();
+  });
+});
+
+const STAMP = "20261022-075400";
+function shot(file: string, stamp = STAMP, url = `https://img.test/${stamp}/${file}.png`) {
+  return { kind: "screenshot", ref: `${stamp}/${file}.png`, url };
+}
+function withShots(shots: ReturnType<typeof shot>[], id = "T-merge", kind: NeedItem["kind"] = "merge"): NeedItem {
+  const base = item(id, kind);
+  return { ...base, ticket: { ...base.ticket, artifacts: [{ kind: "merge_request", ref: "!1", url: "https://example.com/mr/1" }, ...shots] } };
+}
+const SET = [shot("390x844-hour-11"), shot("1440x900-hour-21"), shot("1440x900-hour-11")];
+const NEWER = [shot("1440x900-hour-11", "20261023-090000"), shot("1440x900-hour-21", "20261023-090000")];
+
+async function setupShots(initial = [withShots(SET)]) {
+  const root = new Node();
+  body.append(root);
+  const list = vi.fn<() => Promise<NeedList>>(async () => initial);
+  const act = vi.fn(async () => {});
+  const column = createNeedsColumn(root as unknown as HTMLElement, { list, act }, vi.fn());
+  await column.refresh();
+  return { root, list, act, column };
+}
+const row = (root: Node, id = "T-merge") => byClass(card(root, id), "need-shots");
+const thumbs = (root: Node, id = "T-merge") => row(root, id).children;
+const imgOf = (cell: Node) => cell.children[0];
+const viewerRoot = () => byClass(body, "shot-viewer");
+const viewerName = () => byClass(body, "shot-viewer-name").textContent;
+const key = (name: string) => (dom.activeElement ?? viewerRoot()).dispatch("keydown", { key: name });
+
+describe("hàng ảnh review trong thẻ", () => {
+  it("hiện ngay dưới liên kết, đúng thứ tự tên file, lazy, alt và title theo nhãn", async () => {
+    const { root } = await setupShots();
+    const target = card(root);
+    const links = byClass(target, "need-links");
+    expect(target.children[target.children.indexOf(links) + 1]).toBe(row(root));
+    expect(row(root).hidden).toBe(false);
+    const labels = ["1440x900-hour-11", "1440x900-hour-21", "390x844-hour-11"];
+    expect(thumbs(root).map((c) => c.tag)).toEqual(["button", "button", "button"]);
+    expect(thumbs(root).map((c) => c.attributes.get("title"))).toEqual(labels);
+    thumbs(root).forEach((cell, i) => {
+      const img = imgOf(cell);
+      expect(img.tag).toBe("img");
+      expect(Object.fromEntries(img.attributes)).toEqual({
+        loading: "lazy", decoding: "async", alt: labels[i], title: labels[i], src: `https://img.test/${STAMP}/${labels[i]}.png`,
+      });
+    });
+  });
+
+  it("không có ảnh hợp lệ thì ẩn hàng", async () => {
+    const { root } = await setupShots([withShots([shot("a", STAMP, "javascript:alert(1)")])]);
+    expect(row(root).hidden).toBe(true);
+    expect(thumbs(root)).toHaveLength(0);
+  });
+
+  it("ảnh lỗi thành liên kết mở tab mới, ảnh khác giữ nguyên", async () => {
+    const { root } = await setupShots();
+    const [first, second] = thumbs(root);
+    imgOf(second).dispatch("error");
+    expect(thumbs(root)[0]).toBe(first);
+    const fallback = thumbs(root)[1];
+    expect(fallback.tag).toBe("a");
+    expect(fallback.textContent).toBe("1440x900-hour-21 ↗");
+    expect(fallback.href).toBe(`https://img.test/${STAMP}/1440x900-hour-21.png`);
+    expect(fallback.target).toBe("_blank");
+    expect(fallback.rel).toBe("noopener noreferrer");
+  });
+
+  it("bấm ảnh mở lightbox đúng ảnh, ←/→ chuyển, Esc đóng, không lan và trả focus về ảnh đã bấm", async () => {
+    const { root } = await setupShots();
+    const clicked = thumbs(root)[1];
+    clicked.click();
+    expect(viewerRoot().hidden).toBe(false);
+    expect(viewerRoot().parent).toBe(body);
+    expect(viewerName()).toBe("1440x900-hour-21");
+    key("ArrowRight");
+    expect(viewerName()).toBe("390x844-hour-11");
+    key("ArrowLeft");
+    key("ArrowLeft");
+    expect(viewerName()).toBe("1440x900-hour-11");
+    const esc = key("Escape");
+    expect(esc.stopped).toBe(true);
+    expect(viewerRoot().hidden).toBe(true);
+    expect(dom.activeElement).toBe(clicked);
+  });
+
+  it("poll cùng bộ giữ nguyên node ảnh và ô đã thành liên kết", async () => {
+    const { root, list, column } = await setupShots();
+    imgOf(thumbs(root)[0]).dispatch("error");
+    const before = [...thumbs(root)];
+    const imgs = before.slice(1).map(imgOf);
+    // Mảng và object mới nhưng cùng url: không dựng lại.
+    list.mockResolvedValueOnce([withShots([...SET].reverse())]);
+    await column.refresh();
+    expect(thumbs(root)).toEqual(before);
+    thumbs(root).forEach((cell, i) => expect(cell).toBe(before[i]));
+    expect(thumbs(root).slice(1).map(imgOf)).toEqual(imgs);
+    expect(thumbs(root)[0].tag).toBe("a");
+  });
+
+  it("ảnh mất rồi xuất hiện lại: hàng ẩn rồi hiện, ghi chú và xác nhận vẫn giữ", async () => {
+    const { root, list, column } = await setupShots();
+    const target = confirm(root);
+    find(target, (n) => n.tag === "textarea").value = "xem ảnh rồi";
+    list.mockResolvedValueOnce([withShots([])]);
+    await column.refresh();
+    expect(card(root)).toBe(target);
+    expect(row(root).hidden).toBe(true);
+    expect(thumbs(root)).toHaveLength(0);
+    await column.refresh();
+    expect(card(root)).toBe(target);
+    expect(row(root).hidden).toBe(false);
+    expect(thumbs(root).map((c) => c.attributes.get("title"))).toEqual(["1440x900-hour-11", "1440x900-hour-21", "390x844-hour-11"]);
+    expect(find(target, (n) => n.tag === "textarea").value).toBe("xem ảnh rồi");
+    expect(byClass(target, "need-confirm").hidden).toBe(false);
+  });
+
+  it("bộ mới với số ảnh khác thì dựng lại đúng bộ mới", async () => {
+    const { root, list, column } = await setupShots();
+    const old = [...thumbs(root)];
+    list.mockResolvedValueOnce([withShots([...SET, ...NEWER])]);
+    await column.refresh();
+    expect(thumbs(root)).toHaveLength(2);
+    expect(thumbs(root).some((c) => old.includes(c))).toBe(false);
+    expect(thumbs(root).map((c) => imgOf(c).attributes.get("src"))).toEqual([
+      "https://img.test/20261023-090000/1440x900-hour-11.png",
+      "https://img.test/20261023-090000/1440x900-hour-21.png",
+    ]);
+  });
+
+  it("bộ mới tới khi lightbox đang mở: vẫn xem bộ cũ, đóng thì focus ảnh đầu hàng mới", async () => {
+    const { root, list, column } = await setupShots();
+    thumbs(root)[2].click();
+    list.mockResolvedValueOnce([withShots(NEWER)]);
+    await column.refresh();
+    expect(viewerRoot().hidden).toBe(false);
+    expect(viewerName()).toBe("390x844-hour-11");
+    key("Escape");
+    expect(dom.activeElement).toBe(thumbs(root)[0]);
+    expect(imgOf(thumbs(root)[0]).attributes.get("src")).toContain("20261023-090000");
+  });
+
+  it("ảnh đã bấm thành liên kết khi lightbox mở: đóng thì focus ô đầu hàng", async () => {
+    const { root } = await setupShots();
+    const clicked = thumbs(root)[1];
+    clicked.click();
+    imgOf(clicked).dispatch("error");
+    key("Escape");
+    expect(dom.activeElement).toBe(thumbs(root)[0]);
+  });
+
+  it.each(["rời danh sách", "đổi loại"])("ticket %s khi lightbox mở thì lightbox đóng", async (change) => {
+    const { root, list, column } = await setupShots([withShots(SET), withShots(SET, "T-other")]);
+    thumbs(root).at(0)!.click();
+    list.mockResolvedValueOnce(change === "đổi loại" ? [withShots(SET, "T-merge", "escalated"), withShots(SET, "T-other")] : [withShots(SET, "T-other")]);
+    await expect(column.refresh()).resolves.toBeUndefined();
+    expect(viewerRoot().hidden).toBe(true);
+    // Thẻ cũ đã gỡ: không còn chỗ nào hợp lệ để trả focus.
+    expect(root.contains(dom.activeElement)).toBe(false);
+  });
+
+  it("thẻ khác bị gỡ không đóng lightbox của thẻ đang xem", async () => {
+    const { root, list, column } = await setupShots([withShots(SET), withShots(SET, "T-other")]);
+    thumbs(root).at(0)!.click();
+    list.mockResolvedValueOnce([withShots(SET)]);
+    await column.refresh();
+    expect(viewerRoot().hidden).toBe(false);
+  });
+
+  it("list lỗi (offline) giữ hàng ảnh và lightbox đang mở", async () => {
+    const { root, list, column } = await setupShots();
+    const before = [...thumbs(root)];
+    before[1].click();
+    list.mockRejectedValueOnce(new Error("mất mạng"));
+    await column.refresh();
+    expect(byClass(root, "needs-error").textContent).toContain("mất mạng");
+    before.forEach((cell, i) => expect(thumbs(root)[i]).toBe(cell));
+    expect(viewerRoot().hidden).toBe(false);
+    expect(viewerName()).toBe("1440x900-hour-21");
+    key("Escape");
+    expect(dom.activeElement).toBe(before[1]);
+  });
+
+  it("đổi nguồn đóng lightbox", async () => {
+    const { root, list, act, column } = await setupShots();
+    thumbs(root)[0].click();
+    column.setSource({ list, act });
+    expect(viewerRoot().hidden).toBe(true);
   });
 });

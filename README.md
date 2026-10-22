@@ -55,7 +55,7 @@ Trong khối Số liệu của ngăn chi tiết và tooltip, `tokens_in` đã g�
 
 Hạn mức: Claude và Codex công bố phần đã dùng theo từng cửa sổ. Các CLI không công bố hạn mức (Cursor) để `windows` rỗng; GUI hiện `?` kèm gói nếu có. Khi một cửa sổ chạm 100%, `state` là `limited` và `limit.resets_at` là giờ mở lại. Số lượt và token là do worker tự đếm.
 
-Ngăn chi tiết, tab “Cần bạn”, liệt kê ticket chờ duyệt kế hoạch, chờ duyệt merge và `escalated`. Có liên kết MR/xem trước, ghi chú và các thao tác theo trạng thái; thao tác không thể hoàn tác cần xác nhận. Danh sách làm mới mỗi 3 giây, giữ ghi chú khi poll và giữ thẻ cũ khi tải lỗi; dấu `!` cạnh bộ đếm báo lỗi tải ticket. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
+Ngăn chi tiết, tab “Cần bạn”, liệt kê ticket chờ duyệt kế hoạch, chờ duyệt merge và `escalated`. Có liên kết MR/xem trước, ghi chú và các thao tác theo trạng thái; thao tác không thể hoàn tác cần xác nhận. Ticket có ảnh giao diện Reviewer chụp thì hiện hàng ảnh thu nhỏ của lần review mới nhất (cuộn ngang ở màn hẹp); bấm ảnh để xem lớn, ←/→ chuyển ảnh, Esc đóng; ảnh tải lỗi thành liên kết mở tab mới. Danh sách làm mới mỗi 3 giây, giữ ghi chú khi poll và giữ thẻ cũ khi tải lỗi; dấu `!` cạnh bộ đếm báo lỗi tải ticket. Demo có đủ ba loại ticket, thao tác chỉ đổi dữ liệu trong bộ nhớ; bấm Demo để nạp lại.
 
 Ô số trên thanh trên đếm agent đang chạy, agent đang làm và ticket cần người; tiêu đề tab hiện số ticket. Bấm ô cần bạn, phím **P** hoặc nút “Xử lý” trên toast (khi không nhập chữ) để mở tab Cần bạn rồi tới thẻ. Ticket mới cần người hiện toast. Bấm agent trên thanh bên hoặc trên canvas thì mở tab Agent. Agent biến mất, hoặc phòng offline/hết hạn mức, thì đóng tab Agent và không tự mở lại. Đổi nguồn xoá lựa chọn, feed, cờ đóng ngăn và toast.
 
@@ -82,8 +82,11 @@ src/usage.test.ts          test ngưỡng màu, đếm ngược, usage hỏng, s
 src/tickets.ts             logic ticket thuần, lý do, nút thao tác, request và demo
 src/tickets.test.ts        test dữ liệu ticket, thao tác, request, lỗi và demo
 src/needs-column.ts        cột Cần bạn: duyệt kế hoạch/merge, escalated, ghi chú và xác nhận
-src/needs-column.test.ts   test DOM giả: xác nhận, poll, lỗi và đổi nguồn
-src/needs-column.css       kiểu hiển thị cột Cần bạn
+src/needs-column.test.ts   test DOM giả: xác nhận, poll, lỗi, đổi nguồn, hàng ảnh review và lightbox
+src/needs-column.css       kiểu hiển thị cột Cần bạn và hàng ảnh cuộn ngang
+src/shot-viewer.ts         lightbox xem ảnh review lớn trên body: ←/→, Esc, trả focus, ảnh lỗi thành liên kết
+src/shot-viewer.css        kiểu lightbox ảnh review
+src/shot-viewer.test.ts    test mở, chuyển ảnh ở biên, Esc không lan, bấm nền, ảnh lỗi
 src/attention.ts           bộ đếm tiêu đề tab, phím P và trạng thái toast (thuần)
 src/attention.test.ts      test tiêu đề, phím tắt và vòng đời toast
 src/toasts.ts              toast ticket mới cần người, mở thẻ và đóng thông báo
@@ -145,6 +148,8 @@ vitest.config.ts           cấu hình vitest (môi trường Node, chỉ src/**
 art/characters/body.pixel.json      thân nhân vật (đủ 7 tư thế)
 art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái, 2 dài, 3 búi
 art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer)
+art/demo-shots/                     công thức Pixelbolt ảnh review demo (văn phòng giờ 11 và 21)
+public/demo-shots/<thời điểm>/*.png  ảnh review demo xuất từ art/demo-shots/, ticket demo trỏ tới
 public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/
 public/assets/CREDITS.md            nguồn và giấy phép của mọi tài sản bên ngoài
 docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (văn phòng pixel cho agent) và đề xuất áp dụng

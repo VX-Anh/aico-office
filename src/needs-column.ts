@@ -9,12 +9,14 @@ import {
   NEED_LABEL,
   actionsFor,
   canSubmit,
+  latestScreenshots,
   needsConfirmation,
   mergeRequest,
   needsYou,
   previewLink,
   waitedLabel,
 } from "./tickets";
+import { createShotViewer } from "./shot-viewer";
 import "./needs-column.css";
 
 export interface NeedItem {
@@ -109,6 +111,14 @@ export function createNeedsColumn(
   let items = new Map<string, NeedItem>();
   // Khoá theo id|kind kể cả khi một poll tạm gỡ thẻ đang gửi: thẻ hiện lại vẫn bị khoá tới khi gửi xong.
   const pending = new Set<string>();
+  // Lightbox gắn vào body, dùng chung cho mọi thẻ; nhớ thẻ đã mở để đóng khi thẻ bị gỡ.
+  const viewer = createShotViewer();
+  let viewerOwner: string | null = null;
+
+  function closeViewer(): void {
+    viewerOwner = null;
+    viewer.close();
+  }
 
   function layout(): void {
     heading.textContent = `Cần bạn (${cards.size})`;
@@ -140,6 +150,9 @@ export function createNeedsColumn(
     const mr = link("Xem MR ↗");
     const preview = link("Xem trước ↗");
     links.append(mr, preview);
+    const shotRow = node("div");
+    shotRow.className = "need-shots";
+    shotRow.setAttribute("aria-label", `Ảnh review ${id}`);
     const comment = node("textarea");
     comment.rows = 2;
     comment.placeholder = "Ghi chú";
@@ -156,12 +169,46 @@ export function createNeedsColumn(
     const message = node("p");
     message.className = "need-message";
     message.setAttribute("role", "status");
-    article.append(head, title, reason, links, comment, actions, confirmation, message);
+    article.append(head, title, reason, links, shotRow, comment, actions, confirmation, message);
     let item = first;
     let confirming: NeedAction | null = null;
     // Nhắc thiếu ghi chú tự tắt khi người gõ; lỗi từ aico thì giữ tới lần gửi sau.
     let hint = false;
     const buttons = new Map<NeedAction, HTMLButtonElement>();
+    // Khoá bộ ảnh đang dựng: poll cùng bộ thì giữ node, ảnh không tải lại và ô lỗi vẫn là liên kết.
+    let shotsKey = "";
+
+    function renderShots(): void {
+      const shots = latestScreenshots(item.ticket);
+      const nextKey = JSON.stringify(shots.map((s) => [s.url, s.label]));
+      if (nextKey === shotsKey) return;
+      shotsKey = nextKey;
+      shotRow.hidden = shots.length === 0;
+      shotRow.replaceChildren(...shots.map((shot, i) => {
+        const cell = node("button");
+        cell.type = "button";
+        cell.setAttribute("title", shot.label);
+        const img = node("img");
+        img.setAttribute("loading", "lazy");
+        img.setAttribute("decoding", "async");
+        img.setAttribute("alt", shot.label);
+        img.setAttribute("title", shot.label);
+        // Ảnh sau Cloudflare Access chưa đăng nhập sẽ lỗi: cho mở ở tab mới để đăng nhập.
+        img.addEventListener("error", () => {
+          const fallback = link(`${shot.label} ↗`);
+          fallback.href = shot.url;
+          cell.replaceWith(fallback);
+        });
+        img.setAttribute("src", shot.url);
+        cell.append(img);
+        cell.addEventListener("click", () => {
+          viewerOwner = key;
+          // Hàng ảnh có thể đã dựng lại khi lightbox đang mở: lúc đó trả focus về ảnh đầu hàng mới.
+          viewer.open(shots, i, () => (cell.isConnected ? cell : (shotRow.firstElementChild as HTMLElement | null) ?? comment));
+        });
+        return cell;
+      }));
+    }
 
     function enabled(action: NeedAction): boolean {
       return actionsFor(kind, item.reason, item.ticket).some((a) => a.action === action && a.enabled);
@@ -183,6 +230,7 @@ export function createNeedsColumn(
       setHref(mr, mergeRequest(item.ticket).url);
       setHref(preview, previewLink(item.ticket));
       links.hidden = mr.hidden && preview.hidden;
+      renderShots();
       for (const [action, button] of buttons) button.disabled = busy || !available.get(action);
       comment.readOnly = busy;
       confirmation.hidden = confirming === null;
@@ -313,7 +361,11 @@ export function createNeedsColumn(
       const tickets = needSnapshotOf(raw);
       items = new Map(next.map((item) => [keyOf(item), item]));
       for (const [key, card] of cards) {
-        if (!items.has(key)) { card.root.remove(); cards.delete(key); }
+        if (!items.has(key)) {
+          card.root.remove();
+          cards.delete(key);
+          if (viewerOwner === key) closeViewer();
+        }
       }
       for (const [key, item] of items) {
         const card = cards.get(key);
@@ -342,6 +394,7 @@ export function createNeedsColumn(
       generation++;
       gate.reset();
       source = next;
+      closeViewer();
       cards.clear();
       items.clear();
       pending.clear();

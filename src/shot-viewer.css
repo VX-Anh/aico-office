@@ -1,0 +1,79 @@
+/* Lightbox ảnh review: phủ toàn màn, nằm trên drawer (30), toast (30) và tooltip/popover (40). */
+.shot-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--scrim);
+  color: var(--text);
+  animation: shot-viewer-in 0.18s var(--ease);
+}
+.shot-viewer[hidden] { display: none; }
+.shot-viewer:focus { outline: none; }
+
+/* Vùng trống quanh ảnh là "nền": bấm vào thì đóng. */
+.shot-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gap);
+}
+/* Phóng vừa khung cả khi ảnh nhỏ hơn màn (ảnh 390px, ảnh demo); object-fit giữ tỉ lệ. */
+.shot-viewer-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.shot-viewer-fallback {
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  overflow-wrap: anywhere;
+}
+
+.shot-viewer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: var(--gap);
+  background: var(--panel-solid);
+  border-top: 1px solid var(--line);
+}
+.shot-viewer-caption {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.shot-viewer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shot-viewer-pos { color: var(--text-dim); font-size: 12px; }
+.shot-viewer-bar button {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.shot-viewer-bar button[hidden] { display: none; }
+.shot-viewer-bar button:hover:not(:disabled) { border-color: var(--accent); }
+.shot-viewer-bar button:disabled { opacity: 0.45; cursor: default; }
+
+@keyframes shot-viewer-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-viewer { animation: none; }
+}
