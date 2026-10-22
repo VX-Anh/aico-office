@@ -45,6 +45,38 @@
 .need-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
 .need-links[hidden], .need-links a[hidden], .need-reason[hidden], .need-confirm[hidden] { display: none; }
 .need-links a { color: var(--accent); }
+/* Hàng ảnh review: chỉ hàng này cuộn ngang, thẻ giữ nguyên bề rộng kể cả màn 390px. */
+.need-shots {
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  margin: 6px 0;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.need-shots[hidden] { display: none; }
+.need-card .need-shots button {
+  flex: none;
+  padding: 0;
+  overflow: hidden;
+  line-height: 0;
+}
+.need-shots img { display: block; width: 96px; height: 60px; object-fit: cover; }
+.need-shots a {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 60px;
+  padding: 4px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12px;
+  text-align: center;
+}
 
 .need-card button, .need-card textarea {
   color: var(--text);
