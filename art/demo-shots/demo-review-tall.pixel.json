@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "palette": {
+    "o": "#2a2030",
+    "w": "#2e4d6e",
+    "f": "#b07a46",
+    "l": "#875730",
+    "d": "#dba46a",
+    "e": "#ebbd84",
+    "s": "#123a5a",
+    "c": "#7fd1ff",
+    "g": "#4fae60",
+    "v": "#9b6bd6",
+    "p": "#e57fb0",
+    "h": "#22262b",
+    "k": "#f2c9a0",
+    "b": "#3f7fc4",
+    "i": "#efe6cf",
+    "a": "#f5c26b",
+    "r": "#9a3030",
+    "t": "#5fae4f",
+    "G": "#4e9a46",
+    "n": "#0c1838",
+    "D": "#1f3550",
+    "F": "#6e4426"
+  },
+  "symbols": {
+    "room": [
+      "ooooooooooooooooooooooooo",
+      "owwwwwwwwwwwwwwwwwwwwwwwo",
+      "owwoooiooowwwwwwwooooowwo",
+      "owwocciccowwwwwwwoaaaowwo",
+      "owwocciccowwwwwwwoaaaowwo",
+      "owwoooiooowwwwwwwooooowwo",
+      "owwwoooooowwwwwwoooooowwo",
+      "offfossssoffffffossssoffo",
+      "offfocccsoffffffocccsoffo",
+      "olllossssollllllossssollo",
+      "offeoohhhoeffffeoohhhoefo",
+      "offdddhhhddffffdddhhhddfo",
+      "offdddkkkddffffdddkkkddfo",
+      "offooogggooffffooogggoofo",
+      "olllllggglllllllllggglllo",
+      "offffogggofffffffogggoffo",
+      "offffobbbofffffffobbboffo",
+      "offffbbbbbfffffffbbbbbffo",
+      "otttttbbbbfffffffbbbbbffo",
+      "otttttllllllllllllllllllo",
+      "otttttffffffffffffffffffo",
+      "ofdddfffffffffffffffffffo",
+      "ofdddfffffffffffffffffffo",
+      "offfffffffffffffffffffffo",
+      "ooooooooooofffooooooooooo"
+    ],
+    "sofa": [
+      "oooooooooooo",
+      "orrrrrrrrrro",
+      "orrrrrrrrrro",
+      "orrrrrrrrrro",
+      "oooooooooooo"
+    ],
+    "plant": [
+      "..ttt..",
+      ".ttttt.",
+      "ttttttt",
+      "..ttt..",
+      "..ddd..",
+      "..ddd.."
+    ]
+  },
+  "name": "demo-review-tall",
+  "width": 98,
+  "height": 211,
+  "frames": [
+    {
+      "name": "day",
+      "ops": [
+        {
+          "op": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 98,
+          "h": 211,
+          "color": "G"
+        },
+        {
+          "op": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 98,
+          "h": 16,
+          "color": "o"
+        },
+        {
+          "op": "text",
+          "x": 6,
+          "y": 4,
+          "text": "AICO 11:00",
+          "color": "i"
+        },
+        {
+          "op": "rect",
+          "x": 20,
+          "y": 20,
+          "w": 58,
+          "h": 171,
+          "color": "o"
+        },
+        {
+          "op": "rect",
+          "x": 22,
+          "y": 22,
+          "w": 54,
+          "h": 167,
+          "color": "f"
+        },
+        {
+          "op": "stamp",
+          "symbol": "room",
+          "x": 24,
+          "y": 24,
+          "scale": 2
+        },
+        {
+          "op": "stamp",
+          "symbol": "room",
+          "x": 24,
+          "y": 79,
+          "scale": 2,
+          "remap": {
+            "g": "v"
+          }
+        },
+        {
+          "op": "stamp",
+          "symbol": "room",
+          "x": 24,
+          "y": 134,
+          "scale": 2,
+          "remap": {
+            "g": "p"
+          }
+        },
+        {
+          "op": "rect",
+          "x": 20,
+          "y": 190,
+          "w": 58,
+          "h": 17,
+          "color": "w"
+        },
+        {
+          "op": "stamp",
+          "symbol": "sofa",
+          "x": 24,
+          "y": 193,
+          "scale": 2
+        },
+        {
+          "op": "stamp",
+          "symbol": "plant",
+          "x": 59,
+          "y": 191,
+          "scale": 2
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "review_day": {
+      "frames": [
+        "day"
+      ],
+      "loop": false
+    }
+  }
+}
