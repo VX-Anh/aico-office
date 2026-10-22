@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
   feedPending: 0,
   feedScrolledUp: false,
   drawerLayout: null as (() => void) | null,
+  feedLayout: null as (() => void) | null,
   onSelect: null as ((key: string) => void) | null,
   onClose: null as (() => void) | null,
   onTab: null as ((tab: "agent" | "needs") => void) | null,
@@ -103,6 +104,7 @@ vi.mock("./ui/feed", () => ({
     const setCollapsed = (value: boolean) => {
       h.feedSetCollapsed(value);
       getNode("#feed").classList.toggle("is-collapsed", value);
+      h.feedLayout?.();
     };
     h.feedKey = (event) => {
       const target = event.target as { closest?: (selector: string) => unknown } | null;
@@ -110,7 +112,7 @@ vi.mock("./ui/feed", () => ({
     };
     return {
       setCollapsed,
-      onLayout() {},
+      onLayout(callback: () => void) { h.feedLayout = callback; },
       render(lines: { key: string }[], workers?: unknown) {
         h.feedRender(lines, workers);
         const added = lines.filter((line) => !keys.has(line.key)).length;
@@ -212,6 +214,7 @@ beforeEach(() => {
   h.feedPending = 0;
   h.feedScrolledUp = false;
   h.drawerLayout = null;
+  h.feedLayout = null;
   h.drawScene.mockReset();
   h.drawScene.mockImplementation(() => []);
   nodes = new Map();
@@ -810,6 +813,53 @@ describe("feed: bấm dòng, vị trí khung và đổi nguồn", () => {
     Object.assign(getNode("#sidebar"), { left: 10, top: 60, clientWidth: 300, clientHeight: 600 });
     await realWith([room()]);
     expect([root.vars["--feed-left"], root.vars["--feed-room"]]).toEqual(["10px", "370px"]);
+  });
+
+  it("màn hẹp: --feed-reserve theo chiều cao feed thật để drawer đứng trên feed, cả hai tab", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: String(query).includes("max-width"), addEventListener() {}, removeEventListener() {},
+    }));
+    const root = getNode(":root");
+    root.clientWidth = 390;
+    root.clientHeight = 844;
+    const feedNode = getNode("#feed");
+    // Feed mở cao 45vh (380px) hay thu gọn còn 38px; mock đổi kích thước theo lớp is-collapsed.
+    const open = { left: 10, top: 454, clientWidth: 370, clientHeight: 380 };
+    const shut = { left: 10, top: 796, clientWidth: 370, clientHeight: 38 };
+    Object.assign(feedNode, open);
+    feedNode.classList.toggle = (name: string, force?: boolean) => {
+      const on = force ?? !feedNode.classList.contains(name);
+      if (on) feedNode.classList.add(name); else feedNode.classList.remove(name);
+      if (name === "is-collapsed") Object.assign(feedNode, on ? shut : open);
+      return on;
+    };
+    await realWith([room()]);
+    const reserve = () => root.vars["--feed-reserve"];
+    expect(reserve()).toBe("390px");
+    // Mở ngăn Agent khi feed đang mở: drawer vẫn chừa đủ chỗ cho feed.
+    h.onSelect!(agentKey("claude", agent));
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    expect(reserve()).toBe("390px");
+    press("]");
+    expect(reserve()).toBe("48px");
+    // Mở lại feed lúc drawer đang hiện: drawer lùi lên theo.
+    press("]");
+    expect(reserve()).toBe("390px");
+    h.items([{ ticket: { id: "T-1", title: "Kế hoạch" }, kind: "plan" as const, reason: null }]);
+    h.onTab!("needs");
+    expect(drawerOf()).toEqual({ open: true, tab: "needs" });
+    expect(reserve()).toBe("390px");
+    press("]");
+    expect(reserve()).toBe("48px");
+    press("Escape");
+    press("]");
+    expect(reserve()).toBe("390px");
+  });
+
+  it("feed ẩn hoặc chưa đo được thì xoá --feed-reserve để CSS dùng giá trị mặc định", async () => {
+    getNode("#feed").hidden = true;
+    await realWith([room()]);
+    expect(getNode(":root").vars["--feed-reserve"]).toBe("");
   });
 
   it.each([["open", false], ["collapsed", true], ["x", null]] as const)("?feed=%s đặt trạng thái khung lúc mở trang", async (value, collapsed) => {

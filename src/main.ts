@@ -335,9 +335,12 @@ function relayout(): void {
   const style = document.documentElement.style;
   style.setProperty("--feed-left", `${box.left}px`);
   style.setProperty("--feed-room", `${box.room}px`);
+  const feedRect = panelRect(feedRoot);
+  // Màn hẹp: drawer đứng ngay trên feed theo chiều cao thật (thu gọn hay mở 45vh), không đè lên nhau.
+  style.setProperty("--feed-reserve", feedRect && height > 0 ? `${Math.max(0, Math.round(height - feedRect.top))}px` : "");
   const insets = computeInsets(
     { width, height },
-    { topbar: panelRect(topbarRoot), sidebar: sidebarRect, drawer: drawerRect, feed: panelRect(feedRoot) },
+    { topbar: panelRect(topbarRoot), sidebar: sidebarRect, drawer: drawerRect, feed: feedRect },
     { gap: GAP, narrow, minFree: MIN_FREE },
   );
   style.setProperty("--free-top", `${insets.top}px`);
