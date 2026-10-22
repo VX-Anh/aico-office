@@ -1,12 +1,12 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-01489c4d). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-01489c4d, T-e74ec7c8). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data["Dữ liệu và logic thuần hiện có"]
-    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây"]
+    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây<br/>defaultBaseUrl: origin/api trên tên miền thật<br/>null cho localhost, file:, /preview/"]
     TK["src/tickets.ts<br/>parseTickets, needsYou, NEED_LABEL, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
     ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
     USG["src/usage.ts"]
@@ -30,22 +30,30 @@ flowchart TD
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room<br/>update sidebar mỗi giây và sau poll"]
+  LOC["window.location"]
+  LS["localStorage aico-office.api"]
+  FORM["#settings trong index.html<br/>baseUrl, token"]
+
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room<br/>update sidebar mỗi giây và sau poll<br/>điền ô địa chỉ: kết nối lưu, không thì defaultBaseUrl"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
   MAIN -->|demo assetBase| TK
+  LS -->|loadConfig| MAIN
+  MAIN -->|saveConfig chỉ khi submit| LS
+  LOC -->|defaultBaseUrl| MAIN
+  MAIN -->|value baseUrl, không tự kết nối| FORM
 
   subgraph UI["Khung UI"]
     VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
     FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
     SEL["ui/selection.ts"]
-    FMT["ui/format.ts<br/>agentStatus, providerLetter, tokenStatsRows<br/>tokenStatsLines cho tooltip"]
+    FMT["ui/format.ts<br/>agentStatus, providerLetter, tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
     TOK["ui/tokens.css<br/>--feed-max, --input-bg, --accent-soft<br/>--room-bg, --crit-softer, --radius-xs/room"]
-    TOP["ui/topbar.ts + CSS"]
+    TOP["ui/topbar.ts + CSS<br/>popover cài đặt chứa #settings<br/>settingsFocus: địa chỉ có + token trống → focus token"]
     SIDEM["ui/sidebar-model.ts<br/>thuần: normalizeText bỏ dấu, agentMatches<br/>formatElapsed m:ss/h:mm:ss, slotFill<br/>load/saveHiddenRooms an toàn"]
     SIDE["ui/sidebar.ts + CSS<br/>kiểu Habblaud: ô tìm, phím / và Esc<br/>chip lọc phòng aria-pressed, nhãn đang lọc<br/>khối phòng vạch màu, đếm, thanh chỗ/over<br/>dòng agent: avatar, vai trò, ticket, hoạt động · thời gian chạy<br/>selected/need/offline; thu gọn [, ngăn kéo hẹp"]
-    LS[("localStorage<br/>hiddenRooms")]
+    LSH[("localStorage<br/>hiddenRooms")]
     AV["ui/avatar.ts"]
     DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>+ ticketId, needKind; nhãn 'Chờ bạn …' theo NEED_LABEL<br/>nowCardTitle theo tone<br/>roomStateLabel, taskChecklist, recentRows"]
     DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái: nhãn need là nút mở Cần bạn<br/>thẻ hoạt động: tiêu đề theo tone<br/>checklist task, timeline Gần đây, bảng số liệu"]
@@ -53,6 +61,7 @@ flowchart TD
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
   end
+  FORM --> TOP
   MAIN --> VP
   MAIN --> FM
   MAIN --> SEL
@@ -65,13 +74,14 @@ flowchart TD
   FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
   MAIN --> TOAST
   TOAST -->|onOpen → showNeeds| MAIN
+  TOP -->|submit, Demo| MAIN
   TOP --> FMT
   SIDE --> SIDEM
   SIDE --> FMT
   SIDE --> AV
   SIDE --> ACTV
   SIDE --> PAL
-  SIDE <-->|try/catch, lỗi thì chỉ trong phiên| LS
+  SIDE <-->|try/catch, lỗi thì chỉ trong phiên| LSH
   FEED --> AV
   FEED --> FMT
   FEED --> PAL
@@ -164,7 +174,9 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model, feed DOM, latestScreenshots, shot-viewer<br/>format, drawer-model, drawer DOM<br/>sidebar-model: bỏ dấu, khớp, m:ss/h:mm:ss, slotFill, localStorage lỗi<br/>sidebar DOM: tìm, phím / Esc, chip lọc, thanh chỗ/over<br/>class selected/need/offline; dữ liệu đổi giữa chừng khi đang lọc<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model, drawer DOM<br/>sidebar-model: bỏ dấu, khớp, m:ss/h:mm:ss, slotFill, localStorage lỗi<br/>sidebar DOM: tìm, phím / Esc, chip lọc, thanh chỗ/over<br/>class selected/need/offline; dữ liệu đổi giữa chừng khi đang lọc<br/>api: defaultBaseUrl deploy/localhost/[::1]/file:/preview<br/>topbar: settingsFocus, focus ô token<br/>main: điền sẵn địa chỉ, kết nối lưu thắng, không tự lưu/kết nối<br/>dữ liệu đổi giữa chừng: kết nối lưu mất, Demo/Thoát demo, offline<br/>giữ actors và mọi test cũ"]
+  TEST -.-> API
+  TEST -.-> TOP
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
