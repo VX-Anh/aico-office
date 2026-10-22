@@ -7,23 +7,81 @@
 .drawer button:focus-visible, .drawer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .drawer .drawer-close { font-size: 22px; padding: 2px 9px; }
 .drawer-content { overflow-y: auto; min-height: 0; padding: 14px; overscroll-behavior: contain; overflow-wrap: anywhere; }
-.drawer-title, .drawer h3 { font-family: var(--font-ui); font-weight: 700; }
-.drawer-title { font-size: 22px; }
-.drawer h3 { margin: 0 0 10px; font-size: 18px; color: var(--accent); }
-.drawer section { padding: 14px 0; border-top: 1px solid var(--line); margin-top: 14px; line-height: 1.5; }
-.drawer-muted { color: var(--text-dim); font-size: 12px; }
-.drawer-ticket { margin: 12px 0 6px; font-family: var(--font-mono); }
-.drawer a { margin-left: 10px; color: var(--accent); }
-.drawer-recent, .drawer-task { margin: 8px 0; }
-.drawer-error { color: var(--lvl-crit); }
+/* Tiêu đề có dấu dùng font UI vì Pixelify không đủ dấu tiếng Việt. */
+.drawer-hero { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+.drawer-hero-avatar { flex: 0 0 64px; width: 64px; height: 64px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg); }
+.drawer-hero-avatar .avatar, .drawer-hero-avatar .avatar-fallback { display: block; width: 64px; height: 64px; image-rendering: pixelated; }
+.drawer-hero-body { flex: 1; min-width: 0; }
+.drawer-hero-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.drawer-role { flex-shrink: 0; font: 700 21px/1.2 var(--font-ui); }
+.drawer-agent-id, .drawer-ticket-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; }
+.drawer-agent-id { color: var(--text-dim); }
+.drawer-hero-room { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 6px; font-size: 12px; }
+.drawer-room-chip { display: inline-grid; place-items: center; flex: 0 0 20px; height: 20px; border-radius: var(--radius-sm); color: var(--on-accent); font: 600 14px/1 var(--font-pixel); }
+.drawer-room-name, .drawer-room-state { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-room-state { color: var(--text-dim); }
+.drawer-hero-ticket { display: flex; align-items: baseline; gap: 6px; min-width: 0; margin-top: 6px; }
+.drawer-ticket-label { color: var(--text-dim); font-size: 11px; }
+.drawer-ticket-id { color: var(--accent); }
+.drawer-mission { display: flex; align-items: center; flex-wrap: wrap; gap: var(--gap); margin-top: 12px; padding: var(--gap); border-radius: var(--radius-sm); background: var(--hover); }
+.drawer-mission-title { flex: 1 1 160px; min-width: 0; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.drawer-mission.is-empty { color: var(--text-dim); }
+.drawer-mission-links { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin-left: auto; }
+.drawer-mission-links .drawer-link { padding: 3px 6px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--accent); font-size: 11px; text-decoration: none; }
+.drawer-link:hover { background: var(--hover); }
+.drawer-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0; font-size: 12px; }
+.drawer-status-dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--st-idle); }
+.drawer-status.tone-working .drawer-status-dot { background: var(--st-working); }
+.drawer-status.tone-need .drawer-status-dot { background: var(--st-need); }
+.drawer-status.tone-error .drawer-status-dot { background: var(--lvl-crit); }
+.drawer-status.tone-idle .drawer-status-dot { background: var(--st-idle); }
+.drawer-status.tone-offline .drawer-status-dot { background: var(--st-offline); }
+.drawer-status.tone-limited .drawer-status-dot { background: var(--st-limited); }
+.drawer-status-label { font-weight: 700; }
+.drawer-status-ago { color: var(--text-dim); font-size: 11px; }
+.drawer-now { padding: var(--gap); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.drawer-now.is-error { border-color: var(--lvl-crit); background: var(--crit-soft); }
+.drawer-now-title { margin-bottom: 6px; font: 700 12px/1.4 var(--font-ui); }
+.drawer-now-main { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; line-height: 1.4; }
+.drawer-now-icon { flex-shrink: 0; }
+.drawer-now-text, .drawer-now-detail { min-width: 0; overflow-wrap: anywhere; }
+.drawer-now-detail { margin-top: 6px; color: var(--text-dim); font-size: 12px; line-height: 1.4; }
+.drawer-section { padding-top: 12px; border-top: 1px solid var(--line); margin-top: 12px; }
+.drawer-section .drawer-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap); margin: 0 0 8px; color: var(--text); font: 700 13px/1.4 var(--font-ui); }
+.drawer-section-title { min-width: 0; }
+.drawer-section-count { flex-shrink: 0; margin-left: auto; color: var(--text-dim); font: 600 13px/1 var(--font-pixel); font-variant-numeric: tabular-nums; }
+.drawer-progress { height: 4px; margin-bottom: 8px; overflow: hidden; border-radius: var(--radius-sm); background: var(--hover); }
+.drawer-progress-fill { height: 100%; max-width: 100%; background: var(--accent); }
+.drawer-checklist, .drawer-timeline { margin: 0; padding: 0; list-style: none; }
+.drawer-check { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: 12px; line-height: 1.4; }
+.drawer-check-mark { flex: 0 0 14px; color: var(--text-dim); text-align: center; }
+.drawer-check-title { min-width: 0; overflow-wrap: anywhere; }
+.drawer-check.pending { color: var(--text-dim); }
+.drawer-check.in_progress { font-weight: 700; }
+.drawer-check.in_progress .drawer-check-mark { color: var(--accent); }
+.drawer-check.completed .drawer-check-mark { color: var(--lvl-ok); }
+.drawer-check.completed .drawer-check-title { color: var(--text-dim); }
+.drawer-tl-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 24px; font-size: 11px; }
+.drawer-tl-icon { text-align: center; }
+.drawer-tl-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-tl-ago { color: var(--text-dim); font-size: 10px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.drawer-stats { margin: 0; font-size: 12px; }
+.drawer-stat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--gap); padding: 4px 0; line-height: 1.4; }
+.drawer-stat dt { min-width: 0; color: var(--text-dim); }
+.drawer-stat dd { min-width: 0; margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.drawer-cache { font-size: 11px; }
 .drawer-cache.ok { color: var(--lvl-ok); }
 .drawer-cache.warn { color: var(--lvl-warn); }
 .drawer-cache.crit { color: var(--lvl-crit); }
-.drawer-task.completed { color: var(--st-done); }
-.drawer progress { width: 100%; height: 7px; accent-color: var(--accent); }
+.drawer-muted { color: var(--text-dim); font-size: 12px; }
 .drawer-needs #needs { position: static; width: auto; max-height: none; padding: 0; border: 0; box-shadow: none; background: transparent; }
 @media (max-width: 899px) {
   /* --feed-reserve do main.ts đo từ #feed (gồm lề đáy): feed mở 45vh thì drawer lùi lên, không che đầu feed;
      chiều cao chừa --scene-min để cảnh không bị drawer che hết (main.ts tính viewport theo mép trên drawer). */
   .drawer { --below: var(--feed-reserve, calc(var(--feed-h-min) + var(--gap))); top: auto; bottom: calc(var(--below) + var(--gap)); left: var(--gap); right: var(--gap); width: auto; height: 55dvh; max-height: max(120px, calc(100dvh - var(--topbar-h) - var(--below) - var(--scene-min) - var(--gap) * 4)); border-radius: var(--radius) var(--radius) 0 0; }
+}
+@media (max-width: 899px) {
+  .drawer-content:not(.drawer-needs) { overflow-x: hidden; }
+  .drawer-hero-avatar { flex-basis: 48px; width: 48px; height: 48px; }
+  .drawer-hero-avatar .avatar, .drawer-hero-avatar .avatar-fallback { width: 48px; height: 48px; }
 }
