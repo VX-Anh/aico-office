@@ -88,6 +88,40 @@ describe("statusView: tone need", () => {
     statusView(worker, a, m, now);
     expect(warn).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    { toString: null },
+    { toString: "plan" },
+    [{ toString: null }],
+  ])("kind không chuyển được thành chuỗi vẫn fallback", (kind) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const needs = new Map([["t", kind as unknown as NeedKind]]);
+
+    for (let i = 0; i < 2; i++) {
+      expect(statusView(worker, agent, needs, now)).toMatchObject({
+        tone: "need",
+        label: "Chờ bạn",
+        ticketId: "t",
+        needKind: null,
+      });
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ["toJSON ném", { toJSON() { throw new Error("x"); } }],
+    ["getter ném", Object.defineProperty({}, "kind", { enumerable: true, get() { throw new Error("x"); } })],
+    ["vòng lặp", (() => { const o: Record<string, unknown> = {}; o.self = o; return o; })()],
+    ["BigInt", { n: 1n }],
+    ["symbol", Symbol("plan")],
+    ["hàm", () => "plan"],
+  ])("kind %s: không ném khi ghi cảnh báo, warn một lần", (name, kind) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = { ...agent, ticket_id: `throwy-${name}` };
+    const m = needs(kind, a.ticket_id);
+    for (let i = 0; i < 2; i++) {
+      expect(statusView(worker, a, m, now)).toMatchObject({ tone: "need", label: "Chờ bạn", ticketId: a.ticket_id, needKind: null });
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
   it("kind không chuyển được thành chuỗi vẫn fallback, warn một lần", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const kinds: unknown[] = [

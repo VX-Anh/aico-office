@@ -80,10 +80,22 @@ function readNeedKind(needs: ReadonlyMap<string, NeedKind> | ReadonlySet<string>
   }
   const kind: unknown = needs.get(ticketId);
   if (isNeedKind(kind)) return kind;
-  // Không String(kind): object kiểu { toString: null } làm phép chuyển chuỗi ném lỗi.
-  const shown = typeof kind === "string" ? kind : kind === null ? "null" : Array.isArray(kind) ? "array" : typeof kind;
-  warnOnce(`${ticketId}: loại việc Cần bạn lạ (${shown})`);
+  warnOnce(`${ticketId}: loại việc Cần bạn lạ (${describeKind(kind)})`);
   return null;
+}
+
+// Không String(kind): object kiểu { toString: null } làm phép chuyển chuỗi ném lỗi.
+// JSON giữ nội dung để kind khác nhau trên cùng ticket vẫn mỗi loại warn một lần.
+function describeKind(kind: unknown): string {
+  if (typeof kind === "string") return kind;
+  if (typeof kind !== "object" || kind === null) return kind === null ? "null" : typeof kind;
+  try {
+    const json = JSON.stringify(kind);
+    if (typeof json === "string") return json.length > 60 ? `${json.slice(0, 60)}…` : json;
+  } catch {
+    // toJSON/getter ném, vòng lặp hoặc BigInt: chỉ còn kiểu.
+  }
+  return Array.isArray(kind) ? "array" : "object";
 }
 
 // Lỗi đứng sau offline/limited: phòng mất kết nối thì lỗi cũ của agent không còn là việc cần xem trước.
