@@ -25,6 +25,27 @@ export function computeInsets(view: Size, panels: Panels, opts: InsetOptions): I
   return { top: safeTop, right, bottom, left };
 }
 
+/** Bề rộng tối thiểu của khung feed trước khi chịu chồng ngang hàng với drawer/sidebar. */
+export const FEED_MIN = 320;
+const rightEdge = (r: Rect | null | undefined) => {
+  const edge = r ? r.left + r.width : NaN;
+  return Number.isFinite(edge) ? edge : null;
+};
+export function feedBox(view: Size, panels: { sidebar?: Rect | null; drawer?: Rect | null },
+  opts: { gap: number; narrow: boolean }): { left: number; room: number } {
+  const w = positive(view.width), gap = positive(opts.gap);
+  const base = Math.min(gap, w), end = Math.max(base, w - gap);
+  if (opts.narrow) return { left: base, room: end - base };
+  const side = rightEdge(panels.sidebar);
+  const drawerLeft = panels.drawer && Number.isFinite(panels.drawer.left) ? panels.drawer.left : null;
+  let left = side === null ? base : clamp(side + gap, base, w);
+  let right = drawerLeft === null ? end : clamp(drawerLeft - gap, 0, end);
+  // Sidebar và drawer dừng phía trên feed nên bỏ ràng buộc được: drawer trước, rồi sidebar.
+  if (right - left < FEED_MIN) right = end;
+  if (right - left < FEED_MIN) left = base;
+  return { left, room: Math.max(0, right - left) };
+}
+
 /** Tỉ lệ vùng trống tối thiểu hệ số nguyên phải phủ, dưới mức này thì phóng lấp đầy. */
 export const FILL_MIN = 0.85;
 export interface SceneFit { k: number; cssW: number; cssH: number; left: number; top: number; crisp: boolean }
