@@ -182,6 +182,8 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
     popover.hidden = !next;
     gear.setAttribute("aria-expanded", String(next));
     gear.classList.toggle("active", next);
+    // Popover nằm trong topbar (z 20): nâng cả topbar lên trên ngăn phải (z 30) khi đang mở.
+    root.classList.toggle("settings-open", next);
     if (next) {
       const baseUrl = form.querySelector<HTMLInputElement>('input[name="baseUrl"]');
       const token = form.querySelector<HTMLInputElement>('input[name="token"]');

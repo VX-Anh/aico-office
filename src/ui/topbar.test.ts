@@ -56,7 +56,7 @@ function setup(names = ["baseUrl", "token"]) {
     addEventListener() {},
   });
   const topbar = createTopbar(root as unknown as HTMLElement);
-  return { topbar, inputs, gear: root.querySelector(".settings-toggle")! };
+  return { root, topbar, inputs, gear: root.querySelector(".settings-toggle")! };
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -72,6 +72,17 @@ describe("settingsFocus", () => {
     ["https://office.aico.io.vn/api", " ", "baseUrl"],
   ])("địa chỉ %j, token %j → %s", (baseUrl, token, target) => {
     expect(settingsFocus(baseUrl, token)).toBe(target);
+  });
+});
+
+describe("lớp hiển thị khi mở cài đặt", () => {
+  it("topbar có class settings-open khi popover mở để nổi trên ngăn phải", () => {
+    const { root, topbar, gear } = setup();
+    expect(root.className.split(/\s+/)).not.toContain("settings-open");
+    gear.click();
+    expect(root.className.split(/\s+/)).toContain("settings-open");
+    topbar.setSettingsOpen(false);
+    expect(root.className.split(/\s+/)).not.toContain("settings-open");
   });
 });
 

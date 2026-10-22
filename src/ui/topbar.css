@@ -11,6 +11,8 @@
   gap: 14px;
   padding: 0 12px;
 }
+/* Popover cài đặt mở: nổi trên ngăn phải (30), dưới lightbox ảnh (50). */
+.topbar.settings-open { z-index: 45; }
 
 .topbar .brand {
   display: flex;
