@@ -1,6 +1,6 @@
 # T-d36e23da: GUI: làm lại khung Hoạt động theo kiểu feed của Habblaud
 
-Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 3. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
