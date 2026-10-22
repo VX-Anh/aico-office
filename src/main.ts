@@ -18,7 +18,7 @@ import { createFeedState, reduceFeed, resetFeed, type FeedState } from "./ui/fee
 import { agentKey, drawerView, resolveSelection, type SelectedAgent } from "./ui/selection";
 import { createSidebar, type Sidebar } from "./ui/sidebar";
 import { createTopbar } from "./ui/topbar";
-import { computeInsets, fitScene, type Rect } from "./ui/viewport";
+import { computeInsets, feedBox, fitScene, type Rect } from "./ui/viewport";
 import "./style.css";
 
 const POLL_MS = 3000;
@@ -73,10 +73,14 @@ const shell: {
   feed?: ReturnType<typeof createFeed>;
 } = {};
 
-function readHour(): string | null {
+function readParam(name: string): string | null {
   const search = globalThis.location?.search;
   if (typeof search !== "string" || !search) return null;
-  return new URLSearchParams(search).get("hour");
+  return new URLSearchParams(search).get(name);
+}
+
+function readHour(): string | null {
+  return readParam("hour");
 }
 
 function reducedMotion(): boolean {
@@ -173,7 +177,7 @@ function publish(): void {
 
 function absorbFeed(): void {
   feedState = reduceFeed(feedState, workers, needItems, Date.now());
-  shell.feed?.render(feedState.lines);
+  shell.feed?.render(feedState.lines, workers);
 }
 
 function showNeeds(id: string): void {
@@ -187,6 +191,14 @@ function selectAgent(key: string): void {
   selectedKey = key;
   tab = "agent";
   publish();
+}
+
+// Dòng feed chỉ nhớ phòng + id: agent đã đi hoặc phòng offline/limited thì không mở ngăn trống.
+function selectFeedAgent(room: string, agentId: string): void {
+  const worker = workers.find((item) => item.name === room);
+  if (!worker || worker.state === "offline" || worker.state === "limited") return;
+  const agent = (Array.isArray(worker.agents) ? worker.agents : []).find((item) => item.id === agentId);
+  if (agent) selectAgent(agentKey(room, agent));
 }
 
 function closeDrawer(): void {
@@ -254,8 +266,11 @@ const drawer = createDrawer(drawerRoot, needsRoot, {
     publish();
   },
 });
-const feed = createFeed(feedRoot);
+const feed = createFeed(feedRoot, { onAgent: selectFeedAgent, onTicket: showNeeds });
 shell.feed = feed;
+// ?feed=open|collapsed: chụp ảnh cả hai trạng thái mà không cần bấm phím.
+const feedParam = readParam("feed");
+if (feedParam === "open" || feedParam === "collapsed") feed.setCollapsed(feedParam === "collapsed");
 sidebar.onLayout(relayout);
 drawer.onLayout(relayout);
 feed.onLayout(relayout);
@@ -287,7 +302,7 @@ function changeSource(): void {
   focusedTicket = null;
   figures = [];
   feedState = resetFeed();
-  shell.feed?.render([]);
+  shell.feed?.render([], workers);
   const now = Date.now();
   const width = sceneSize(workers).width;
   overlay.draw([], width, now, { signs: [], banners: [], reducedMotion: reducedMotion() });
@@ -313,12 +328,21 @@ function relayout(): void {
   narrow = typeof matchMedia === "function" && matchMedia(NARROW_QUERY).matches;
   const width = document.documentElement.clientWidth || globalThis.innerWidth || 0;
   const height = document.documentElement.clientHeight || globalThis.innerHeight || 0;
+  const sidebarRect = panelRect(sidebarRoot);
+  const drawerRect = panelRect(drawerRoot);
+  // Ghi vị trí ngang trước khi đo #feed; ngang chỉ phụ thuộc sidebar/drawer nên không lặp.
+  const box = feedBox({ width, height }, { sidebar: sidebarRect, drawer: drawerRect }, { gap: GAP, narrow });
+  const style = document.documentElement.style;
+  style.setProperty("--feed-left", `${box.left}px`);
+  style.setProperty("--feed-room", `${box.room}px`);
+  const feedRect = panelRect(feedRoot);
+  // Màn hẹp: drawer đứng ngay trên feed theo chiều cao thật (thu gọn hay mở 45vh), không đè lên nhau.
+  style.setProperty("--feed-reserve", feedRect && height > 0 ? `${Math.max(0, Math.round(height - feedRect.top))}px` : "");
   const insets = computeInsets(
     { width, height },
-    { topbar: panelRect(topbarRoot), sidebar: panelRect(sidebarRoot), drawer: panelRect(drawerRoot), feed: panelRect(feedRoot) },
+    { topbar: panelRect(topbarRoot), sidebar: sidebarRect, drawer: drawerRect, feed: feedRect },
     { gap: GAP, narrow, minFree: MIN_FREE },
   );
-  const style = document.documentElement.style;
   style.setProperty("--free-top", `${insets.top}px`);
   style.setProperty("--free-right", `${insets.right}px`);
   style.setProperty("--free-bottom", `${insets.bottom}px`);

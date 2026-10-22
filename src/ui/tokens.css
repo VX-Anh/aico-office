@@ -48,8 +48,11 @@
   --topbar-h: 64px;
   --sidebar-w: 304px;
   --drawer-w: 380px;
+  --feed-max: 700px;
   --feed-h: 200px;
   --feed-h-min: 38px;
+  /* Khớp MIN_FREE trong main.ts: phần cảnh luôn chừa lại khi drawer và feed cùng mở trên màn hẹp. */
+  --scene-min: 100px;
 
   /* main.ts ghi lại lúc chạy theo kích thước panel thật. */
   --free-top: var(--topbar-h);

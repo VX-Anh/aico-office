@@ -19,6 +19,14 @@ const h = vi.hoisted(() => ({
   drawerRender: vi.fn(),
   feedRender: vi.fn(),
   feedSetCollapsed: vi.fn(),
+  feedActions: {} as { onAgent?(room: string, agentId: string): void; onTicket?(id: string): void },
+  // Listener phím riêng của feed thật: chỉ chạy khi main không chặn bằng stopImmediatePropagation.
+  feedKey: null as ((event: { key: string; target: unknown }) => void) | null,
+  // Bộ đếm "N mới" giả: cộng khi đang cuộn lên, render([]) đặt lại như feed thật.
+  feedPending: 0,
+  feedScrolledUp: false,
+  drawerLayout: null as (() => void) | null,
+  feedLayout: null as (() => void) | null,
   onSelect: null as ((key: string) => void) | null,
   onClose: null as (() => void) | null,
   onTab: null as ((tab: "agent" | "needs") => void) | null,
@@ -77,28 +85,45 @@ vi.mock("./ui/drawer", () => ({
     h.onTab = options.onTab;
     root.hidden = true;
     return {
-      onLayout() {},
+      onLayout(callback: () => void) { h.drawerLayout = callback; },
       render(view: { open: boolean; tab: string }, info: unknown, now: number) {
         h.drawerRender(view, info, now);
+        const changed = root.hidden === view.open;
         root.hidden = !view.open;
         root.dataset.tab = view.tab;
+        if (changed) h.drawerLayout?.();
       },
       destroy() {},
     };
   },
 }));
 vi.mock("./ui/feed", () => ({
-  createFeed: () => ({
-    setCollapsed(value: boolean) {
+  createFeed: (_root: unknown, actions: typeof h.feedActions = {}) => {
+    h.feedActions = actions;
+    const keys = new Set<string>();
+    const setCollapsed = (value: boolean) => {
       h.feedSetCollapsed(value);
       getNode("#feed").classList.toggle("is-collapsed", value);
-    },
-    onLayout() {},
-    render(lines: unknown[]) {
-      h.feedRender(lines);
-    },
-    destroy() {},
-  }),
+      h.feedLayout?.();
+    };
+    h.feedKey = (event) => {
+      const target = event.target as { closest?: (selector: string) => unknown } | null;
+      if (event.key === "]" && !target?.closest?.("input")) setCollapsed(!getNode("#feed").classList.contains("is-collapsed"));
+    };
+    return {
+      setCollapsed,
+      onLayout(callback: () => void) { h.feedLayout = callback; },
+      render(lines: { key: string }[], workers?: unknown) {
+        h.feedRender(lines, workers);
+        const added = lines.filter((line) => !keys.has(line.key)).length;
+        keys.clear();
+        for (const line of lines) keys.add(line.key);
+        if (!lines.length || !h.feedScrolledUp) h.feedPending = 0;
+        else h.feedPending += added;
+      },
+      destroy() {},
+    };
+  },
 }));
 
 class Node {
@@ -112,6 +137,8 @@ class Node {
   classes = new Set<string>();
   dataset: Record<string, string> = {};
   vars: Record<string, string> = {};
+  left = 0;
+  top = 0;
   setAttribute() {}
   insertBefore(child: Node, before: Node | null) {
     const old = this.children.indexOf(child);
@@ -145,7 +172,8 @@ class Node {
   getBoundingClientRect() {
     const width = this.clientWidth || this.offsetWidth;
     const height = this.clientHeight || this.offsetHeight;
-    return { x: 0, y: 0, left: 0, top: 0, width, height, right: width, bottom: height, toJSON() { return {}; } };
+    const { left, top } = this;
+    return { x: left, y: top, left, top, width, height, right: left + width, bottom: top + height, toJSON() { return {}; } };
   }
   addEventListener(type: string, fn: (event: unknown) => void) { this.listeners.set(type, fn); }
   querySelector(selector: string) { return getNode(selector); }
@@ -181,6 +209,12 @@ beforeEach(() => {
   h.onSelect = null;
   h.onClose = null;
   h.onTab = null;
+  h.feedActions = {};
+  h.feedKey = null;
+  h.feedPending = 0;
+  h.feedScrolledUp = false;
+  h.drawerLayout = null;
+  h.feedLayout = null;
   h.drawScene.mockReset();
   h.drawScene.mockImplementation(() => []);
   nodes = new Map();
@@ -214,11 +248,15 @@ const agent = { id: "a", role: "coder", ticket_id: "T-9", mode: "write", started
 function room(state: WorkerStatus["state"] = "working", agents: unknown[] = [agent]): WorkerStatus {
   return { name: "claude", state, roles: ["coder"], slots: 2, agents } as WorkerStatus;
 }
+// Phát như trình duyệt: listener của main đăng ký trước feed, chặn được listener phím của feed.
 function press(key: string, target: unknown = null): void {
-  getNode("document").listeners.get("keydown")!({
+  let stopped = false;
+  const event = {
     key, target, ctrlKey: false, metaKey: false, altKey: false, repeat: false,
-    preventDefault() {}, stopImmediatePropagation() {},
-  });
+    preventDefault() {}, stopImmediatePropagation() { stopped = true; },
+  };
+  getNode("document").listeners.get("keydown")!(event);
+  if (!stopped) h.feedKey?.(event);
 }
 function pollTick(): void {
   (vi.mocked(setInterval).mock.calls[0][0] as () => void)();
@@ -304,7 +342,7 @@ describe("ghép activity giữ nguyên cột Cần bạn", () => {
     expect(h.reset).toHaveBeenCalledOnce();
     expect(document.title).toBe("AICO Office");
     expect(drawerOf().open).toBe(false);
-    expect(h.feedRender).toHaveBeenLastCalledWith([]);
+    expect(h.feedRender).toHaveBeenLastCalledWith([], expect.any(Array));
     expect(getNode("#needs-count").classList.contains("hot")).toBe(false);
     expect(getNode("#needs-count").disabled).toBe(true);
     const nextSource = h.source.mock.calls.at(-1)![0];
@@ -435,7 +473,6 @@ describe("chọn agent, feed và lỗi poll", () => {
     ["phòng limited", (base) => ({ ...base, state: "limited" })],
   ];
   it.each(cases)("agent đang chọn %s thì đóng, xuất hiện lại không tự mở và không lặp feed", async (label, mutate) => {
-    expect(label.length).toBeGreaterThan(0);
     h.config = { baseUrl: "http://aico", token: "test" };
     const selected = { ...agent, stats: { tokens_in: 100, tokens_cached: 80, tokens_out: 10 } };
     const base = room("working", [selected]);
@@ -451,7 +488,9 @@ describe("chọn agent, feed và lỗi poll", () => {
     pollTick();
     await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(calls));
     expect(drawerOf().open).toBe(false);
-    expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(1);
+    // Chuyển sang limited thêm đúng một dòng hết hạn mức; ngoài ra không lặp dòng cũ.
+    const lines = label === "phòng limited" ? 2 : 1;
+    expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(lines);
     const again = h.sidebarUpdate.mock.calls.length;
     h.fetchWorkers.mockResolvedValue([base]);
     pollTick();
@@ -460,7 +499,7 @@ describe("chọn agent, feed và lỗi poll", () => {
     expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBeNull();
     expect(h.drawerRender.mock.calls.at(-1)?.[1]).toBeNull();
     expect(h.sidebarUpdate.mock.calls.at(-1)?.[0][0].agents[0].stats).toEqual(selected.stats);
-    expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(1);
+    expect(h.feedRender.mock.calls.at(-1)?.[0]).toHaveLength(lines);
   });
 
   it("poll đổi stats và số agent 1→2→1 không trộn dữ liệu tới drawer và tooltip", async () => {
@@ -564,7 +603,7 @@ describe("chọn agent, feed và lỗi poll", () => {
     expect(h.feedRender.mock.calls.at(-1)?.[0]).not.toEqual([]);
     getNode("#demo").listeners.get("click")!({});
     expect(h.reset).toHaveBeenCalledOnce();
-    expect(h.feedRender).toHaveBeenLastCalledWith([]);
+    expect(h.feedRender).toHaveBeenLastCalledWith([], expect.any(Array));
     expect(drawerOf().open).toBe(false);
     expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBeNull();
     h.items([{ ticket: { id: "T-2", title: "Mới" }, kind: "merge", reason: null }]);
@@ -625,6 +664,255 @@ describe("chọn agent, feed và lỗi poll", () => {
     expect(h.feedSetCollapsed).toHaveBeenLastCalledWith(false);
     press("Escape");
     expect(drawerOf().open).toBe(false);
+  });
+});
+
+describe("feed: bấm dòng, vị trí khung và đổi nguồn", () => {
+  async function realWith(workers: WorkerStatus[]): Promise<void> {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    h.fetchWorkers.mockResolvedValue(workers);
+    await import("./main");
+    await connected();
+  }
+  async function pollWith(workers: WorkerStatus[]): Promise<void> {
+    const calls = h.sidebarUpdate.mock.calls.length;
+    h.fetchWorkers.mockResolvedValue(workers);
+    pollTick();
+    await vi.waitFor(() => expect(h.sidebarUpdate.mock.calls.length).toBeGreaterThan(calls));
+  }
+
+  it("feed nhận lines kèm workers mới nhất", async () => {
+    await realWith([room()]);
+    expect(h.feedRender.mock.calls.at(-1)?.[1]).toEqual([room()]);
+    await pollWith([room("idle", [])]);
+    expect(h.feedRender.mock.calls.at(-1)?.[1]).toEqual([room("idle", [])]);
+  });
+
+  it("bấm dòng agent mở tab Agent đúng key; agent đổi started_at thì chọn bản đang có", async () => {
+    await realWith([room()]);
+    h.feedActions.onAgent!("claude", "a");
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBe(agentKey("claude", agent));
+    expect(h.drawerRender.mock.calls.at(-1)?.[1].agent).toEqual(agent);
+    press("Escape");
+    const next = { ...agent, started_at: "2026-02-01T00:00:00.000Z" };
+    await pollWith([room("working", [next])]);
+    h.feedActions.onAgent!("claude", "a");
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBe(agentKey("claude", next));
+  });
+
+  const gone: [string, WorkerStatus[]][] = [
+    ["agent đã đi", [room("working", [])]],
+    ["phòng chuyển limited", [room("limited")]],
+    ["phòng chuyển offline", [room("offline")]],
+    ["phòng biến mất", []],
+    ["agents sai kiểu", [{ ...room(), agents: "x" as unknown as [] }]],
+  ];
+  it.each(gone)("%s giữa chừng thì bấm dòng agent không mở ngăn", async (_label, after) => {
+    await realWith([room()]);
+    await pollWith(after);
+    const renders = h.drawerRender.mock.calls.length;
+    expect(() => h.feedActions.onAgent!("claude", "a")).not.toThrow();
+    expect(drawerOf().open).toBe(false);
+    expect(h.drawerRender.mock.calls.length).toBe(renders);
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBeNull();
+    // Quay lại phòng thì bấm lại được.
+    await pollWith([room()]);
+    h.feedActions.onAgent!("claude", "a");
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+  });
+
+  it("bấm dòng agent khác phòng cùng id chỉ chọn đúng phòng", async () => {
+    const other = { ...room(), name: "codex" } as WorkerStatus;
+    await realWith([room("limited"), other]);
+    h.feedActions.onAgent!("claude", "a");
+    expect(drawerOf().open).toBe(false);
+    h.feedActions.onAgent!("codex", "a");
+    expect(h.sidebarUpdate.mock.calls.at(-1)?.[2]).toBe(agentKey("codex", agent));
+  });
+
+  it("bấm dòng ticket mở Cần bạn và focus thẻ; ticket đã xử lý không lỗi, không đổi focusedTicket", async () => {
+    await realWith([room()]);
+    h.items([
+      { ticket: { id: "T-1", title: "Một" }, kind: "plan", reason: null },
+      { ticket: { id: "T-2", title: "Hai" }, kind: "merge", reason: null },
+      { ticket: { id: "T-3", title: "Ba" }, kind: "escalated", reason: null },
+    ]);
+    press("Escape");
+    h.onSelect!(agentKey("claude", agent));
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    h.focus.mockReturnValue(true);
+    h.feedActions.onTicket!("T-1");
+    expect(drawerOf()).toEqual({ open: true, tab: "needs" });
+    expect(h.focus).toHaveBeenLastCalledWith("T-1");
+    expect(h.drawerRender.mock.invocationCallOrder.at(-1)!).toBeLessThan(h.focus.mock.invocationCallOrder.at(-1)!);
+    // Thẻ đã xử lý: cột không tìm thấy nên focus trả false.
+    h.focus.mockReturnValue(false);
+    expect(() => h.feedActions.onTicket!("T-old")).not.toThrow();
+    expect(drawerOf()).toEqual({ open: true, tab: "needs" });
+    h.focus.mockReturnValue(true);
+    press("P");
+    expect(h.focus).toHaveBeenLastCalledWith("T-2");
+  });
+
+  it("bấm dòng ticket khi không còn thẻ nào thì không mở ngăn trống", async () => {
+    await realWith([room()]);
+    h.focus.mockReturnValue(false);
+    expect(() => h.feedActions.onTicket!("T-old")).not.toThrow();
+    expect(drawerOf().open).toBe(false);
+  });
+
+  it("relayout ghi --feed-left/--feed-room theo sidebar và drawer, trước khi đo #feed", async () => {
+    const root = getNode(":root");
+    root.clientWidth = 1440;
+    root.clientHeight = 900;
+    const sidebar = getNode("#sidebar");
+    Object.assign(sidebar, { left: 10, top: 60, clientWidth: 300, clientHeight: 600 });
+    const drawer = getNode("#drawer");
+    Object.assign(drawer, { left: 1050, top: 60, clientWidth: 380, clientHeight: 600 });
+    const feedNode = getNode("#feed");
+    Object.assign(feedNode, { left: 320, top: 740, clientWidth: 700, clientHeight: 150 });
+    const seen: string[] = [];
+    const measure = feedNode.getBoundingClientRect.bind(feedNode);
+    feedNode.getBoundingClientRect = () => {
+      seen.push(root.vars["--feed-left"]);
+      return measure();
+    };
+    h.sidebarToggle.mockImplementation(() => {
+      sidebar.clientWidth = sidebar.clientWidth === 300 ? 44 : 300;
+    });
+    await realWith([room()]);
+    const vars = () => [root.vars["--feed-left"], root.vars["--feed-room"]];
+    expect(vars()).toEqual(["320px", "1110px"]);
+    // computeInsets vẫn chừa đáy theo #feed.
+    expect(root.vars["--free-bottom"]).toBe("170px");
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+    h.onSelect!(agentKey("claude", agent));
+    expect(vars()).toEqual(["320px", "720px"]);
+    press("[");
+    expect(vars()).toEqual(["64px", "976px"]);
+    press("Escape");
+    expect(drawerOf().open).toBe(false);
+    expect(vars()).toEqual(["64px", "1366px"]);
+    press("[");
+    expect(vars()).toEqual(["320px", "1110px"]);
+    h.onSelect!(agentKey("claude", agent));
+    expect(vars()).toEqual(["320px", "720px"]);
+    expect(root.vars["--free-bottom"]).toBe("170px");
+  });
+
+  it("màn hẹp: feed rộng hết màn trừ lề, không theo sidebar/drawer", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: String(query).includes("max-width"), addEventListener() {}, removeEventListener() {},
+    }));
+    const root = getNode(":root");
+    root.clientWidth = 390;
+    root.clientHeight = 844;
+    Object.assign(getNode("#sidebar"), { left: 10, top: 60, clientWidth: 300, clientHeight: 600 });
+    await realWith([room()]);
+    expect([root.vars["--feed-left"], root.vars["--feed-room"]]).toEqual(["10px", "370px"]);
+  });
+
+  it("màn hẹp: --feed-reserve theo chiều cao feed thật để drawer đứng trên feed, cả hai tab", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: String(query).includes("max-width"), addEventListener() {}, removeEventListener() {},
+    }));
+    const root = getNode(":root");
+    root.clientWidth = 390;
+    root.clientHeight = 844;
+    const feedNode = getNode("#feed");
+    // Feed mở cao 45vh (380px) hay thu gọn còn 38px; mock đổi kích thước theo lớp is-collapsed.
+    const open = { left: 10, top: 454, clientWidth: 370, clientHeight: 380 };
+    const shut = { left: 10, top: 796, clientWidth: 370, clientHeight: 38 };
+    Object.assign(feedNode, open);
+    feedNode.classList.toggle = (name: string, force?: boolean) => {
+      const on = force ?? !feedNode.classList.contains(name);
+      if (on) feedNode.classList.add(name); else feedNode.classList.remove(name);
+      if (name === "is-collapsed") Object.assign(feedNode, on ? shut : open);
+      return on;
+    };
+    await realWith([room()]);
+    const reserve = () => root.vars["--feed-reserve"];
+    expect(reserve()).toBe("390px");
+    // Mở ngăn Agent khi feed đang mở: drawer vẫn chừa đủ chỗ cho feed.
+    h.onSelect!(agentKey("claude", agent));
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    expect(reserve()).toBe("390px");
+    press("]");
+    expect(reserve()).toBe("48px");
+    // Mở lại feed lúc drawer đang hiện: drawer lùi lên theo.
+    press("]");
+    expect(reserve()).toBe("390px");
+    h.items([{ ticket: { id: "T-1", title: "Kế hoạch" }, kind: "plan" as const, reason: null }]);
+    h.onTab!("needs");
+    expect(drawerOf()).toEqual({ open: true, tab: "needs" });
+    expect(reserve()).toBe("390px");
+    press("]");
+    expect(reserve()).toBe("48px");
+    press("Escape");
+    press("]");
+    expect(reserve()).toBe("390px");
+  });
+
+  it("feed ẩn hoặc chưa đo được thì xoá --feed-reserve để CSS dùng giá trị mặc định", async () => {
+    getNode("#feed").hidden = true;
+    await realWith([room()]);
+    expect(getNode(":root").vars["--feed-reserve"]).toBe("");
+  });
+
+  it.each([["open", false], ["collapsed", true], ["x", null]] as const)("?feed=%s đặt trạng thái khung lúc mở trang", async (value, collapsed) => {
+    vi.stubGlobal("location", { search: `?feed=${value}` });
+    await import("./main");
+    if (collapsed === null) expect(h.feedSetCollapsed).not.toHaveBeenCalled();
+    else expect(h.feedSetCollapsed).toHaveBeenCalledExactlyOnceWith(collapsed);
+  });
+
+  it("phím ] thu/mở đúng một lần mỗi lần bấm", async () => {
+    await realWith([room()]);
+    expect(h.feedKey).not.toBeNull();
+    press("]");
+    expect(h.feedSetCollapsed).toHaveBeenCalledOnce();
+    expect(getNode("#feed").classList.contains("is-collapsed")).toBe(true);
+    press("]");
+    expect(h.feedSetCollapsed).toHaveBeenCalledTimes(2);
+    expect(getNode("#feed").classList.contains("is-collapsed")).toBe(false);
+  });
+
+  it.each([true, false])("đổi nguồn làm feed rỗng và ẩn viên N mới (từ nguồn thật: %s)", async (fromReal) => {
+    if (fromReal) await realWith([room()]);
+    else await import("./main");
+    h.feedScrolledUp = true;
+    h.items([{ ticket: { id: "T-1", title: "Kế hoạch" }, kind: "plan", reason: null }]);
+    h.items([{ ticket: { id: "T-2", title: "Hai" }, kind: "merge", reason: null }]);
+    expect(h.feedPending).toBeGreaterThan(0);
+    if (fromReal) getNode("#demo").listeners.get("click")!({});
+    else {
+      h.fetchWorkers.mockResolvedValue([room()]);
+      vi.stubGlobal("FormData", class { get(name: string) { return name === "baseUrl" ? "http://aico" : "tok"; } });
+      getNode("#settings").listeners.get("submit")!({ preventDefault() {} });
+    }
+    expect(h.feedRender.mock.calls.at(-1)?.[0]).toEqual([]);
+    expect(h.feedPending).toBe(0);
+    // Demo → thật đi qua form cài đặt có token.
+    if (fromReal) expect(getNode("#conn").textContent).toContain("demo");
+    else await connected();
+  });
+
+  it("poll lỗi giữ nguyên feed và viên N mới", async () => {
+    await realWith([room()]);
+    h.feedScrolledUp = true;
+    h.items([{ ticket: { id: "T-1", title: "Kế hoạch" }, kind: "plan", reason: null }]);
+    const pending = h.feedPending;
+    const calls = h.feedRender.mock.calls.length;
+    const lines = h.feedRender.mock.calls.at(-1)?.[0];
+    h.fetchWorkers.mockRejectedValueOnce(new Error("mất mạng"));
+    pollTick();
+    await vi.waitFor(() => expect(getNode("#conn").textContent).toContain("Lỗi: mất mạng"));
+    expect(h.feedRender.mock.calls.length).toBe(calls);
+    expect(h.feedRender.mock.calls.at(-1)?.[0]).toBe(lines);
+    expect(h.feedPending).toBe(pending);
   });
 });
 

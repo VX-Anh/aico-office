@@ -15,7 +15,8 @@ export function computeInsets(view: Size, panels: Panels, opts: InsetOptions): I
   const feed = panels.feed ? clamp(h - panels.feed.top + gap, 0, h) : 0;
   let left = !opts.narrow && panels.sidebar ? clamp(panels.sidebar.left + panels.sidebar.width + gap, 0, w) : 0;
   let right = !opts.narrow && panels.drawer ? clamp(w - panels.drawer.left + gap, 0, w) : 0;
-  const sheet = opts.narrow && panels.drawer ? Math.min(positive(panels.drawer.height) + gap, h * .55) : 0;
+  // Màn hẹp: drawer đứng trên feed nên chừa đáy tới mép trên drawer, không chỉ chiều cao drawer.
+  const sheet = opts.narrow && panels.drawer ? clamp(positive(h - panels.drawer.top + gap), 0, h) : 0;
   // Bỏ phần drawer trước, rồi sidebar; màn cực nhỏ còn phải giảm topbar/feed.
   right = Math.min(right, Math.max(0, budgetW - left));
   left = Math.min(left, budgetW - right);
@@ -23,6 +24,27 @@ export function computeInsets(view: Size, panels: Panels, opts: InsetOptions): I
   const safeTop = Math.min(top, Math.max(0, budgetH - baseBottom));
   const bottom = Math.min(Math.max(feed, sheet), Math.max(0, budgetH - safeTop));
   return { top: safeTop, right, bottom, left };
+}
+
+/** Bề rộng tối thiểu của khung feed trước khi chịu chồng ngang hàng với drawer/sidebar. */
+export const FEED_MIN = 320;
+const rightEdge = (r: Rect | null | undefined) => {
+  const edge = r ? r.left + r.width : NaN;
+  return Number.isFinite(edge) ? edge : null;
+};
+export function feedBox(view: Size, panels: { sidebar?: Rect | null; drawer?: Rect | null },
+  opts: { gap: number; narrow: boolean }): { left: number; room: number } {
+  const w = positive(view.width), gap = positive(opts.gap);
+  const base = Math.min(gap, w), end = Math.max(base, w - gap);
+  if (opts.narrow) return { left: base, room: end - base };
+  const side = rightEdge(panels.sidebar);
+  const drawerLeft = panels.drawer && Number.isFinite(panels.drawer.left) ? panels.drawer.left : null;
+  let left = side === null ? base : clamp(side + gap, base, w);
+  let right = drawerLeft === null ? end : clamp(drawerLeft - gap, 0, end);
+  // Sidebar và drawer dừng phía trên feed nên bỏ ràng buộc được: drawer trước, rồi sidebar.
+  if (right - left < FEED_MIN) right = end;
+  if (right - left < FEED_MIN) left = base;
+  return { left, room: Math.max(0, right - left) };
 }
 
 /** Tỉ lệ vùng trống tối thiểu hệ số nguyên phải phủ, dưới mức này thì phóng lấp đầy. */

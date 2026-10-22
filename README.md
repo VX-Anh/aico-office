@@ -1,6 +1,6 @@
 # AICO Office
 
-Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Canvas phủ cả màn hình; thanh trên, thanh bên, ngăn chi tiết và feed nổi trên cảnh như kính, không che phòng. Toà nhà nằm trên bãi cỏ có cây, lối gạch, đèn và đường xe (xe đứng yên khi trình duyệt yêu cầu giảm chuyển động). Biển tên phòng và banner sự kiện nằm trên lớp chữ. Thêm `?hour=21:30` để thử ánh sáng đêm mà không đổi đồng hồ. Demo 48 giây có banner MR mở, đã merge và leo thang.
+Văn phòng pixel nhìn từ trên xuống (góc 3/4 kiểu game RPG) cho [AI Company OS](https://github.com/VX-Anh/ai-company): mỗi provider (Claude Code, Codex, Cursor) là một **phòng làm việc** có `slots` bàn; mỗi agent con đang chạy (tech_lead, coder, reviewer, designer) ngồi một bàn. Bên dưới là **phòng nghỉ** chung nối với các phòng bằng ô cửa. Canvas phủ cả màn hình; thanh trên, thanh bên, ngăn chi tiết và feed nổi trên cảnh như kính, không che phòng. Toà nhà nằm trên bãi cỏ có cây, lối gạch, đèn và đường xe (xe đứng yên khi trình duyệt yêu cầu giảm chuyển động). Biển tên phòng và banner sự kiện nằm trên lớp chữ. Thêm `?hour=21:30` để thử ánh sáng đêm mà không đổi đồng hồ. `?feed=open` hoặc `?feed=collapsed` đặt sẵn trạng thái khung Hoạt động (để chụp ảnh). Demo 48 giây có banner MR mở, đã merge và leo thang.
 
 Repo này cũng là **repo pilot** của aico: tính năng mới được tạo thành issue (nhãn `ai-company`) để chính các agent làm qua luồng plan → code → review → merge.
 
@@ -23,7 +23,7 @@ Thanh hạn mức pixel nằm trên tường phòng (cạnh đồng hồ, không
 
 Thanh trên ghi hạn mức từng phòng: ô chữ cái provider, hai dòng cửa sổ (phần trăm, mức màu, giờ reset kiểu `1H05` / `47M`). Phòng không công bố cửa sổ (Cursor) thì ghi gói; không có cả gói thì `?`.
 
-Bố cục: thanh trên 64px (logo, trạng thái kết nối, ô số agent / đang làm / cần bạn, hạn mức, nút cài đặt và Demo); thanh bên trái khoảng 304px (từng phòng rồi agent con, bấm để mở ngăn và căn cảnh vào nhân vật, thu gọn bằng phím **[**); ngăn chi tiết bên phải khoảng 380px (tab Agent và tab Cần bạn, đóng bằng nút X hoặc **Esc**); feed hoạt động dưới đáy (cao khoảng 200px, thu gọn bằng phím **]**). Cảnh được co theo hệ số pixel nguyên vào vùng trống giữa các panel. Màn hẹp hơn 900px: thanh bên thành ngăn kéo, ngăn chi tiết thành tấm từ dưới lên, feed một dòng.
+Bố cục: thanh trên 64px (logo, trạng thái kết nối, ô số agent / đang làm / cần bạn, hạn mức, nút cài đặt và Demo); thanh bên trái khoảng 304px (từng phòng rồi agent con, bấm để mở ngăn và căn cảnh vào nhân vật, thu gọn bằng phím **[**); ngăn chi tiết bên phải khoảng 380px (tab Agent và tab Cần bạn, đóng bằng nút X hoặc **Esc**); feed hoạt động là thẻ kính nổi ở góc dưới trái (cao khoảng 200px, rộng tối đa 700px, bắt đầu sau thanh bên và chừa chỗ ngăn chi tiết; mỗi dòng gồm giờ, avatar, vai trò, chip phòng, mã ticket, icon và nội dung; bấm dòng agent thì mở tab Agent, bấm dòng ticket thì mở Cần bạn; thu gọn bằng nút tiêu đề, mũi tên hoặc phím **]**, khi đó còn một dòng ticker; đã cuộn lên thì hiện viên “N mới”). Cảnh được co theo hệ số pixel nguyên vào vùng trống giữa các panel. Màn hẹp hơn 900px: thanh bên thành ngăn kéo, ngăn chi tiết thành tấm từ dưới lên, feed là thanh nổi thu gọn rộng hết màn, mở ra cao khoảng 45vh.
 
 ## Chạy
 
@@ -96,10 +96,10 @@ src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi
 src/time.ts                chuỗi "N giây/phút/giờ/ngày trước", tương lai → vừa xong (hàm thuần)
 src/time.test.ts           test biên giây/phút/giờ/ngày, tương lai, at hỏng, now NaN/0
 src/ui/tokens.css          biến màu, kính, font Pixelify Sans, kích thước panel
-src/ui/viewport.ts         vùng trống (computeInsets) và căn cảnh (fitScene), hàm thuần
-src/ui/viewport.test.ts    test panel mở/đóng, màn hẹp, màn nhỏ, hệ số pixel
-src/ui/feed-model.ts       gom feed từ recent và ticket cần người, khử trùng (thuần)
-src/ui/feed-model.test.ts  test thứ tự, giới hạn dòng, ticket đổi loại, không lặp recent
+src/ui/viewport.ts         vùng trống (computeInsets), căn cảnh (fitScene), vị trí khung feed (feedBox), hàm thuần
+src/ui/viewport.test.ts    test panel mở/đóng, màn hẹp, màn nhỏ, hệ số pixel, feedBox
+src/ui/feed-model.ts       gom feed từ recent, ticket cần người và phòng hết hạn mức; mã ticket, tone (thuần)
+src/ui/feed-model.test.ts  test thứ tự, giới hạn dòng, ticket đổi loại, không lặp recent, ticket/tone, hết hạn mức
 src/ui/selection.ts        khoá agent, resolveSelection, drawerView (thuần)
 src/ui/selection.test.ts   test agent biến mất, started_at đổi, tab Cần bạn
 src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent
@@ -112,10 +112,11 @@ src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
 src/ui/drawer.ts           ngăn chi tiết: tab Agent / Cần bạn, Esc
 src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
 src/ui/drawer.test.ts      test DOM số liệu cache, fallback, màu và cập nhật khi đang mở
-src/ui/feed.ts             feed hoạt động, phím ]
-src/ui/feed.css            kiểu feed
-src/main.ts                vòng lặp, poll, vùng trống, chọn agent, feed, phím P [ ] Esc
-src/main.test.ts           test ghép nối Cần bạn, chọn agent, stats tới UI, vòng đời agent, đổi nguồn, lỗi và hồi phục poll
+src/ui/feed.ts             khung feed nổi: dòng lưới, ticker khi thu gọn, viên N mới, bấm dòng, phím ]
+src/ui/feed.css            kiểu feed: thẻ kính góc dưới trái, thanh nổi màn hẹp
+src/ui/feed.test.ts        test DOM cột dòng, title, tone/mờ, ticker, N mới, neo cuộn, bấm dòng, phím ]
+src/main.ts                vòng lặp, poll, vùng trống, vị trí feed, chọn agent, feed, phím P [ ] Esc
+src/main.test.ts           test ghép nối Cần bạn, chọn agent, stats tới UI, vòng đời agent, bấm dòng feed, vị trí feed, đổi nguồn, lỗi và hồi phục poll
 src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/index.test.ts    test cache nền, xe, quầng màn hình và fit nguồn sáng
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ, sân; giữ chỗ ngồi theo id (hàm thuần)
@@ -156,6 +157,10 @@ docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (vă
 ```
 
 Sơ đồ module: [docs/architecture.md](docs/architecture.md).
+
+## Ghi công
+
+- Kiểu feed hoạt động học theo [Habblaud](https://github.com/marmottajr/habblaud) (MIT), không chép code.
 
 ## Thêm sprite mới
 

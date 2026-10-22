@@ -23,5 +23,7 @@
 .drawer progress { width: 100%; height: 7px; accent-color: var(--accent); }
 .drawer-needs #needs { position: static; width: auto; max-height: none; padding: 0; border: 0; box-shadow: none; background: transparent; }
 @media (max-width: 899px) {
-  .drawer { top: auto; bottom: calc(var(--feed-h-min) + var(--gap) * 2); left: var(--gap); right: var(--gap); width: auto; height: 55dvh; max-height: calc(100dvh - var(--topbar-h) - var(--feed-h-min) - var(--gap) * 4); border-radius: var(--radius) var(--radius) 0 0; }
+  /* --feed-reserve do main.ts đo từ #feed (gồm lề đáy): feed mở 45vh thì drawer lùi lên, không che đầu feed;
+     chiều cao chừa --scene-min để cảnh không bị drawer che hết (main.ts tính viewport theo mép trên drawer). */
+  .drawer { --below: var(--feed-reserve, calc(var(--feed-h-min) + var(--gap))); top: auto; bottom: calc(var(--below) + var(--gap)); left: var(--gap); right: var(--gap); width: auto; height: 55dvh; max-height: max(120px, calc(100dvh - var(--topbar-h) - var(--below) - var(--scene-min) - var(--gap) * 4)); border-radius: var(--radius) var(--radius) 0 0; }
 }

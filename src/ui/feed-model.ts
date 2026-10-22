@@ -11,6 +11,10 @@ export interface FeedLine {
   name: string;
   icon: string;
   text: string;
+  /** agent.ticket_id (chuỗi khác rỗng), id ticket của dòng ticket, còn lại null. */
+  ticket: string | null;
+  /** need: '!' cần người; done: '✓'; error: escalated, hết hạn mức hoặc activity lỗi. */
+  tone: "need" | "done" | "error" | null;
 }
 export interface FeedState {
   lines: FeedLine[];
@@ -18,9 +22,11 @@ export interface FeedState {
   needs: ReadonlyMap<string, NeedItem>;
   floor: number;
   sequence: number;
+  /** Trạng thái phòng lần cuối thấy; giữ cả phòng tạm vắng để không báo hết hạn mức lặp. */
+  rooms: ReadonlyMap<string, WorkerStatus["state"]>;
 }
 export function createFeedState(): FeedState {
-  return { lines: [], seen: new Map(), needs: new Map(), floor: -Infinity, sequence: 0 };
+  return { lines: [], seen: new Map(), needs: new Map(), floor: -Infinity, sequence: 0, rooms: new Map() };
 }
 export function resetFeed(): FeedState { return createFeedState(); }
 
@@ -33,12 +39,23 @@ export function reduceFeed(state: FeedState, workers: readonly WorkerStatus[], n
     seen.set(line.key, at);
     lines.push(line);
   };
+  const rooms = new Map(state.rooms);
+  for (const worker of workers) {
+    if (worker.state === "limited" && rooms.get(worker.name) !== "limited") {
+      // now không hợp lệ thì chưa ghi nhận, để lần sau vẫn báo được.
+      if (!Number.isFinite(now)) continue;
+      add({ key: `limit:${++sequence}`, at: new Date(now).toISOString(), room: worker.name, agentId: null,
+        name: worker.name, icon: "⏳", text: "hết hạn mức", ticket: null, tone: "error" });
+    }
+    rooms.set(worker.name, worker.state);
+  }
   for (const worker of workers) {
     if (worker.state === "offline" || worker.state === "limited") continue;
     for (const agent of Array.isArray(worker.agents) ? worker.agents : []) {
       for (const a of readAgentActivity(agent, `${worker.name}/${agent.id}`).recent ?? []) {
         add({ key: JSON.stringify([worker.name, agent.id, a.at, a.text]), at: a.at,
-          room: worker.name, agentId: agent.id, name: agent.role || agent.id, icon: a.icon, text: a.text });
+          room: worker.name, agentId: agent.id, name: agent.role || agent.id, icon: a.icon, text: a.text,
+          ticket: typeof agent.ticket_id === "string" && agent.ticket_id ? agent.ticket_id : null, tone: a.error ? "error" : null });
       }
     }
   }
@@ -47,7 +64,8 @@ export function reduceFeed(state: FeedState, workers: readonly WorkerStatus[], n
     if (!Number.isFinite(now)) return;
     const at = new Date(now).toISOString();
     add({ key: `ticket:${++sequence}`, at, room: "", agentId: null, name: item.ticket.id,
-      icon: resolved ? "✓" : "!", text: `${item.ticket.title}: ${resolved ? "đã xử lý" : NEED_LABEL[item.kind]}` });
+      icon: resolved ? "✓" : "!", text: `${item.ticket.title}: ${resolved ? "đã xử lý" : NEED_LABEL[item.kind]}`,
+      ticket: item.ticket.id, tone: resolved ? "done" : item.kind === "escalated" ? "error" : "need" });
   };
   for (const [id, item] of needs) {
     if (state.needs.get(id)?.kind !== item.kind) ticketLine(item, false);
@@ -60,5 +78,5 @@ export function reduceFeed(state: FeedState, workers: readonly WorkerStatus[], n
   const floor = kept.length ? Math.max(state.floor, Date.parse(kept[0].at))
     : lines.length ? Math.max(state.floor, ...lines.map((line) => Date.parse(line.at))) : state.floor;
   for (const [key, at] of seen) if (at < floor) seen.delete(key);
-  return { lines: kept, seen, needs, floor, sequence };
+  return { lines: kept, seen, needs, floor, sequence, rooms };
 }

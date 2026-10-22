@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { demoWorkers } from "../api";
 import { sceneSize } from "../scene/layout";
-import { computeInsets, fitScene, type Panels } from "./viewport";
+import { computeInsets, FEED_MIN, feedBox, fitScene, type Panels } from "./viewport";
 
 const view = { width: 1440, height: 900 };
 const panels: Panels = {
@@ -26,13 +26,32 @@ describe("computeInsets", () => {
     }
     expect(computeInsets(view, {}, opts)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
   });
-  it("màn hẹp bỏ sidebar, sheet tối đa 55% và không cộng đôi feed", () => {
+  it("màn hẹp bỏ sidebar và không cộng đôi feed", () => {
     const result = computeInsets({ width: 390, height: 844 }, {
-      ...panels, feed: { left: 0, top: 806, width: 390, height: 38 },
+      ...panels, feed: { left: 0, top: 806, width: 390, height: 38 }, drawer: { left: 10, top: 332, width: 370, height: 464 },
     }, { ...opts, narrow: true });
     expect(result.left).toBe(0);
     expect(result.right).toBe(0);
-    expect(result.bottom).toBe(844 * .55);
+    expect(result.bottom).toBe(844 - 332 + 10);
+  });
+  it("màn hẹp: drawer cao quá thì vẫn giữ minFree cho cảnh", () => {
+    const result = computeInsets({ width: 390, height: 844 }, {
+      ...panels, feed: { left: 10, top: 454, width: 370, height: 380 }, drawer: { left: 10, top: 74, width: 370, height: 370 },
+    }, { ...opts, narrow: true });
+    expect(844 - result.top - result.bottom).toBe(100);
+  });
+  it("màn hẹp: drawer đứng trên feed thì chừa đáy tới mép trên drawer, mọi tổ hợp feed/drawer", () => {
+    const small = { width: 390, height: 844 };
+    // Feed mở 45vh (đỉnh 454) hay thu gọn (đỉnh 806); drawer đứng ngay trên feed.
+    for (const feedTop of [454, 806]) {
+      const feed = { left: 10, top: feedTop, width: 370, height: 834 - feedTop };
+      for (const drawerHeight of [null, 120, 250]) {
+        const drawer = drawerHeight === null ? null : { left: 10, top: feedTop - 10 - drawerHeight, width: 370, height: drawerHeight };
+        const result = computeInsets(small, { ...panels, feed, drawer }, { ...opts, narrow: true });
+        expect(result.bottom).toBe(drawer ? 844 - drawer.top + 10 : 844 - feedTop + 10);
+        expect(844 - result.top - result.bottom).toBeGreaterThanOrEqual(100);
+      }
+    }
   });
   it("thiếu chỗ thì giảm drawer trước sidebar", () => {
     expect(computeInsets({ width: 800, height: 900 }, { ...panels, drawer: { left: 410, top: 74, width: 380, height: 600 } }, { ...opts, minFree: 400 })).toMatchObject({ left: 324, right: 76 });
@@ -44,6 +63,50 @@ describe("computeInsets", () => {
       expect(size.width - result.left - result.right).toBeGreaterThanOrEqual(Math.min(size.width, 100));
       expect(size.height - result.top - result.bottom).toBeGreaterThanOrEqual(Math.min(size.height, 100));
     }
+  });
+});
+describe("feedBox", () => {
+  const wide = { gap: 10, narrow: false };
+  const collapsed = { left: 10, top: 74, width: 44, height: 600 };
+  it("1440: mọi tổ hợp sidebar mở/thu gọn/ẩn và drawer mở/đóng", () => {
+    for (const [sidebar, left] of [[panels.sidebar, 324], [collapsed, 64], [null, 10]] as const) {
+      for (const drawer of [panels.drawer, null]) {
+        const right = drawer ? drawer.left - 10 : 1440 - 10;
+        expect(feedBox(view, { sidebar, drawer }, wide)).toEqual({ left, room: right - left });
+      }
+    }
+    expect(feedBox(view, {}, wide)).toEqual({ left: 10, room: 1420 });
+  });
+  it("1000: thiếu chỗ thì bỏ drawer trước, vẫn thiếu thì bỏ sidebar", () => {
+    const small = { width: 1000, height: 800 };
+    const drawer = { left: 610, top: 74, width: 380, height: 600 };
+    expect(feedBox(small, { sidebar: panels.sidebar, drawer }, wide)).toEqual({ left: 324, room: 666 });
+    expect(feedBox(small, { sidebar: collapsed, drawer }, wide)).toEqual({ left: 64, room: 536 });
+    const huge = { left: 10, top: 74, width: 700, height: 600 };
+    expect(feedBox(small, { sidebar: huge, drawer }, wide)).toEqual({ left: 10, room: 980 });
+    expect(feedBox(small, { sidebar: huge, drawer: null }, wide)).toEqual({ left: 10, room: 980 });
+  });
+  it("màn hẹp bỏ qua panel, rộng hết màn trừ lề", () => {
+    expect(feedBox({ width: 390, height: 844 }, { sidebar: panels.sidebar, drawer: panels.drawer }, { gap: 10, narrow: true }))
+      .toEqual({ left: 10, room: 370 });
+  });
+  it("NaN hoặc màn rất nhỏ không ra số âm hay NaN", () => {
+    const bad = { left: NaN, top: NaN, width: NaN, height: NaN };
+    const cases = [
+      feedBox({ width: 30, height: 20 }, panels, wide),
+      feedBox({ width: 30, height: 20 }, panels, { gap: 10, narrow: true }),
+      feedBox({ width: NaN, height: NaN }, panels, wide),
+      feedBox(view, { sidebar: bad, drawer: bad }, wide),
+      feedBox(view, panels, { gap: NaN, narrow: false }),
+      feedBox({ width: 5, height: 5 }, {}, { gap: 10, narrow: false }),
+    ];
+    for (const box of cases) {
+      expect(Number.isFinite(box.left) && Number.isFinite(box.room)).toBe(true);
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.room).toBeGreaterThanOrEqual(0);
+    }
+    expect(cases[3]).toEqual({ left: 10, room: 1420 });
+    expect(FEED_MIN).toBe(320);
   });
 });
 describe("fitScene", () => {
