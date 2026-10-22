@@ -23,7 +23,7 @@
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
 }
-.sidebar-title { margin: 0; font-size: 15px; font-weight: 700; flex: 1 1 auto; white-space: nowrap; }
+.sidebar-title { font-family: var(--font-ui); margin: 0; font-size: 15px; font-weight: 700; flex: 1 1 auto; white-space: nowrap; }
 .sidebar-toggle {
   width: 26px;
   height: 26px;
@@ -37,47 +37,136 @@
 .sidebar-toggle:hover { background: var(--hover); border-color: var(--accent); }
 .sidebar.collapsed:not(.narrow) .sidebar-head { padding: 8px; border-bottom: 0; justify-content: center; }
 .sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .sidebar-filtering,
+.sidebar.collapsed .sidebar-tools,
 .sidebar.collapsed .sidebar-scroll,
 .sidebar.collapsed .sidebar-legend { display: none; }
 
-.sidebar-scroll { flex: 1 1 auto; overflow-y: auto; padding: 8px; }
+.sidebar-scroll { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 8px; }
 .sidebar-rooms { display: flex; flex-direction: column; gap: var(--gap); }
 .sidebar-empty,
 .room-empty { margin: 4px 6px; font-size: 12px; color: var(--text-dim); }
 .sidebar-empty[hidden],
 .room-empty[hidden] { display: none; }
 
+/* Công cụ không co ngang khi tên phòng hoặc từ khoá dài. */
+.sidebar-tools { min-width: 0; padding: 8px 10px; flex: 0 0 auto; }
+.sidebar-filtering { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+.sidebar-filtering[hidden] { display: none; }
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--input-bg);
+  color: var(--text-dim);
+}
+.sidebar-search:focus-within { border-color: var(--accent); }
+.sidebar-search input {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.sidebar-search input::placeholder { color: var(--text-dim); }
+.sidebar-kbd {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  font: 11px var(--font-mono);
+}
+.sidebar-search:focus-within .sidebar-kbd { display: none; }
+.sidebar-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-width: 0; }
+.room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--room-bg);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+}
+.room-chip:hover { background: var(--hover); }
+.room-chip > :last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-chip[aria-pressed="false"] { opacity: .45; }
+.room-chip[aria-pressed="false"] .room-letter { background: var(--st-offline) !important; }
+.room-chip[aria-pressed="false"] > :last-child { text-decoration: line-through; }
+.sidebar :is(.room-chip, .agent-row, .sidebar-toggle):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 /* Khối phòng. */
 .room {
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--hover);
+  border-radius: var(--radius-room);
+  background: var(--room-bg);
+  min-width: 0;
   padding: 6px;
 }
-.room[data-state="offline"] { opacity: .6; }
+.room[data-state="offline"] { background: var(--crit-softer); }
 .room[data-state="offline"] .room-state { color: var(--st-offline); }
-.room[data-state="limited"] { border-color: var(--lvl-crit); background: var(--crit-soft); }
+.room[data-state="limited"] { border-color: var(--lvl-crit); background: var(--crit-softer); }
 .room[data-state="limited"] .room-state { color: var(--st-limited); }
 .room[data-state="working"] .room-state { color: var(--st-working); }
 .room[data-state="idle"] .room-state { color: var(--st-idle); }
 
-.room-head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 4px; }
+.room-head {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  padding: 2px 2px 4px 7px;
+  border-left: 3px solid var(--room-color, var(--st-offline));
+}
 .room-letter {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--room-color, var(--st-idle));
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 12px;
   text-shadow: 0 1px 0 var(--bg);
 }
-.room-title { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.15; }
-.room-name { font-size: 14px; text-transform: capitalize; }
-.room-state { font-size: 11px; color: var(--text-dim); }
-.room-count { font-size: 12px; color: var(--text-dim); }
+.room-title { display: contents; }
+.room-name { grid-column: 2; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-ui); font-size: 13.5px; font-weight: 650; text-transform: capitalize; }
+.room-state { grid-column: 1 / -1; grid-row: 2; font-size: 11px; color: var(--text-dim); }
+.room-count { grid-column: 3; grid-row: 1; padding: 2px 5px; border-radius: 4px; background: var(--hover); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
 .room-count.over { color: var(--st-need); }
+.room-slots { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.room-slots-bar { flex: 1 1 auto; min-width: 0; height: 3px; overflow: hidden; border-radius: 3px; background: var(--line); }
+.room-slots-bar > i { display: block; height: 100%; max-width: 100%; background: var(--room-color, var(--st-idle)); }
+.room-slots-text { flex: 0 0 auto; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.room-slots.over .room-slots-bar > i,
+.room-slots-bar.over > i { background: var(--st-need); }
+.room-slots.over .room-slots-text,
+.room-slots-text.over { color: var(--st-need); }
+.room-empty.is-nomatch { font-size: 11px; font-style: italic; }
 .room-alert {
+  grid-column: 4;
+  grid-row: 1;
   display: grid;
   place-items: center;
   width: 18px;
@@ -95,21 +184,26 @@
 /* Dòng agent con. */
 .room-agents { display: flex; flex-direction: column; gap: 2px; }
 .agent-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  box-sizing: border-box;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   width: 100%;
   padding: 5px 6px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: transparent;
   text-align: left;
   cursor: pointer;
   transition: background .15s var(--ease), border-color .15s var(--ease);
 }
 .agent-row:hover { background: var(--hover); }
-.agent-row.selected { border-color: var(--accent); background: var(--hover); }
-.agent-row.need { box-shadow: inset 2px 0 0 var(--st-need); }
+.agent-row.selected { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.agent-row.need { background: var(--need-soft); }
+.agent-row.need.selected { box-shadow: inset 2px 0 0 var(--st-need); }
+.agent-row.offline { opacity: .58; }
 
 .avatar {
   width: 32px;
@@ -130,8 +224,8 @@
 
 .agent-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.25; }
 .agent-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.agent-role { font-size: 13px; font-weight: 600; white-space: nowrap; }
-.agent-ticket { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-role { font-size: 13px; font-weight: 650; white-space: nowrap; }
+.agent-ticket { margin-left: auto; min-width: 0; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-text {
   font-size: 12px;
   color: var(--text-dim);
@@ -140,11 +234,14 @@
   white-space: nowrap;
 }
 
+.agent-elapsed { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.agent-elapsed[hidden] { display: none; }
+
 .status-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
-  border-radius: 50%;
+  border-radius: 2px;
   background: var(--st-idle);
 }
 .status-dot[data-state="working"] { background: var(--st-working); }

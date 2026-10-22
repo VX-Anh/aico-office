@@ -23,7 +23,7 @@ Thanh hạn mức pixel nằm trên tường phòng (cạnh đồng hồ, không
 
 Thanh trên ghi hạn mức từng phòng: ô chữ cái provider, hai dòng cửa sổ (phần trăm, mức màu, giờ reset kiểu `1H05` / `47M`). Phòng không công bố cửa sổ (Cursor) thì ghi gói; không có cả gói thì `?`.
 
-Bố cục: thanh trên 64px (logo, trạng thái kết nối, ô số agent / đang làm / cần bạn, hạn mức, nút cài đặt và Demo); thanh bên trái khoảng 304px (từng phòng rồi agent con, bấm để mở ngăn và căn cảnh vào nhân vật, thu gọn bằng phím **[**); ngăn chi tiết bên phải khoảng 380px (tab Agent và tab Cần bạn, đóng bằng nút X hoặc **Esc**); feed hoạt động là thẻ kính nổi ở góc dưới trái (cao khoảng 200px, rộng tối đa 700px, bắt đầu sau thanh bên và chừa chỗ ngăn chi tiết; mỗi dòng gồm giờ, avatar, vai trò, chip phòng, mã ticket, icon và nội dung; bấm dòng agent thì mở tab Agent, bấm dòng ticket thì mở Cần bạn; thu gọn bằng nút tiêu đề, mũi tên hoặc phím **]**, khi đó còn một dòng ticker; đã cuộn lên thì hiện viên “N mới”). Cảnh được co theo hệ số pixel nguyên vào vùng trống giữa các panel. Màn hẹp hơn 900px: thanh bên thành ngăn kéo, ngăn chi tiết thành tấm từ dưới lên, feed là thanh nổi thu gọn rộng hết màn, mở ra cao khoảng 45vh.
+Bố cục: thanh trên 64px (logo, trạng thái kết nối, ô số agent / đang làm / cần bạn, hạn mức, nút cài đặt và Demo); thanh bên trái khoảng 304px (ô tìm agent theo vai trò, id, ticket, việc đang làm hoặc tên phòng, không phân biệt hoa thường và dấu, phím **/** để tìm, **Esc** xoá rồi thoát ô; hàng chip lọc phòng bấm để ẩn/hiện phòng, nhớ trong localStorage; từng phòng có vạch màu, số agent, thanh chỗ, rồi agent con kèm thời gian chạy; bấm để mở ngăn và căn cảnh vào nhân vật, thu gọn bằng phím **[**); ngăn chi tiết bên phải khoảng 380px (tab Agent và tab Cần bạn, đóng bằng nút X hoặc **Esc**); feed hoạt động là thẻ kính nổi ở góc dưới trái (cao khoảng 200px, rộng tối đa 700px, bắt đầu sau thanh bên và chừa chỗ ngăn chi tiết; mỗi dòng gồm giờ, avatar, vai trò, chip phòng, mã ticket, icon và nội dung; bấm dòng agent thì mở tab Agent, bấm dòng ticket thì mở Cần bạn; thu gọn bằng nút tiêu đề, mũi tên hoặc phím **]**, khi đó còn một dòng ticker; đã cuộn lên thì hiện viên “N mới”). Cảnh được co theo hệ số pixel nguyên vào vùng trống giữa các panel. Màn hẹp hơn 900px: thanh bên thành ngăn kéo, ngăn chi tiết thành tấm từ dưới lên, feed là thanh nổi thu gọn rộng hết màn, mở ra cao khoảng 45vh.
 
 ## Chạy
 
@@ -109,8 +109,11 @@ src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtA
 src/ui/topbar.ts           thanh trên: ô số, hạn mức, popover cài đặt, nút Demo
 src/ui/topbar.test.ts      test settingsFocus và focus popover theo địa chỉ/token
 src/ui/topbar.css          kiểu thanh trên
-src/ui/sidebar.ts          thanh bên: phòng → agent, phím [
+src/ui/sidebar.ts          thanh bên: ô tìm (phím / và Esc), chip lọc phòng, khối phòng có thanh chỗ, dòng agent có thời gian chạy, phím [
 src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
+src/ui/sidebar.test.ts     test DOM tìm, phím / Esc, chip lọc, thanh chỗ/over, selected/need/offline, dữ liệu đổi khi đang lọc
+src/ui/sidebar-model.ts    bỏ dấu, khớp agent với từ khoá, thời gian chạy m:ss/h:mm:ss, thanh chỗ, lưu lọc phòng an toàn (thuần)
+src/ui/sidebar-model.test.ts  test bỏ dấu, khớp theo trường, thời gian hỏng/tương lai, slotFill, localStorage hỏng/lỗi
 src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
 src/ui/drawer.ts           ngăn chi tiết: tab Agent (hero, nhiệm vụ, trạng thái, Đang làm, task, gần đây, số liệu) / Cần bạn, Esc
 src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
@@ -165,7 +168,7 @@ Sơ đồ module: [docs/architecture.md](docs/architecture.md).
 
 ## Ghi công
 
-- Kiểu feed hoạt động và ngăn chi tiết (drawer) học theo [Habblaud](https://github.com/marmottajr/habblaud) (MIT), không chép code.
+- Kiểu feed hoạt động, ngăn chi tiết (drawer) và thanh bên (sidebar) học theo [Habblaud](https://github.com/marmottajr/habblaud) (MIT), không chép code.
 
 ## Thêm sprite mới
 
