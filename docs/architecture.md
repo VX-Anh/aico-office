@@ -1,13 +1,13 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-17d9ab91). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-446cb8a0). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data["Dữ liệu và logic thuần hiện có"]
     API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây"]
-    TK["src/tickets.ts<br/>parseTickets, needsYou, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
+    TK["src/tickets.ts<br/>parseTickets, needsYou, NEED_LABEL, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
     ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
     USG["src/usage.ts"]
     TIME["src/time.ts"]
@@ -30,7 +30,7 @@ flowchart TD
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>ghi --feed-left/--feed-room"]
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
@@ -40,13 +40,13 @@ flowchart TD
     VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
     FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
     SEL["ui/selection.ts"]
-    FMT["ui/format.ts<br/>tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
+    FMT["ui/format.ts<br/>agentStatus, tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
     TOK["ui/tokens.css<br/>--feed-max"]
     TOP["ui/topbar.ts + CSS"]
     SIDE["ui/sidebar.ts + CSS"]
     AV["ui/avatar.ts"]
-    DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>roomStateLabel, taskChecklist, recentRows"]
-    DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái, thẻ Đang làm, checklist task<br/>timeline Gần đây, bảng số liệu"]
+    DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>+ ticketId, needKind; nhãn 'Chờ bạn …' theo NEED_LABEL<br/>nowCardTitle theo tone<br/>roomStateLabel, taskChecklist, recentRows"]
+    DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái: nhãn need là nút mở Cần bạn<br/>thẻ hoạt động: tiêu đề theo tone<br/>checklist task, timeline Gần đây, bảng số liệu"]
     FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>dòng ticket is-ticket: ô ticket rỗng, title không lặp<br/>màn hẹp: cột tên fit-content, mã ticket đủ<br/>tự cuộn, viên N mới, phím ]"]
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
@@ -57,9 +57,11 @@ flowchart TD
   MAIN --> TOP
   MAIN --> SIDE
   MAIN -->|view, agent + needItems, now| DRW
+  DRW -->|onTicket id → showNeeds| MAIN
   MAIN -->|lines + workers| FEED
   FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
   MAIN --> TOAST
+  TOAST -->|onOpen → showNeeds| MAIN
   TOP --> FMT
   SIDE --> FMT
   SIDE --> AV
@@ -77,6 +79,7 @@ flowchart TD
   DRWM --> ACTV
   DRWM --> TIME
   DRWM --> FMT
+  DRWM -->|NEED_LABEL, NeedKind| TK
   DRW --> NEEDS
   COL --> NEEDS
   TOK -.-> TOP
@@ -154,7 +157,7 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model: tone, phòng, checklist, timeline<br/>drawer DOM: hero, nhiệm vụ, trạng thái, thẻ Đang làm<br/>checklist, timeline, số liệu, dữ liệu đổi giữa chừng<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model: tone, nhãn need theo loại, nowCardTitle<br/>phòng, checklist, timeline<br/>drawer DOM: hero, nhiệm vụ, nút nhãn need → onTicket<br/>tiêu đề thẻ theo tone, checklist, timeline, số liệu<br/>dữ liệu đổi giữa chừng: need vào/rời, kind đổi, offline<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
