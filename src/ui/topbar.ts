@@ -17,6 +17,10 @@ export interface Topbar {
   setSettingsOpen(open: boolean): void;
 }
 
+export function settingsFocus(baseUrl: string, token: string): "baseUrl" | "token" {
+  return baseUrl.trim() !== "" && token === "" ? "token" : "baseUrl";
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.className = cls;
@@ -178,7 +182,14 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
     popover.hidden = !next;
     gear.setAttribute("aria-expanded", String(next));
     gear.classList.toggle("active", next);
-    if (next) form.querySelector<HTMLInputElement>("input")?.focus();
+    if (next) {
+      const baseUrl = form.querySelector<HTMLInputElement>('input[name="baseUrl"]');
+      const token = form.querySelector<HTMLInputElement>('input[name="token"]');
+      const target = baseUrl && token
+        ? settingsFocus(baseUrl.value, token.value) === "token" ? token : baseUrl
+        : form.querySelector<HTMLInputElement>("input");
+      target?.focus();
+    }
     options.onSettings?.(next);
   };
   gear.addEventListener("click", () => setOpen(!open));
