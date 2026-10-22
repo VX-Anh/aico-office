@@ -8,6 +8,8 @@ interface FakeEvent {
   key?: string;
   shiftKey?: boolean;
   altKey?: boolean;
+  clientX?: number;
+  clientY?: number;
   defaultPrevented: boolean;
   stopped: boolean;
   preventDefault(): void;
@@ -206,6 +208,20 @@ describe("lightbox xem ảnh", () => {
     expect(viewer.isOpen()).toBe(false);
     viewer.open(shots, 0, () => null);
     dialog().click();
+    expect(viewer.isOpen()).toBe(false);
+  });
+
+  it("bấm vào dải viền quanh ảnh (object-fit: contain) cũng là bấm nền", () => {
+    const { viewer } = openAt(0);
+    // Khung 1000x500, ảnh 200x200 hiện 500x500 ở giữa: x 250..750.
+    Object.assign(img(), {
+      naturalWidth: 200,
+      naturalHeight: 200,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    });
+    img().dispatch("click", { clientX: 500, clientY: 250 });
+    expect(viewer.isOpen()).toBe(true);
+    img().dispatch("click", { clientX: 100, clientY: 250 });
     expect(viewer.isOpen()).toBe(false);
   });
 

@@ -153,7 +153,10 @@ export function createShotViewer(): ShotViewer {
     event.stopPropagation();
   });
   root.addEventListener("click", (event) => {
-    if (event.target === root || event.target === stage) hide();
+    const target = event.target;
+    if (target === root || target === stage) hide();
+    else if ((target as Element | null)?.className === "shot-viewer-img" &&
+             outsideContent(target as HTMLImageElement, event)) hide();
   });
   prev.addEventListener("click", () => { go(-1); });
   next.addEventListener("click", () => { go(1); });
@@ -181,4 +184,15 @@ export function createShotViewer(): ShotViewer {
     close: hide,
     isOpen: () => open,
   };
+}
+
+// Ảnh phủ cả khung (object-fit: contain): bấm vào dải viền quanh phần ảnh thật cũng là bấm nền.
+function outsideContent(img: HTMLImageElement, event: MouseEvent): boolean {
+  if (typeof img.getBoundingClientRect !== "function") return false;
+  const box = img.getBoundingClientRect();
+  if (!img.naturalWidth || !img.naturalHeight || !box.width || !box.height) return false;
+  const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight);
+  const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+  const left = box.left + (box.width - w) / 2, top = box.top + (box.height - h) / 2;
+  return event.clientX < left || event.clientX > left + w || event.clientY < top || event.clientY > top + h;
 }
