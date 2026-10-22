@@ -40,6 +40,8 @@
 .drawer-status.tone-offline .drawer-status-dot { background: var(--st-offline); }
 .drawer-status.tone-limited .drawer-status-dot { background: var(--st-limited); }
 .drawer-status-label { font-weight: 700; }
+.drawer .drawer-status-link { border: 0; background: transparent; padding: 0; color: inherit; font-weight: 700; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; }
+.drawer .drawer-status-link:hover, .drawer .drawer-status-link:focus-visible { text-decoration-style: solid; }
 .drawer-status-ago { color: var(--text-dim); font-size: 11px; }
 .drawer-now { padding: var(--gap); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .drawer-now.is-error { border-color: var(--lvl-crit); background: var(--crit-soft); }

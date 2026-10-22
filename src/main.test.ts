@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   sidebarUpdate: vi.fn(),
   sidebarToggle: vi.fn(),
   drawerRender: vi.fn(),
+  drawerTicket: null as ((id: string) => void) | null,
   feedRender: vi.fn(),
   feedSetCollapsed: vi.fn(),
   feedActions: {} as { onAgent?(room: string, agentId: string): void; onTicket?(id: string): void },
@@ -80,7 +81,8 @@ vi.mock("./ui/sidebar", () => ({
   },
 }));
 vi.mock("./ui/drawer", () => ({
-  createDrawer: (root: Node, _needs: unknown, options: { onClose(): void; onTab(tab: "agent" | "needs"): void }) => {
+  createDrawer: (root: Node, _needs: unknown, options: { onClose(): void; onTab(tab: "agent" | "needs"): void; onTicket(id: string): void }) => {
+    h.drawerTicket = options.onTicket;
     h.onClose = options.onClose;
     h.onTab = options.onTab;
     root.hidden = true;
@@ -754,6 +756,18 @@ describe("feed: bấm dòng, vị trí khung và đổi nguồn", () => {
     h.focus.mockReturnValue(true);
     press("P");
     expect(h.focus).toHaveBeenLastCalledWith("T-2");
+  });
+
+  it("bấm nhãn need mở tab Cần bạn rồi focus ticket", async () => {
+    await realWith([room()]);
+    h.items([{ ticket: { id: "T-1", title: "Một" }, kind: "plan", reason: null }]);
+    h.onSelect!(agentKey("claude", agent));
+    expect(drawerOf()).toEqual({ open: true, tab: "agent" });
+    h.focus.mockReturnValue(true);
+    h.drawerTicket!("T-1");
+    expect(drawerOf()).toEqual({ open: true, tab: "needs" });
+    expect(h.focus).toHaveBeenLastCalledWith("T-1");
+    expect(h.drawerRender.mock.invocationCallOrder.at(-1)!).toBeLessThan(h.focus.mock.invocationCallOrder.at(-1)!);
   });
 
   it("bấm dòng ticket khi không còn thẻ nào thì không mở ngăn trống", async () => {

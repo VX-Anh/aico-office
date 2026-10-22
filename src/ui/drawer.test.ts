@@ -27,7 +27,9 @@ class DrawerNode {
   replaceChildren(...children: DrawerNode[]) { this.text = ""; this.children = children; }
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
   getAttribute(name: string) { return this.attributes.get(name) ?? null; }
-  addEventListener() {}
+  listeners = new Map<string, () => void>();
+  addEventListener(type: string, listener: () => void) { this.listeners.set(type, listener); }
+  click() { this.listeners.get("click")?.(); }
   querySelectorAll() { return []; }
   classes() { return this.className.split(/\s+/).filter(Boolean); }
   all(cls: string): DrawerNode[] {
@@ -68,7 +70,8 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function openDrawer() {
   const root = new DrawerNode();
   const needs = new DrawerNode();
-  const drawer = createDrawer(root as unknown as HTMLElement, needs as unknown as HTMLElement, { onClose() {}, onTab() {} });
+  const onTicket = vi.fn();
+  const drawer = createDrawer(root as unknown as HTMLElement, needs as unknown as HTMLElement, { onClose() {}, onTab() {}, onTicket });
   const panel = root.children[1];
   const show = (data: DrawerAgentInfo | null, at = now) => {
     drawer.render({ open: true, tab: "agent" }, data, at);
@@ -79,7 +82,7 @@ function openDrawer() {
   const text = (cls: string) => panel.one(cls)?.textContent;
   const stats = () => section("Số liệu").all("drawer-stat").map(node => `${node.children[0].textContent}: ${node.children[1].textContent}`);
   const suffixes = () => section("Số liệu").all("drawer-cache");
-  return { drawer, root, panel, show, section, text, stats, suffixes };
+  return { drawer, root, panel, show, section, text, stats, suffixes, onTicket };
 }
 
 describe("tab Agent: bố cục", () => {
@@ -159,7 +162,7 @@ describe("hộp nhiệm vụ", () => {
 describe("dòng trạng thái", () => {
   it.each([
     ["working", worker(), agentOf(), [], "Đang làm"],
-    ["need", worker(), agentOf(), [need("T-30755290", "x")], "Chờ"],
+    ["need", worker(), agentOf(), [need("T-30755290", "x")], "Chờ bạn duyệt merge"],
     ["error", worker(), agentOf({ activity: { kind: "error", text: "Build lỗi", at: iso(12) } }), [], "Lỗi"],
     ["idle", worker({ state: "idle" }), agentOf(), [], "Rảnh"],
     ["offline", worker({ state: "offline" }), agentOf(), [], "Mất kết nối"],
@@ -171,6 +174,8 @@ describe("dòng trạng thái", () => {
     expect(panel.one("drawer-status-dot")).toBeDefined();
     expect(text("drawer-status-label")).toBe(label);
     expect(text("drawer-status-ago")).toBe("· 12 giây trước");
+    expect(text("drawer-now-title")).toBe(tone === "working" ? "Đang làm" : tone === "error" ? "Lỗi gần nhất" : "Hoạt động gần nhất");
+    expect(panel.one("drawer-status-label")!.tagName).toBe(tone === "need" ? "button" : "span");
   });
 
   it("không có activity thì lấy started_at; không có cả hai thì ẩn thời gian", () => {
@@ -382,7 +387,7 @@ describe("dữ liệu đổi giữa chừng trên cùng drawer", () => {
     const { show, panel, text } = openDrawer();
     const steps = [
       [worker(), [], "working", "Đang làm"],
-      [worker(), [need("T-30755290", "x")], "need", "Chờ"],
+      [worker(), [need("T-30755290", "x")], "need", "Chờ bạn duyệt merge"],
       [worker({ state: "idle" }), [], "idle", "Rảnh"],
       [worker(), [], "working", "Đang làm"],
     ] as const;
@@ -466,5 +471,69 @@ describe("dữ liệu đổi giữa chừng trên cùng drawer", () => {
     show(data, now + 61_000);
     expect(text("drawer-status-ago")).toBe("· 1 phút trước");
     expect(text("drawer-tl-ago")).toBe("1 phút trước");
+  });
+});
+
+
+describe("nhãn Cần bạn và tiêu đề theo dữ liệu mới", () => {
+  it("vào → rời → vào lại, số mục 0 → 3 → 1 và loại đổi", () => {
+    const { show, panel, text, onTicket } = openDrawer();
+    const target = need("T-30755290", "Việc");
+    const steps: [NeedItem[], string][] = [
+      [[], "Đang làm"],
+      [[need("T-other", "Khác"), { ...target, kind: "plan" }, need("T-last", "Cuối")], "Chờ bạn duyệt kế hoạch"],
+      [[target], "Chờ bạn duyệt merge"],
+      [[], "Đang làm"],
+      [[{ ...target, kind: "escalated" }], "Chờ bạn xử lý (escalated)"],
+      [[{ ...target, kind: "lạ" as NeedItem["kind"] }], "Chờ bạn"],
+    ];
+    for (const [items, label] of steps) {
+      show(info(agentOf(), worker(), items));
+      expect(text("drawer-status-label")).toBe(label);
+      expect(text("drawer-now-title")).toBe(items.length ? "Hoạt động gần nhất" : "Đang làm");
+      expect(panel.all("drawer-status-link")).toHaveLength(items.length ? 1 : 0);
+      const node = panel.one("drawer-status-label")!;
+      expect(node.tagName).toBe(items.length ? "button" : "span");
+      node.click();
+      if (items.length) expect(onTicket).toHaveBeenLastCalledWith("T-30755290");
+    }
+    expect(onTicket).toHaveBeenCalledTimes(4);
+  });
+
+  it("ticket_id T-1 → T-2 → null → T-1 gọi đúng id mới", () => {
+    const { show, panel, onTicket } = openDrawer();
+    const items = [need("T-1", "Một"), need("T-2", "Hai")];
+    for (const id of ["T-1", "T-2", null, "T-1"]) {
+      show(info(agentOf({ ticket_id: id }), worker(), items));
+      const node = panel.one("drawer-status-label")!;
+      expect(node.tagName).toBe(id ? "button" : "span");
+      if (id) {
+        expect(node.title).toBe(`Mở ${id} trong Cần bạn`);
+        expect(node.getAttribute("aria-label")).toBe(node.title);
+      }
+      node.click();
+      if (id) expect(onTicket).toHaveBeenLastCalledWith(id);
+    }
+    expect(onTicket.mock.calls).toEqual([["T-1"], ["T-2"], ["T-1"]]);
+  });
+
+  it("need → offline/limited → need, activity có → null → có → lỗi", () => {
+    const { show, panel, text, onTicket } = openDrawer();
+    const items = [need("T-30755290", "Việc")];
+    for (const state of ["working", "offline", "working", "limited", "working"] as const) {
+      show(info(agentOf(), worker({ state }), items));
+      expect(text("drawer-now-title")).toBe("Hoạt động gần nhất");
+      expect(panel.one("drawer-status-label")!.tagName).toBe(state === "working" ? "button" : "span");
+      if (state !== "working") panel.one("drawer-status-label")!.click();
+    }
+    expect(onTicket).not.toHaveBeenCalled();
+    for (const activity of [{ kind: "read", text: "Đọc", at: iso(5) }, null, { kind: "read", text: "Đọc", at: iso(5) }, { kind: "error", text: "Lỗi", at: iso(5) }]) {
+      show(info(agentOf({ activity }), worker(), items));
+      const error = activity?.kind === "error";
+      expect(text("drawer-now-title")).toBe(!activity ? "Đang làm" : error ? "Lỗi gần nhất" : "Hoạt động gần nhất");
+      expect(panel.one("drawer-now")!.classes().includes("is-error")).toBe(error);
+      expect(panel.all("drawer-status-link")).toHaveLength(error ? 0 : 1);
+      if (!activity) expect(text("drawer-now-text")).toBe("Chưa có hoạt động");
+    }
   });
 });
