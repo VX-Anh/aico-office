@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-446cb8a0). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-01489c4d). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
@@ -30,7 +30,7 @@ flowchart TD
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room"]
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room<br/>update sidebar mỗi giây và sau poll"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
@@ -40,10 +40,12 @@ flowchart TD
     VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
     FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
     SEL["ui/selection.ts"]
-    FMT["ui/format.ts<br/>agentStatus, tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
-    TOK["ui/tokens.css<br/>--feed-max"]
+    FMT["ui/format.ts<br/>agentStatus, providerLetter, tokenStatsRows<br/>tokenStatsLines cho tooltip"]
+    TOK["ui/tokens.css<br/>--feed-max, --input-bg, --accent-soft<br/>--room-bg, --crit-softer, --radius-xs/room"]
     TOP["ui/topbar.ts + CSS"]
-    SIDE["ui/sidebar.ts + CSS"]
+    SIDEM["ui/sidebar-model.ts<br/>thuần: normalizeText bỏ dấu, agentMatches<br/>formatElapsed m:ss/h:mm:ss, slotFill<br/>load/saveHiddenRooms an toàn"]
+    SIDE["ui/sidebar.ts + CSS<br/>kiểu Habblaud: ô tìm, phím / và Esc<br/>chip lọc phòng aria-pressed, nhãn đang lọc<br/>khối phòng vạch màu, đếm, thanh chỗ/over<br/>dòng agent: avatar, vai trò, ticket, hoạt động · thời gian chạy<br/>selected/need/offline; thu gọn [, ngăn kéo hẹp"]
+    LS[("localStorage<br/>hiddenRooms")]
     AV["ui/avatar.ts"]
     DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>+ ticketId, needKind; nhãn 'Chờ bạn …' theo NEED_LABEL<br/>nowCardTitle theo tone<br/>roomStateLabel, taskChecklist, recentRows"]
     DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái: nhãn need là nút mở Cần bạn<br/>thẻ hoạt động: tiêu đề theo tone<br/>checklist task, timeline Gần đây, bảng số liệu"]
@@ -55,7 +57,8 @@ flowchart TD
   MAIN --> FM
   MAIN --> SEL
   MAIN --> TOP
-  MAIN --> SIDE
+  MAIN -->|workers, needIds, selectedKey, now| SIDE
+  SIDE -->|onSelect key → selectAgent| MAIN
   MAIN -->|view, agent + needItems, now| DRW
   DRW -->|onTicket id → showNeeds| MAIN
   MAIN -->|lines + workers| FEED
@@ -63,8 +66,12 @@ flowchart TD
   MAIN --> TOAST
   TOAST -->|onOpen → showNeeds| MAIN
   TOP --> FMT
+  SIDE --> SIDEM
   SIDE --> FMT
   SIDE --> AV
+  SIDE --> ACTV
+  SIDE --> PAL
+  SIDE <-->|try/catch, lỗi thì chỉ trong phiên| LS
   FEED --> AV
   FEED --> FMT
   FEED --> PAL
@@ -157,7 +164,7 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model: tone, nhãn need theo loại, nowCardTitle<br/>phòng, checklist, timeline<br/>drawer DOM: hero, nhiệm vụ, nút nhãn need → onTicket<br/>tiêu đề thẻ theo tone, checklist, timeline, số liệu<br/>dữ liệu đổi giữa chừng: need vào/rời, kind đổi, offline<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model, feed DOM, latestScreenshots, shot-viewer<br/>format, drawer-model, drawer DOM<br/>sidebar-model: bỏ dấu, khớp, m:ss/h:mm:ss, slotFill, localStorage lỗi<br/>sidebar DOM: tìm, phím / Esc, chip lọc, thanh chỗ/over<br/>class selected/need/offline; dữ liệu đổi giữa chừng khi đang lọc<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
@@ -174,4 +181,6 @@ flowchart TD
   TEST -.-> FMT
   TEST -.-> DRWM
   TEST -.-> DRW
+  TEST -.-> SIDEM
+  TEST -.-> SIDE
 ```
