@@ -314,6 +314,26 @@ describe("ghép activity giữ nguyên cột Cần bạn", () => {
   });
 
 
+  it("bấm Demo không xoá kết nối đã lưu; bấm lần nữa là quay về aico thật", async () => {
+    h.config = { baseUrl: "http://aico", token: "test" };
+    h.fetchWorkers.mockResolvedValue([room()]);
+    const api = await import("./api");
+    await import("./main");
+    await connected();
+    const demo = getNode("#demo");
+    expect(demo.textContent).toBe("Demo");
+    demo.listeners.get("click")!({});
+    expect(getNode("#conn").textContent).toContain("demo");
+    expect(demo.textContent).toBe("Thoát demo");
+    expect(api.saveConfig).not.toHaveBeenCalled();
+    h.fetchWorkers.mockClear();
+    demo.listeners.get("click")!({});
+    await connected();
+    expect(h.fetchWorkers).toHaveBeenCalledWith(h.config);
+    expect(getNode("#conn").textContent).toBe("Đã nối http://aico");
+    expect(demo.textContent).toBe("Demo");
+  });
+
   it("lỗi nguồn thật trả về muộn sau khi đổi sang demo không bật dấu lỗi", async () => {
     h.config = { baseUrl: "http://aico", token: "test" };
     let reject!: (error: Error) => void;

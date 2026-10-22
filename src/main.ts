@@ -41,6 +41,8 @@ const overlay = createOverlay(canvas);
 const tooltip = createAgentTooltip(canvas);
 
 let config: ApiConfig | null = loadConfig();
+// Kết nối thật đã lưu: xem demo không xoá nó, bấm nút lần nữa là quay về.
+let savedConfig = config;
 const initialNow = Date.now();
 let workers: WorkerStatus[] = withDemoActivity(demoWorkers(initialNow), initialNow);
 const workerGate = createLatestGate();
@@ -416,7 +418,9 @@ form.addEventListener("submit", (event) => {
   const baseUrl = String(data.get("baseUrl") ?? "").trim();
   const token = String(data.get("token") ?? "").trim();
   config = baseUrl && token ? { baseUrl, token } : null;
+  savedConfig = config;
   saveConfig(config);
+  syncDemoButton();
   // Nguồn thật chưa kịp poll: đừng giữ agent demo trên thanh bên.
   if (config) workers = [];
   changeSource();
@@ -424,13 +428,22 @@ form.addEventListener("submit", (event) => {
   void poll();
 });
 demoButton.addEventListener("click", () => {
-  config = null;
-  saveConfig(null);
+  config = config ? null : savedConfig;
+  // Nguồn thật chưa kịp poll: đừng giữ agent demo trên thanh bên.
+  if (config) workers = [];
+  syncDemoButton();
   changeSource();
   resetActors();
   void poll();
 });
 if (config) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = config.baseUrl;
+
+function syncDemoButton(): void {
+  const back = !config && savedConfig !== null;
+  demoButton.textContent = back ? "Thoát demo" : "Demo";
+  demoButton.title = back ? `Quay lại ${savedConfig!.baseUrl}` : "Xem giao diện với dữ liệu giả";
+}
+syncDemoButton();
 
 function frame(t: number): void {
   // demo tính lại mỗi frame để nhân vật bắt đầu đi ngay khi kịch bản đổi pha, không trễ theo nhịp polling 3 giây
