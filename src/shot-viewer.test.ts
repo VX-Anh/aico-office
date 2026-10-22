@@ -29,6 +29,8 @@ class Node {
     for (const child of children) { child.remove(); this.children.push(child); child.parent = this; }
   }
   remove() {
+    // Như Chromium: gỡ phần tử đang focus (hoặc cha của nó) thì focus rơi về body.
+    if (this.contains(dom.activeElement)) dom.activeElement = body;
     if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1);
     this.parent = null;
   }
@@ -283,6 +285,53 @@ describe("lightbox xem ảnh", () => {
     expect(caption()).toBe("1440x900-hour-11 2/2");
     key("Escape");
     expect(dom.activeElement).toBe(second);
+  });
+
+  it.each([
+    [0, "ArrowRight"],
+    [2, "ArrowLeft"],
+  ])("giữ focus khi rời liên kết ảnh lỗi tại %s", (index, arrow) => {
+    const { viewer, thumb } = openAt(index);
+    img().dispatch("error");
+    byClass("shot-viewer-fallback").focus();
+
+    key(arrow);
+
+    expect(dom.activeElement?.isConnected).toBe(true);
+    expect(dialog().contains(dom.activeElement)).toBe(true);
+    key("Escape");
+    expect(viewer.isOpen()).toBe(false);
+    expect(dom.activeElement).toBe(thumb);
+  });
+
+  it("rời liên kết ảnh lỗi sang ảnh cũng lỗi: focus vẫn trong dialog, phím vẫn chạy", () => {
+    const { viewer, thumb } = openAt(0);
+    img().dispatch("error");
+    byClass("shot-viewer-fallback").focus();
+    key("ArrowRight");
+    img().dispatch("error");
+    expect(dialog().contains(dom.activeElement)).toBe(true);
+    byClass("shot-viewer-fallback").focus();
+    key("ArrowRight");
+    expect(caption()).toBe("390x844-hour-11 3/3");
+    expect(dialog().contains(dom.activeElement)).toBe(true);
+    key("ArrowLeft");
+    expect(caption()).toBe("1440x900-hour-21 2/3");
+    key("Escape");
+    expect(viewer.isOpen()).toBe(false);
+    expect(dom.activeElement).toBe(thumb);
+  });
+
+  it("rời liên kết ảnh lỗi: focus về nút cùng hướng, tới biên thì về Đóng", () => {
+    openAt(1);
+    img().dispatch("error");
+    byClass("shot-viewer-fallback").focus();
+    key("ArrowRight");
+    expect(dom.activeElement).toBe(byClass("shot-viewer-close"));
+    img().dispatch("error");
+    byClass("shot-viewer-fallback").focus();
+    key("ArrowLeft");
+    expect(dom.activeElement).toBe(byClass("shot-viewer-prev"));
   });
 
   it("chụp lại danh sách lúc mở: đổi mảng gốc không ảnh hưởng", () => {

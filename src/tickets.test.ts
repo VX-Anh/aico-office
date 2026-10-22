@@ -870,6 +870,18 @@ describe("demo", () => {
     expect(demoTickets()[1].artifacts.some((a) => a.kind === "screenshot")).toBe(false);
   });
 
+  it("demoNeedTickets: mọi ảnh demo có PNG trong public/, trừ ảnh cố ý lỗi", () => {
+    // Chỉ lấy tên file (không nạp): thiếu PNG thì demo chỉ còn liên kết thay ảnh.
+    const files = new Set(Object.keys(import.meta.glob("../public/demo-shots/*/*.png")).map((p) => p.replace("../public/", "")));
+    const base = "https://example.com/aico-office/";
+    const refs = demoNeedTickets().flatMap((t) => t.artifacts.filter((a) => a.kind === "screenshot"));
+    expect(refs.length).toBeGreaterThan(0);
+    for (const a of refs) {
+      const file = a.url!.slice(base.length);
+      expect(files.has(file), file).toBe(!file.endsWith("-missing.png"));
+    }
+  });
+
   it("demoNeedTickets(now, assetBase): url ảnh theo assetBase, vẫn qua safeUrl", () => {
     for (const base of ["http://localhost:5173/", "https://vx-anh.github.io/aico-office/"]) {
       const review = demoNeedTickets(0, base).find((t) => t.id === "T-demo-review")!;

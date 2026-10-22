@@ -66,8 +66,10 @@ export function createShotViewer(): ShotViewer {
     return result;
   }
 
-  function show(): void {
+  function show(toward: HTMLButtonElement | null = null): void {
     const shot = shots[index];
+    // Liên kết ảnh lỗi đang focus sắp bị gỡ: không giữ lại thì focus rơi về body, Esc lọt xuống drawer.
+    const lost = stage.contains(document.activeElement);
     // Không đặt crossOrigin: ảnh sau Cloudflare Access cần gửi cookie như ảnh thường.
     const img = node("img", "shot-viewer-img");
     img.setAttribute("alt", shot.label);
@@ -92,14 +94,15 @@ export function createShotViewer(): ShotViewer {
     next.disabled = index === shots.length - 1;
     // Nút đang focus vừa bị khoá (tới biên) thì focus mất khỏi dialog; chuyển sang Đóng.
     const active = document.activeElement;
-    if ((active === prev && prev.disabled) || (active === next && next.disabled)) close.focus();
+    if (lost) (toward && !toward.hidden && !toward.disabled ? toward : close).focus();
+    else if ((active === prev && prev.disabled) || (active === next && next.disabled)) close.focus();
   }
 
   function go(step: number): void {
     const target = index + step;
     if (target < 0 || target >= shots.length) return;
     index = target;
-    show();
+    show(step < 0 ? prev : next);
   }
 
   function focusables(): HTMLElement[] {
