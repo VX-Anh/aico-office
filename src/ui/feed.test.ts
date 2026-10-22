@@ -254,6 +254,101 @@ describe("khung hoạt động", () => {
     expect(cells[6].textContent).toBe("Nội dung đầy đủ ticket");
   });
 
+  const ticketLine = (key: string, id = "T-1") => ({ ...line(key), agentId: null, room: "", name: id, ticket: id });
+  const limitLine = (key: string) => ({ ...line(key), agentId: null, ticket: null, name: "codex" });
+  const count = (text: string, part: string) => text.split(part).length - 1;
+  const expectTicket = (row: FeedNode, id = "T-1") => {
+    expect(row.children).toHaveLength(7);
+    expect(row.children[2].textContent).toBe(id);
+    expect(row.children[4].className).toBe("feed-ticket");
+    expect(row.children[4].textContent).toBe("");
+    expect(count(row.title, id)).toBe(1);
+    expect(row.className.split(" ")).toContain("is-ticket");
+  };
+  const expectAgent = (row: FeedNode) => {
+    expect(row.children).toHaveLength(7);
+    expect(row.children[2].textContent).toBe("coder");
+    expect(row.children[4].textContent).toBe("T-1");
+    expect(row.title).toContain("coder · codex · T-1 ·");
+    expect(row.className.split(" ")).not.toContain("is-ticket");
+  };
+  const expectLimit = (row: FeedNode) => {
+    expect(row.children).toHaveLength(7);
+    expect(row.children[4].textContent).toBe("");
+    expect(row.className.split(" ")).not.toContain("is-ticket");
+  };
+
+  it("dòng ticket không lặp mã, dòng agent giữ mã, hết hạn mức không là dòng ticket", () => {
+    const { feed, list } = setup();
+    feed.render([ticketLine("t"), line("a"), limitLine("l")], [worker]);
+    const [ticket, agent, limit] = list.children;
+    expectTicket(ticket);
+    expect(ticket.title).toBe(`${ticket.children[0].textContent} · T-1 · Nội dung đầy đủ t`);
+    expectAgent(agent);
+    expect(agent.title).toBe(`${agent.children[0].textContent} · coder · codex · T-1 · Nội dung đầy đủ a`);
+    expectLimit(limit);
+  });
+
+  it("dòng mất rồi xuất hiện lại vẫn đúng ô, class và title", () => {
+    const { feed, list } = setup();
+    for (let i = 0; i < 2; i++) {
+      feed.render([ticketLine("t"), line("a")], [worker]);
+      expectTicket(list.children[0]);
+      expectAgent(list.children[1]);
+      feed.render([]);
+      expect(list.textContent).toBe("Hoạt động của agent sẽ hiện ở đây.");
+    }
+    feed.render([line("a")], [worker]);
+    feed.render([ticketLine("t")], [worker]);
+    expectTicket(list.children[0]);
+    feed.render([line("a")], [worker]);
+    expectAgent(list.children[0]);
+  });
+
+  it("số dòng đổi và trộn loại dòng giữ đúng ô/class; cùng key đổi ticket thì cập nhật", () => {
+    const { feed, list } = setup();
+    const mixed = (start: number, size: number) => Array.from({ length: size }, (_, i) => {
+      const key = String(start + i);
+      return [ticketLine(key), line(key), limitLine(key)][(start + i) % 3];
+    });
+    const check = () => list.children.forEach(row => {
+      const kind = Number(row.children[6].textContent.replace("Nội dung đầy đủ ", "")) % 3;
+      [expectTicket, expectAgent, expectLimit][kind](row);
+    });
+    for (const [start, size] of [[0, 3], [0, 7], [2, 7], [5, 3], [5, 9], [1, 2]]) {
+      feed.render(mixed(start, size), [worker]);
+      expect(list.children).toHaveLength(size);
+      check();
+    }
+    feed.render([ticketLine("x")], [worker]);
+    expectTicket(list.children[0]);
+    feed.render([{ ...ticketLine("x"), ticket: "T-2" }], [worker]);
+    const row = list.children[0];
+    expect(row.children[4].textContent).toBe("T-2");
+    expect(row.title).toContain("T-1 · T-2");
+    expect(row.className.split(" ")).not.toContain("is-ticket");
+    feed.render([ticketLine("x", "T-2")], [worker]);
+    expectTicket(list.children[0], "T-2");
+    feed.render([{ ...ticketLine("x"), ticket: null }], [worker]);
+    expectLimit(list.children[0]);
+  });
+
+  it("offline/limited/[]/working: dòng ticket không mờ, dòng agent bật tắt mờ mà giữ mã", () => {
+    const { feed, list } = setup();
+    const states: [WorkerStatus[], boolean][] = [
+      [[worker], false], [[{ ...worker, state: "offline" }], true], [[worker], false],
+      [[{ ...worker, state: "limited" }], true], [[], true], [[worker], false],
+    ];
+    for (const [workers, gone] of states) {
+      feed.render([ticketLine("t"), line("a")], workers);
+      const [ticket, agent] = list.children;
+      expectTicket(ticket);
+      expect(ticket.className.split(" ")).not.toContain("is-gone");
+      expectAgent(agent);
+      expect(agent.className.split(" ").includes("is-gone")).toBe(gone);
+    }
+  });
+
   it("màn hẹp bắt đầu thu gọn", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
     expect(setup().title.attributes.get("aria-expanded")).toBe("false");

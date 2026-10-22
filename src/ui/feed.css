@@ -27,6 +27,8 @@
 @media (max-width: 899px) {
   .feed { left: var(--gap); right: var(--gap); width: auto; height: 45vh; }
   .feed-line { grid-template-columns: 36px 18px minmax(45px, 70px) 18px minmax(0, 1fr); gap: 5px; }
+  /* Mã ticket ngắn, cần đọc đủ; tên vai trò ở dòng agent vẫn cắt theo cột trên. */
+  .feed-line.is-ticket { grid-template-columns: 36px 18px fit-content(140px) 18px minmax(0, 1fr); }
   .feed-line .feed-ticket, .feed-line .feed-room { display: none; }
   .feed.is-collapsed .feed-new { display: none; }
 }
