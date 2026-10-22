@@ -26,13 +26,32 @@ describe("computeInsets", () => {
     }
     expect(computeInsets(view, {}, opts)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
   });
-  it("màn hẹp bỏ sidebar, sheet tối đa 55% và không cộng đôi feed", () => {
+  it("màn hẹp bỏ sidebar và không cộng đôi feed", () => {
     const result = computeInsets({ width: 390, height: 844 }, {
-      ...panels, feed: { left: 0, top: 806, width: 390, height: 38 },
+      ...panels, feed: { left: 0, top: 806, width: 390, height: 38 }, drawer: { left: 10, top: 332, width: 370, height: 464 },
     }, { ...opts, narrow: true });
     expect(result.left).toBe(0);
     expect(result.right).toBe(0);
-    expect(result.bottom).toBe(844 * .55);
+    expect(result.bottom).toBe(844 - 332 + 10);
+  });
+  it("màn hẹp: drawer cao quá thì vẫn giữ minFree cho cảnh", () => {
+    const result = computeInsets({ width: 390, height: 844 }, {
+      ...panels, feed: { left: 10, top: 454, width: 370, height: 380 }, drawer: { left: 10, top: 74, width: 370, height: 370 },
+    }, { ...opts, narrow: true });
+    expect(844 - result.top - result.bottom).toBe(100);
+  });
+  it("màn hẹp: drawer đứng trên feed thì chừa đáy tới mép trên drawer, mọi tổ hợp feed/drawer", () => {
+    const small = { width: 390, height: 844 };
+    // Feed mở 45vh (đỉnh 454) hay thu gọn (đỉnh 806); drawer đứng ngay trên feed.
+    for (const feedTop of [454, 806]) {
+      const feed = { left: 10, top: feedTop, width: 370, height: 834 - feedTop };
+      for (const drawerHeight of [null, 120, 250]) {
+        const drawer = drawerHeight === null ? null : { left: 10, top: feedTop - 10 - drawerHeight, width: 370, height: drawerHeight };
+        const result = computeInsets(small, { ...panels, feed, drawer }, { ...opts, narrow: true });
+        expect(result.bottom).toBe(drawer ? 844 - drawer.top + 10 : 844 - feedTop + 10);
+        expect(844 - result.top - result.bottom).toBeGreaterThanOrEqual(100);
+      }
+    }
   });
   it("thiếu chỗ thì giảm drawer trước sidebar", () => {
     expect(computeInsets({ width: 800, height: 900 }, { ...panels, drawer: { left: 410, top: 74, width: 380, height: 600 } }, { ...opts, minFree: 400 })).toMatchObject({ left: 324, right: 76 });

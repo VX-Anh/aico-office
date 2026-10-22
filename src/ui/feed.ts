@@ -40,6 +40,8 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
   let hovering = false;
   let pending = 0;
   let resumeOnLeave = false;
+  // scrollTop do chính feed đặt (giữ neo); sự kiện scroll kéo theo không phải cuộn tay.
+  let settled: number | null = null;
   let layout = () => {};
   const rows = new Map<string, HTMLElement>();
   const atEnd = () => list.scrollHeight - list.scrollTop - list.clientHeight <= 4;
@@ -74,8 +76,10 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
     if (resumeOnLeave || atEnd()) toEnd();
   });
   list.addEventListener("scroll", () => {
-    if (!atEnd()) resumeOnLeave = false;
-    else { pending = 0; showPending(); }
+    if (settled !== null && list.scrollTop === settled) { settled = null; return; }
+    settled = null;
+    resumeOnLeave = atEnd();
+    if (resumeOnLeave) { pending = 0; showPending(); }
   });
   const onKey = (event: KeyboardEvent) => {
     const target = event.target;
@@ -146,7 +150,11 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
       else if (follow) toEnd();
       else {
         pending += added;
-        if (anchor?.parentElement === list) list.scrollTop = anchor.offsetTop - offset;
+        if (anchor?.parentElement === list) {
+          const before = list.scrollTop;
+          list.scrollTop = anchor.offsetTop - offset;
+          if (list.scrollTop !== before) settled = list.scrollTop;
+        }
       }
       showPending();
     },

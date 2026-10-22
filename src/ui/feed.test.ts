@@ -165,6 +165,48 @@ describe("khung hoạt động", () => {
     expect(list.scrollTop).toBe(26);
   });
 
+  it("rời chuột theo tiếp sau khi giữ neo lúc cắt lịch sử", () => {
+    const { feed, list, fresh } = setup();
+    feed.render(batch(10));
+    list.fire("pointerenter");
+    feed.render(batch(10, 2));
+    // Trình duyệt phát scroll sau khi render đổi scrollTop để giữ neo.
+    list.fire("scroll");
+    list.fire("pointerleave");
+    expect(list.scrollTop).toBe(list.scrollHeight - list.clientHeight);
+    expect(fresh.hidden).toBe(true);
+  });
+
+  it("đang cuộn lên, cuộn tay về cuối lúc rê chuột rồi có dòng mới: rời chuột theo tiếp", () => {
+    const { feed, list, fresh } = setup();
+    feed.render(batch(10));
+    list.scrollTop = 26;
+    list.fire("scroll");
+    list.fire("pointerenter");
+    list.scrollTop = list.scrollHeight;
+    list.fire("scroll");
+    feed.render(batch(10, 3));
+    list.fire("scroll");
+    expect(fresh.textContent).toBe("3 mới");
+    list.fire("pointerleave");
+    expect(list.scrollTop).toBe(list.scrollHeight - list.clientHeight);
+    expect(fresh.hidden).toBe(true);
+  });
+
+  it("giữ neo nhiều lần lúc rê chuột rồi cuộn tay lên thì vẫn dừng khi rời chuột", () => {
+    const { feed, list } = setup();
+    feed.render(batch(10));
+    list.fire("pointerenter");
+    feed.render(batch(10, 2));
+    list.fire("scroll");
+    feed.render(batch(10, 4));
+    list.fire("scroll");
+    list.scrollTop = 26;
+    list.fire("scroll");
+    list.fire("pointerleave");
+    expect(list.scrollTop).toBe(26);
+  });
+
   it("cắt đầu giữ dòng neo cùng vị trí", () => {
     const { feed, list } = setup();
     feed.render(batch(10));

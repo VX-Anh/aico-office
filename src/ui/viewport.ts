@@ -15,7 +15,8 @@ export function computeInsets(view: Size, panels: Panels, opts: InsetOptions): I
   const feed = panels.feed ? clamp(h - panels.feed.top + gap, 0, h) : 0;
   let left = !opts.narrow && panels.sidebar ? clamp(panels.sidebar.left + panels.sidebar.width + gap, 0, w) : 0;
   let right = !opts.narrow && panels.drawer ? clamp(w - panels.drawer.left + gap, 0, w) : 0;
-  const sheet = opts.narrow && panels.drawer ? Math.min(positive(panels.drawer.height) + gap, h * .55) : 0;
+  // Màn hẹp: drawer đứng trên feed nên chừa đáy tới mép trên drawer, không chỉ chiều cao drawer.
+  const sheet = opts.narrow && panels.drawer ? clamp(positive(h - panels.drawer.top + gap), 0, h) : 0;
   // Bỏ phần drawer trước, rồi sidebar; màn cực nhỏ còn phải giảm topbar/feed.
   right = Math.min(right, Math.max(0, budgetW - left));
   left = Math.min(left, budgetW - right);
