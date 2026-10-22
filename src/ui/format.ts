@@ -97,22 +97,30 @@ function tokenOrMissing(value: number | null): string {
   return value === null ? "chưa có" : fmtTokenCount(value);
 }
 
+// Dữ liệu tách nhãn/giá trị cho bảng số liệu của drawer; cacheSuffix giữ dạng " (N% từ cache)".
+export interface TokenStatsRow {
+  label: string;
+  value: string;
+  cacheSuffix: string | null;
+  level: TokenStatsLine["level"];
+}
+
 // Có cache thì nghìn/triệu và dòng Token mới. Thiếu cache giữ số đầy đủ như drawer và tooltip cũ.
 // Màu chỉ gắn hậu tố, theo tỉ lệ trước khi làm tròn phần trăm (69,5% hiện 70% nhưng vẫn warn).
-export function tokenStatsLines(stats: TokenStatsInput | null | undefined): TokenStatsLine[] {
-  const tool: TokenStatsLine = { text: `Lần gọi tool: ${legacyCount(stats?.tool_calls)}`, cacheSuffix: null, level: null };
+export function tokenStatsRows(stats: TokenStatsInput | null | undefined): TokenStatsRow[] {
+  const tool: TokenStatsRow = { label: "Lần gọi tool", value: legacyCount(stats?.tool_calls), cacheSuffix: null, level: null };
   const cached = finiteCount(stats?.tokens_cached);
   const tokensIn = finiteCount(stats?.tokens_in);
   const tokensOut = finiteCount(stats?.tokens_out);
   if (cached === null) {
     return [
       tool,
-      { text: `Token vào: ${legacyCount(tokensIn)}`, cacheSuffix: null, level: null },
-      { text: `Token ra: ${legacyCount(tokensOut)}`, cacheSuffix: null, level: null },
+      { label: "Token vào", value: legacyCount(tokensIn), cacheSuffix: null, level: null },
+      { label: "Token ra", value: legacyCount(tokensOut), cacheSuffix: null, level: null },
     ];
   }
   let cacheSuffix: string | null = null;
-  let level: TokenStatsLine["level"] = null;
+  let level: TokenStatsRow["level"] = null;
   if (tokensIn !== null && tokensIn > 0) {
     const capped = Math.min(cached, tokensIn);
     const ratio = capped / tokensIn;
@@ -122,8 +130,13 @@ export function tokenStatsLines(stats: TokenStatsInput | null | undefined): Toke
   const fresh = tokensIn === null ? null : Math.max(0, tokensIn - cached);
   return [
     tool,
-    { text: `Token vào: ${tokenOrMissing(tokensIn)}`, cacheSuffix, level },
-    { text: `Token mới: ${tokenOrMissing(fresh)}`, cacheSuffix: null, level: null },
-    { text: `Token ra: ${tokenOrMissing(tokensOut)}`, cacheSuffix: null, level: null },
+    { label: "Token vào", value: tokenOrMissing(tokensIn), cacheSuffix, level },
+    { label: "Token mới", value: tokenOrMissing(fresh), cacheSuffix: null, level: null },
+    { label: "Token ra", value: tokenOrMissing(tokensOut), cacheSuffix: null, level: null },
   ];
+}
+
+// Tooltip vẫn cần chuỗi ghép sẵn.
+export function tokenStatsLines(stats: TokenStatsInput | null | undefined): TokenStatsLine[] {
+  return tokenStatsRows(stats).map(({ label, value, cacheSuffix, level }) => ({ text: `${label}: ${value}`, cacheSuffix, level }));
 }

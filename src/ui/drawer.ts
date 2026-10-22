@@ -1,9 +1,10 @@
-import { readAgentActivity, taskProgress } from "../activity";
+import { readAgentActivity } from "../activity";
 import type { NeedItem } from "../needs-column";
-import { roleStyle } from "../scene/palette";
+import { paletteOf, roleStyle } from "../scene/palette";
 import { mergeRequest, previewLink } from "../tickets";
-import { relativeTime } from "../time";
-import { tokenStatsLines } from "./format";
+import { createAvatar } from "./avatar";
+import { recentRows, roomStateLabel, statusView, taskChecklist } from "./drawer-model";
+import { providerLetter, tokenStatsRows } from "./format";
 import type { DrawerView, SelectedAgent } from "./selection";
 import "./drawer.css";
 
@@ -75,77 +76,137 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
         tab.setAttribute("aria-selected", String(selected));
       }
       needsTab.textContent = `Cần bạn (${view.needsCount ?? info?.needItems?.length ?? needsRoot.querySelectorAll(".need-card").length})`;
+      // Dựng lại cả tab mỗi lần: dữ liệu đổi giữa chừng (mất ticket, đổi agent) không sót nút cũ.
       agentPanel.replaceChildren();
-      const line = (parent: HTMLElement, text: string, className = "") => {
-        const node = document.createElement("div");
+      const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
+        const node = document.createElement(tag);
         node.className = className;
-        node.textContent = text;
-        parent.append(node);
+        if (text !== undefined) node.textContent = text;
         return node;
       };
-      const section = (title: string) => {
-        const block = document.createElement("section");
-        const heading = document.createElement("h3");
-        heading.textContent = title;
+      const section = (title: string, count: string | null) => {
+        const block = el("section", "drawer-section");
+        const heading = el("h3", "drawer-section-head");
+        heading.append(el("span", "drawer-section-title", title));
+        if (count !== null) heading.append(el("span", "drawer-section-count", count));
         block.append(heading);
         agentPanel.append(block);
         return block;
       };
-      if (!info) line(agentPanel, "Chọn một agent để xem chi tiết.", "drawer-muted");
+      if (!info) agentPanel.append(el("div", "drawer-muted", "Chọn một agent để xem chi tiết."));
       else {
         const { agent, worker } = info;
         const data = readAgentActivity(agent, info.key);
-        line(agentPanel, agent.id, "drawer-title");
-        line(agentPanel, `${roleStyle(agent.role ?? "").label} · ${worker.name}`, "drawer-muted");
-        const ticket = info.needItems?.find(item => item.ticket.id === agent.ticket_id)?.ticket;
-        const ticketRow = line(agentPanel, agent.ticket_id ?? "Chưa có ticket", "drawer-ticket");
+        const needItems = info.needItems ?? [];
+        const ticketId = typeof agent.ticket_id === "string" && agent.ticket_id ? agent.ticket_id : null;
+        const ticket = ticketId === null ? undefined : needItems.find(item => item.ticket.id === ticketId)?.ticket;
+
+        const hero = el("div", "drawer-hero");
+        const avatarBox = el("div", "drawer-hero-avatar");
+        avatarBox.append(createAvatar(agent));
+        const body = el("div", "drawer-hero-body");
+        const name = el("div", "drawer-hero-name");
+        const id = el("span", "drawer-agent-id mono", agent.id);
+        id.title = agent.id;
+        name.append(el("span", "drawer-role", roleStyle(agent.role ?? "").label), id);
+        const room = el("div", "drawer-hero-room");
+        const chip = el("span", "drawer-room-chip", providerLetter(worker.name));
+        chip.style.background = paletteOf(worker).shirt;
+        chip.setAttribute("aria-hidden", "true");
+        room.append(chip, el("span", "drawer-room-name", worker.name), el("span", "drawer-room-state", roomStateLabel(worker.state)));
+        body.append(name, room);
+        if (ticketId !== null) {
+          const row = el("div", "drawer-hero-ticket");
+          row.append(el("span", "drawer-ticket-label", "Ticket"), el("span", "drawer-ticket-id mono", ticketId));
+          body.append(row);
+        }
+        hero.append(avatarBox, body);
+
+        const mission = el("div", ticketId === null ? "drawer-mission is-empty" : "drawer-mission");
+        if (ticketId === null) mission.append(el("div", "drawer-mission-title", "Chưa có ticket"));
+        else if (ticket?.title) mission.append(el("div", "drawer-mission-title", ticket.title));
+        // Ticket không nằm trong Cần bạn thì không có tiêu đề: hiện mã mờ thay cho hộp trống.
+        else mission.append(el("div", "drawer-mission-title drawer-muted mono", ticketId));
         if (ticket) {
-          line(agentPanel, ticket.title);
-          for (const [label, url] of [["MR", mergeRequest(ticket).url], ["Xem trước", previewLink(ticket)]]) {
+          const links = el("div", "drawer-mission-links");
+          for (const [label, url] of [["MR ↗", mergeRequest(ticket).url], ["Xem trước ↗", previewLink(ticket)]] as const) {
             if (!url) continue;
-            const link = document.createElement("a");
-            link.textContent = label;
+            const link = el("a", "drawer-link", label);
             link.href = url;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
-            ticketRow.append(link);
+            links.append(link);
           }
+          if (links.children.length) mission.append(links);
         }
-        const current = section("Đang làm");
-        line(current, data.activity ? `${data.activity.icon} ${data.activity.text}` : "Chưa có hoạt động", data.activity?.error ? "drawer-error" : "");
-        if (data.activity?.detail) line(current, data.activity.detail, "drawer-muted");
-        const recent = section("Gần đây");
-        const activities = data.recent?.slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-        if (!activities?.length) line(recent, "Chưa có hoạt động", "drawer-muted");
-        for (const activity of activities ?? []) {
-          const row = line(recent, `${activity.icon} ${activity.text}`, "drawer-recent");
-          line(row, relativeTime(activity.at, now), "drawer-muted");
-        }
-        const tasks = section("Task");
-        const progress = taskProgress(agent);
-        if (progress) {
-          line(tasks, `${progress.done}/${progress.total} đã xong`);
-          const bar = document.createElement("progress");
-          bar.max = progress.total;
-          bar.value = progress.done;
+
+        const status = statusView(worker, agent, new Set(needItems.map(item => item.ticket.id)), now);
+        const statusRow = el("div", `drawer-status tone-${status.tone}`);
+        statusRow.append(el("span", "drawer-status-dot"), el("span", "drawer-status-label", status.label));
+        if (status.ago !== null) statusRow.append(el("span", "drawer-status-ago", `· ${status.ago}`));
+
+        const activity = data.activity;
+        const card = el("div", activity?.error ? "drawer-now is-error" : "drawer-now");
+        const main = el("div", "drawer-now-main");
+        if (activity) main.append(el("span", "drawer-now-icon", activity.icon), el("span", "drawer-now-text", activity.text));
+        else main.append(el("span", "drawer-now-text drawer-muted", "Chưa có hoạt động"));
+        card.append(el("div", "drawer-now-title", "Đang làm"), main);
+        if (activity?.detail) card.append(el("div", "drawer-now-detail", activity.detail));
+        agentPanel.append(hero, mission, statusRow, card);
+
+        const checklist = taskChecklist(agent);
+        const tasks = section("Task", checklist ? `${checklist.done}/${checklist.total}` : null);
+        if (!checklist) tasks.append(el("div", "drawer-muted", "Chưa có task"));
+        else {
+          const bar = el("div", "drawer-progress");
+          bar.setAttribute("role", "progressbar");
           bar.setAttribute("aria-label", "Tiến độ task");
-          tasks.append(bar);
-        }
-        if (!data.tasks?.length) line(tasks, "Chưa có task", "drawer-muted");
-        for (const task of data.tasks ?? []) {
-          const labels = { pending: "Chờ", in_progress: "Đang làm", completed: "Đã xong" };
-          line(tasks, `${labels[task.status]} · ${task.title}`, `drawer-task ${task.status}`);
-        }
-        const stats = section("Số liệu");
-        for (const item of tokenStatsLines(data.stats)) {
-          const row = line(stats, item.text);
-          if (item.cacheSuffix !== null) {
-            const suffix = document.createElement("span");
-            suffix.className = item.level ? `drawer-cache ${item.level}` : "drawer-cache";
-            suffix.textContent = item.cacheSuffix;
-            row.append(suffix);
+          bar.setAttribute("aria-valuemin", "0");
+          bar.setAttribute("aria-valuemax", String(checklist.total));
+          bar.setAttribute("aria-valuenow", String(checklist.done));
+          const fill = el("div", "drawer-progress-fill");
+          fill.style.width = `${Math.round((checklist.done * 100) / checklist.total)}%`;
+          bar.append(fill);
+          const list = el("ul", "drawer-checklist");
+          const marks = { pending: "○", in_progress: "◐", completed: "✓" };
+          for (const task of checklist.items) {
+            const item = el("li", `drawer-check ${task.status}`);
+            const title = el("span", "drawer-check-title", task.title);
+            title.title = task.title;
+            item.append(el("span", "drawer-check-mark", marks[task.status]), title);
+            list.append(item);
           }
+          tasks.append(bar, list);
         }
+
+        const rows = recentRows(agent, info.key, now);
+        const recent = section("Gần đây", String(rows.length));
+        if (!rows.length) recent.append(el("div", "drawer-muted", "Chưa có hoạt động"));
+        else {
+          const list = el("ol", "drawer-timeline");
+          for (const row of rows) {
+            const item = el("li", "drawer-tl-row");
+            const text = el("span", "drawer-tl-text", row.text);
+            text.title = row.text;
+            const ago = el("time", "drawer-tl-ago", row.ago);
+            ago.setAttribute("datetime", row.at);
+            item.append(el("span", "drawer-tl-icon", row.icon), text, ago);
+            list.append(item);
+          }
+          recent.append(list);
+        }
+
+        const stats = section("Số liệu", null);
+        const table = el("dl", "drawer-stats");
+        for (const row of tokenStatsRows(data.stats)) {
+          const item = el("div", "drawer-stat");
+          const value = el("dd", "");
+          value.append(el("span", "drawer-stat-value", row.value));
+          if (row.cacheSuffix !== null) value.append(el("span", row.level ? `drawer-cache ${row.level}` : "drawer-cache", row.cacheSuffix));
+          item.append(el("dt", "", row.label), value);
+          table.append(item);
+        }
+        stats.append(table);
       }
       if (changed) layout();
     },

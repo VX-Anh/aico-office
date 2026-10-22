@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-2536d85d). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-17d9ab91). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
@@ -40,12 +40,13 @@ flowchart TD
     VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
     FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
     SEL["ui/selection.ts"]
-    FMT["ui/format.ts"]
+    FMT["ui/format.ts<br/>tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
     TOK["ui/tokens.css<br/>--feed-max"]
     TOP["ui/topbar.ts + CSS"]
     SIDE["ui/sidebar.ts + CSS"]
     AV["ui/avatar.ts"]
-    DRW["ui/drawer.ts + CSS"]
+    DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>roomStateLabel, taskChecklist, recentRows"]
+    DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái, thẻ Đang làm, checklist task<br/>timeline Gần đây, bảng số liệu"]
     FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>dòng ticket is-ticket: ô ticket rỗng, title không lặp<br/>màn hẹp: cột tên fit-content, mã ticket đủ<br/>tự cuộn, viên N mới, phím ]"]
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
@@ -55,7 +56,7 @@ flowchart TD
   MAIN --> SEL
   MAIN --> TOP
   MAIN --> SIDE
-  MAIN --> DRW
+  MAIN -->|view, agent + needItems, now| DRW
   MAIN -->|lines + workers| FEED
   FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
   MAIN --> TOAST
@@ -68,9 +69,14 @@ flowchart TD
   FMT --> USG
   FMT --> ACTV
   FM --> ACTV
+  DRW --> DRWM
+  DRW --> AV
+  DRW --> FMT
+  DRW --> PAL
   DRW --> TK
-  DRW --> ACTV
-  DRW --> TIME
+  DRWM --> ACTV
+  DRWM --> TIME
+  DRWM --> FMT
   DRW --> NEEDS
   COL --> NEEDS
   TOK -.-> TOP
@@ -138,16 +144,17 @@ flowchart TD
   VP -->|vùng trống, focus, vị trí feed| MAIN
 
   OVL["src/overlay.ts<br/>chữ DPR: hoạt động, progress<br/>biển phòng, banner và confetti hữu hạn"]
-  TIP["src/agent-tooltip.ts + CSS<br/>hit-test và xem nhanh"]
+  TIP["src/agent-tooltip.ts + CSS<br/>hit-test và xem nhanh<br/>tokenStatsLines"]
   MAIN -->|figures, biển phòng, banner| OVL
   MAIN -->|figures và chọn agent| TIP
   OVL --> ACTV
   OVL --> PAL
   TIP --> ACTV
+  TIP --> FMT
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>feed: dòng ticket không lặp mã, dòng agent giữ mã<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model: tone, phòng, checklist, timeline<br/>drawer DOM: hero, nhiệm vụ, trạng thái, thẻ Đang làm<br/>checklist, timeline, số liệu, dữ liệu đổi giữa chừng<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
@@ -161,4 +168,7 @@ flowchart TD
   TEST -.-> VP
   TEST -.-> FM
   TEST -.-> FEED
+  TEST -.-> FMT
+  TEST -.-> DRWM
+  TEST -.-> DRW
 ```

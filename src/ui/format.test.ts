@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WorkerAgent, WorkerStatus } from "../api";
-import { agentStatus, clock, fmtAgo, fmtNumber, fmtTokenCount, providerLetter, tokenStatsLines, usageTile } from "./format";
+import { agentStatus, clock, fmtAgo, fmtNumber, fmtTokenCount, providerLetter, tokenStatsLines, tokenStatsRows, usageTile } from "./format";
 const now = Date.parse("2026-01-01T10:00:00Z");
 const agent: WorkerAgent = { id: "a", role: "coder", ticket_id: "t", mode: "write", started_at: "2026-01-01T00:00:00Z" };
 const worker: WorkerStatus = { name: "claude", state: "working", roles: [], agents: [agent] };
@@ -138,6 +138,39 @@ describe("format", () => {
     ]);
     expect(lines[1]).toEqual({ text: "Token vào: 1 nghìn", cacheSuffix: ` (${percent}% từ cache)`, level });
     expect(lines.filter((row) => row.cacheSuffix !== null || row.level !== null)).toEqual([lines[1]]);
+  });
+  it("tokenStatsRows có cache: nhãn, giá trị, hậu tố và Token mới", () => {
+    expect(tokenStatsRows({ tool_calls: 12_000, tokens_in: 1_120_000, tokens_out: 2_500, tokens_cached: 1_033_000 })).toEqual([
+      { label: "Lần gọi tool", value: "12.000", cacheSuffix: null, level: null },
+      { label: "Token vào", value: "1,12 triệu", cacheSuffix: " (92% từ cache)", level: "ok" },
+      { label: "Token mới", value: "87 nghìn", cacheSuffix: null, level: null },
+      { label: "Token ra", value: "2,5 nghìn", cacheSuffix: null, level: null },
+    ]);
+  });
+  it("tokenStatsRows thiếu hoặc hỏng cache: không có Token mới, không màu", () => {
+    const legacy = [
+      { label: "Lần gọi tool", value: "3", cacheSuffix: null, level: null },
+      { label: "Token vào", value: "1.120.000", cacheSuffix: null, level: null },
+      { label: "Token ra", value: "87.000", cacheSuffix: null, level: null },
+    ];
+    for (const tokens_cached of [undefined, null, Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      expect(tokenStatsRows({ tool_calls: 3, tokens_in: 1_120_000, tokens_out: 87_000, tokens_cached })).toEqual(legacy);
+    }
+    expect(tokenStatsRows(null).map((r) => r.value)).toEqual(["chưa có", "chưa có", "chưa có"]);
+    expect(tokenStatsRows({ tool_calls: -2, tokens_in: Number.NaN, tokens_out: null }).map((r) => r.value)).toEqual(["chưa có", "chưa có", "chưa có"]);
+  });
+  it.each([
+    [399, "crit"], [400, "warn"], [699, "warn"], [700, "ok"],
+  ] as const)("tokenStatsRows biên cache %i/1000 mức %s", (cached, level) => {
+    const rows = tokenStatsRows({ tool_calls: 1, tokens_in: 1_000, tokens_out: 8, tokens_cached: cached });
+    expect(rows.map((r) => r.label)).toEqual(["Lần gọi tool", "Token vào", "Token mới", "Token ra"]);
+    expect(rows[1].level).toBe(level);
+    expect(rows.filter((r) => r.level !== null)).toEqual([rows[1]]);
+  });
+  it("tokenStatsLines dựng từ tokenStatsRows", () => {
+    for (const stats of [null, { tool_calls: 1, tokens_in: 1_000, tokens_out: 8, tokens_cached: 500 }, { tokens_in: 5 }]) {
+      expect(tokenStatsLines(stats)).toEqual(tokenStatsRows(stats).map((r) => ({ text: `${r.label}: ${r.value}`, cacheSuffix: r.cacheSuffix, level: r.level })));
+    }
   });
   it("ưu tiên offline/limited rồi cần bạn, working, idle; cờ lỗi riêng", () => {
     const needs = new Set(["t"]);
