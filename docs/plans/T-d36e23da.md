@@ -1,15 +1,16 @@
 # T-d36e23da: GUI: làm lại khung Hoạt động theo kiểu feed của Habblaud
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | feed-model: thêm trường ticket, tone và dòng hết hạn mức | coder | `src/ui/feed-model.ts`, `src/ui/feed-model.test.ts` | - | xong (claude) |
-| W2 | feed.ts + feed.css: khung nổi, đầu khung, dòng lưới, cuộn, màn hẹp | coder | `src/ui/feed.ts`, `src/ui/feed.css`, `src/ui/feed.test.ts`, `src/ui/tokens.css` | - | xong (codex) |
-| W3 | viewport: hàm thuần feedBox cho vị trí và bề rộng khung feed | coder | `src/ui/viewport.ts`, `src/ui/viewport.test.ts` | - | xong (claude) |
-| W4 | Ghép nối main.ts, README (bố cục, cấu trúc, ghi công Habblaud), ảnh chụp | coder | `src/main.ts`, `src/main.test.ts`, `README.md` | W1, W2, W3 | xong (claude) |
+| W1 | feed-model: thêm trường ticket, tone và dòng hết hạn mức | coder | `src/ui/feed-model.ts`, `src/ui/feed-model.test.ts` | - | chưa chạy |
+| W2 | feed.ts + feed.css: khung nổi, đầu khung, dòng lưới, cuộn, màn hẹp | coder | `src/ui/feed.ts`, `src/ui/feed.css`, `src/ui/feed.test.ts`, `src/ui/tokens.css` | - | chưa chạy |
+| W3 | viewport: hàm thuần feedBox cho vị trí và bề rộng khung feed | coder | `src/ui/viewport.ts`, `src/ui/viewport.test.ts` | - | chưa chạy |
+| W4 | Ghép nối main.ts, README (bố cục, cấu trúc, ghi công Habblaud), ảnh chụp | coder | `src/main.ts`, `src/main.test.ts`, `README.md` | W1, W2, W3 | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
