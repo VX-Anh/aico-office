@@ -102,16 +102,18 @@ src/ui/feed-model.ts       gom feed từ recent, ticket cần người và phòn
 src/ui/feed-model.test.ts  test thứ tự, giới hạn dòng, ticket đổi loại, không lặp recent, ticket/tone, hết hạn mức
 src/ui/selection.ts        khoá agent, resolveSelection, drawerView (thuần)
 src/ui/selection.test.ts   test agent biến mất, started_at đổi, tab Cần bạn
-src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent
-src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtAgo
+src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent, hàng số liệu token
+src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtAgo, tokenStatsRows/Lines
 src/ui/topbar.ts           thanh trên: ô số, hạn mức, popover cài đặt, nút Demo
 src/ui/topbar.css          kiểu thanh trên
 src/ui/sidebar.ts          thanh bên: phòng → agent, phím [
 src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
 src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
-src/ui/drawer.ts           ngăn chi tiết: tab Agent / Cần bạn, Esc
+src/ui/drawer.ts           ngăn chi tiết: tab Agent (hero, nhiệm vụ, trạng thái, Đang làm, task, gần đây, số liệu) / Cần bạn, Esc
 src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
-src/ui/drawer.test.ts      test DOM số liệu cache, fallback, màu và cập nhật khi đang mở
+src/ui/drawer.test.ts      test DOM hero, nhiệm vụ, trạng thái, checklist, timeline, số liệu cache và dữ liệu đổi khi đang mở
+src/ui/drawer-model.ts     dữ liệu tab Agent: tone/nhãn trạng thái, nhãn phòng, checklist task, timeline (thuần)
+src/ui/drawer-model.test.ts test từng tone, lỗi cũ, thời gian tương lai/hỏng, task, recent, dữ liệu sai kiểu
 src/ui/feed.ts             khung feed nổi: dòng lưới, ticker khi thu gọn, viên N mới, bấm dòng, phím ]
 src/ui/feed.css            kiểu feed: thẻ kính góc dưới trái, thanh nổi màn hẹp
 src/ui/feed.test.ts        test DOM cột dòng, title, tone/mờ, ticker, N mới, neo cuộn, bấm dòng, phím ]
@@ -160,7 +162,7 @@ Sơ đồ module: [docs/architecture.md](docs/architecture.md).
 
 ## Ghi công
 
-- Kiểu feed hoạt động học theo [Habblaud](https://github.com/marmottajr/habblaud) (MIT), không chép code.
+- Kiểu feed hoạt động và ngăn chi tiết (drawer) học theo [Habblaud](https://github.com/marmottajr/habblaud) (MIT), không chép code.
 
 ## Thêm sprite mới
 
