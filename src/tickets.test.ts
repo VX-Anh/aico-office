@@ -19,6 +19,7 @@ import {
   demoTickets,
   irreversible,
   latestEscalationReason,
+  latestScreenshots,
   mergeRequest,
   needKind,
   needsConfirmation,
@@ -445,6 +446,113 @@ describe("previewLink", () => {
   });
 });
 
+describe("latestScreenshots", () => {
+  const t = (artifacts: unknown[]) => parseTickets([ticket("T-1", { artifacts })], who())![0];
+  const SHOT_BASE = "https://preview.aico.io.vn/preview/img-T-1-";
+  const shot = (ref: string | null, url: string | null = ref && `${SHOT_BASE}${ref}`) => ({ kind: "screenshot", ref, url });
+  const labels = (artifacts: unknown[]) => latestScreenshots(t(artifacts)).map((s) => s.label);
+
+  it("chỉ lấy bộ mới nhất, sắp theo tên file, label bỏ .png", () => {
+    const list = latestScreenshots(
+      t([
+        shot("20261022-075400/390x844-hour-11.png"),
+        shot("20261021-080000/1440x900-hour-11.png"),
+        shot("20261022-075400/1440x900-hour-21.png"),
+        shot("20261022-075400/1440x900-hour-11.png"),
+        MR,
+      ]),
+    );
+    expect(list).toEqual([
+      { url: `${SHOT_BASE}20261022-075400/1440x900-hour-11.png`, label: "1440x900-hour-11" },
+      { url: `${SHOT_BASE}20261022-075400/1440x900-hour-21.png`, label: "1440x900-hour-21" },
+      { url: `${SHOT_BASE}20261022-075400/390x844-hour-11.png`, label: "390x844-hour-11" },
+    ]);
+  });
+
+  it("thứ tự không phụ thuộc thứ tự artifact; so theo mã ký tự, không theo locale", () => {
+    const files = ["b.png", "A.png", "a.png", "_x.png", "10.png", "9.png"];
+    const sorted = ["10", "9", "A", "_x", "a", "b"];
+    expect(labels(files.map((f) => shot(`20261022-075400/${f}`)))).toEqual(sorted);
+    expect(labels([...files].reverse().map((f) => shot(`20261022-075400/${f}`)))).toEqual(sorted);
+  });
+
+  it("trùng tên file trong cùng bộ thì giữ cái sau", () => {
+    const ref = "20261022-075400/a.png";
+    expect(latestScreenshots(t([shot(ref, "https://x/1.png"), shot(ref, "https://x/2.png")]))).toEqual([
+      { url: "https://x/2.png", label: "a" },
+    ]);
+  });
+
+  it("url xấu, javascript:, data:, tương đối thì bỏ ảnh đó", () => {
+    const ok = shot("20261022-075400/ok.png");
+    for (const url of ["javascript:alert(1)", "data:image/png;base64,AAAA", "demo-shots/a.png", "/a.png", "không phải url", "ftp://x/a.png", ""]) {
+      expect(labels([ok, shot("20261022-075400/bad.png", url)])).toEqual(["ok"]);
+    }
+    expect(labels([shot("20261022-075400/http.png", "http://p.local/a.png")])).toEqual(["http"]);
+  });
+
+  it("thiếu ref hoặc url thì bỏ", () => {
+    const ok = shot("20261022-075400/ok.png");
+    expect(labels([ok, shot(null, "https://x/a.png"), shot("20261022-075400/a.png", null)])).toEqual(["ok"]);
+    expect(labels([ok, { kind: "screenshot" }, { kind: "screenshot", url: "https://x/b.png" }])).toEqual(["ok"]);
+  });
+
+  it("ref sai dạng thì bỏ, kể cả khi thời điểm trông mới hơn", () => {
+    const ok = shot("20261022-075400/ok.png");
+    for (const ref of [
+      "20261022-075400/a.jpg",
+      "20261022-075400/a.PNG",
+      "20261022-075400/.png/x",
+      "2026102-075400/a.png",
+      "20261023-0754/a.png",
+      "20261023-075400/sub/a.png",
+      "20261023-075400/a b.png",
+      "20261023-075400/../a.png",
+      " 20261023-075400/a.png",
+      "20261023-075400/a.png ",
+      "20261023-075400a.png",
+      "/a.png",
+    ]) {
+      expect(labels([ok, shot(ref)])).toEqual(["ok"]);
+    }
+  });
+
+  it("chỉ kind screenshot", () => {
+    expect(labels([{ kind: "preview", ref: "20261022-075400/a.png", url: "https://x/a.png" }])).toEqual([]);
+    expect(labels([{ kind: "Screenshot", ref: "20261022-075400/a.png", url: "https://x/a.png" }])).toEqual([]);
+  });
+
+  it("bộ mới nhất toàn url hỏng thì lùi về bộ hợp lệ gần nhất", () => {
+    expect(
+      labels([
+        shot("20261020-080000/old.png"),
+        shot("20261021-080000/mid.png"),
+        shot("20261022-075400/new-a.png", "javascript:alert(1)"),
+        shot("20261022-075400/new-b.png", null),
+      ]),
+    ).toEqual(["mid"]);
+  });
+
+  it("tối đa 16 ảnh: 20 ảnh thì lấy 16 ảnh đầu theo tên", () => {
+    const names = Array.from({ length: 20 }, (_, i) => `s${String(i).padStart(2, "0")}`);
+    const list = labels([...names].reverse().map((n) => shot(`20261022-075400/${n}.png`)));
+    expect(list).toEqual(names.slice(0, 16));
+  });
+
+  it("ticket không có screenshot thì []", () => {
+    expect(latestScreenshots(t([]))).toEqual([]);
+    expect(latestScreenshots(t([MR, PREVIEW]))).toEqual([]);
+  });
+
+  it("hàm thuần: không warn, không đổi ticket", () => {
+    const tk = t([shot("20261022-075400/b.png"), shot("20261022-075400/a.png")]);
+    const copy = JSON.parse(JSON.stringify(tk));
+    latestScreenshots(tk);
+    expect(tk).toEqual(copy);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
 describe("waitedLabel", () => {
   const now = Date.parse("2026-10-21T12:00:00Z");
   it("giây, phút, giờ, ngày", () => {
@@ -744,6 +852,31 @@ describe("demo", () => {
     expect(previewLink(merge)).toMatch(/^https:/);
     expect(new Set(list.map((t) => t.id)).size).toBe(list.length);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("demoNeedTickets: review có 2 bộ ảnh, chỉ hiện đúng 3 ảnh bộ mới; merge có 2 ảnh", () => {
+    const list = demoNeedTickets();
+    const review = list.find((t) => t.id === "T-demo-review")!;
+    expect(review.artifacts.filter((a) => a.kind === "screenshot")).toHaveLength(4);
+    expect(latestScreenshots(review)).toEqual(
+      ["1440x900-hour-11", "1440x900-hour-21", "390x844-hour-11"].map((label) => ({
+        url: `https://example.com/aico-office/demo-shots/20261022-075400/${label}.png`,
+        label,
+      })),
+    );
+    const merge = list.find((t) => t.id === "T-demo-merge")!;
+    expect(latestScreenshots(merge)).toHaveLength(2);
+    expect(mergeRequest(merge).url).toMatch(/^https:/);
+    expect(demoTickets()[1].artifacts.some((a) => a.kind === "screenshot")).toBe(false);
+  });
+
+  it("demoNeedTickets(now, assetBase): url ảnh theo assetBase, vẫn qua safeUrl", () => {
+    for (const base of ["http://localhost:5173/", "https://vx-anh.github.io/aico-office/"]) {
+      const review = demoNeedTickets(0, base).find((t) => t.id === "T-demo-review")!;
+      const shots = latestScreenshots(review);
+      expect(shots).toHaveLength(3);
+      for (const s of shots) expect(s.url.startsWith(`${base}demo-shots/20261022-075400/`)).toBe(true);
+    }
   });
 
   it("demoNeedTickets(now): giờ cập nhật lùi từ now, đều đã qua", () => {

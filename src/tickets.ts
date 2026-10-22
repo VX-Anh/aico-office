@@ -210,6 +210,39 @@ export function previewLink(ticket: Ticket): string | null {
   return url;
 }
 
+export interface Screenshot {
+  url: string;
+  label: string;
+}
+
+// ref = "<thời điểm>/<file>.png"; thời điểm dạng 20261022-075400 nên so chuỗi là so thời gian.
+const SHOT_REF = /^(\d{8}-\d{6})\/([A-Za-z0-9._-]+\.png)$/;
+export const MAX_SCREENSHOTS = 16;
+
+// Chỉ hiện bộ ảnh của lần review mới nhất. Thời điểm chọn trong các ảnh hợp lệ, để bộ mới toàn url
+// hỏng không che mất bộ cũ còn xem được. So bằng `<` thay vì localeCompare để thứ tự không đổi theo máy.
+export function latestScreenshots(ticket: Ticket): Screenshot[] {
+  let latest = "";
+  const byStamp = new Map<string, Map<string, string>>();
+  for (const a of ticket.artifacts) {
+    if (a.kind !== "screenshot" || !a.ref) continue;
+    const m = SHOT_REF.exec(a.ref);
+    const url = safeUrl(a.url);
+    if (!m || !url) continue;
+    const [, stamp, file] = m;
+    let files = byStamp.get(stamp);
+    if (!files) byStamp.set(stamp, (files = new Map()));
+    files.set(file, url); // trùng tên thì cái sau ghi đè
+    if (stamp > latest) latest = stamp;
+  }
+  const files = byStamp.get(latest);
+  if (!files) return [];
+  return [...files.keys()]
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .slice(0, MAX_SCREENSHOTS)
+    .map((file) => ({ url: files.get(file)!, label: file.slice(0, -".png".length) }));
+}
+
 export function actionAvailability(reason: string | null, ticket: Ticket): Record<EscalationAction, boolean> {
   return {
     retry_push: reason?.trimStart().startsWith(RETRY_PUSH_PREFIX) ?? false,
@@ -366,11 +399,15 @@ export function demoTickets(): DemoTicket[] {
   ];
 }
 
+const DEMO_ASSET_BASE = "https://example.com/aico-office/";
+
 // Đủ 3 loại cần người. `now` cho trước thì giờ cập nhật tính lùi từ đó để "đã chờ" trông như thật.
 // Id kế hoạch trùng ticket_id của agent claude chạy lâu nhất, để chấm "cần bạn" gắn đúng người.
-export function demoNeedTickets(now?: number): DemoTicket[] {
+// `assetBase` là url tuyệt đối tới public/ (safeUrl không nhận url tương đối).
+export function demoNeedTickets(now?: number, assetBase = DEMO_ASSET_BASE): DemoTicket[] {
   const at = (iso: string, minutesAgo: number) =>
     now === undefined ? iso : new Date(now - minutesAgo * 60_000).toISOString();
+  const shot = (ref: string): TicketArtifact => ({ kind: "screenshot", ref, url: new URL(`demo-shots/${ref}`, assetBase).href });
   const [push, merge] = demoTickets();
   return [
     {
@@ -391,12 +428,26 @@ export function demoNeedTickets(now?: number): DemoTicket[] {
         { kind: "branch", ref: "aico/T-demo-review", url: null },
         { kind: "merge_request", ref: "!57", url: "https://example.com/aico-office/merge_requests/57" },
         { kind: "preview", ref: null, url: "https://example.com/aico-office/preview/57" },
+        // Hai lần review: chỉ bộ mới (3 ảnh) được hiện.
+        shot("20261021-080000/1440x900-hour-11.png"),
+        shot("20261022-075400/1440x900-hour-11.png"),
+        shot("20261022-075400/1440x900-hour-21.png"),
+        shot("20261022-075400/390x844-hour-11.png"),
       ],
       updated_at: at("2026-10-21T08:10:00Z", 12),
       reason: null,
     },
     { ...push, updated_at: at(push.updated_at!, 45) },
-    { ...merge, updated_at: at(merge.updated_at!, 30) },
+    {
+      ...merge,
+      // Ảnh thứ hai cố ý trỏ tới file không có, để thấy ảnh lỗi thành liên kết.
+      artifacts: [
+        ...merge.artifacts,
+        shot("20261022-075400/1440x900-hour-11.png"),
+        shot("20261022-075400/1440x900-missing.png"),
+      ],
+      updated_at: at(merge.updated_at!, 30),
+    },
   ];
 }
 

@@ -98,7 +98,8 @@ function onSnapshot(tickets: Ticket[]): void {
 }
 
 function ticketSource(current: ApiConfig | null): NeedSource {
-  let tickets = demoNeedTickets(Date.now());
+  const page = globalThis.location?.href; // vắng khi chạy test trong Node
+  let tickets = demoNeedTickets(Date.now(), page ? new URL(import.meta.env.BASE_URL, page).href : undefined);
   const reasons = current ? createReasonCache((id) => fetchEscalationReason(current, id)) : null;
   return {
     async list() {
