@@ -1,12 +1,12 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-446cb8a0). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-e74ec7c8). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data["Dữ liệu và logic thuần hiện có"]
-    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây"]
+    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây<br/>defaultBaseUrl: origin/api trên tên miền thật<br/>null cho localhost, file:, /preview/"]
     TK["src/tickets.ts<br/>parseTickets, needsYou, NEED_LABEL, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
     ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
     USG["src/usage.ts"]
@@ -30,11 +30,19 @@ flowchart TD
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room"]
+  LOC["window.location"]
+  LS["localStorage aico-office.api"]
+  FORM["#settings trong index.html<br/>baseUrl, token"]
+
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room<br/>điền ô địa chỉ: kết nối lưu, không thì defaultBaseUrl"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
   MAIN -->|demo assetBase| TK
+  LS -->|loadConfig| MAIN
+  MAIN -->|saveConfig chỉ khi submit| LS
+  LOC -->|defaultBaseUrl| MAIN
+  MAIN -->|value baseUrl, không tự kết nối| FORM
 
   subgraph UI["Khung UI"]
     VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
@@ -42,7 +50,7 @@ flowchart TD
     SEL["ui/selection.ts"]
     FMT["ui/format.ts<br/>agentStatus, tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
     TOK["ui/tokens.css<br/>--feed-max"]
-    TOP["ui/topbar.ts + CSS"]
+    TOP["ui/topbar.ts + CSS<br/>popover cài đặt chứa #settings<br/>settingsFocus: địa chỉ có + token trống → focus token"]
     SIDE["ui/sidebar.ts + CSS"]
     AV["ui/avatar.ts"]
     DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>+ ticketId, needKind; nhãn 'Chờ bạn …' theo NEED_LABEL<br/>nowCardTitle theo tone<br/>roomStateLabel, taskChecklist, recentRows"]
@@ -51,6 +59,7 @@ flowchart TD
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
   end
+  FORM --> TOP
   MAIN --> VP
   MAIN --> FM
   MAIN --> SEL
@@ -62,6 +71,7 @@ flowchart TD
   FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
   MAIN --> TOAST
   TOAST -->|onOpen → showNeeds| MAIN
+  TOP -->|submit, Demo| MAIN
   TOP --> FMT
   SIDE --> FMT
   SIDE --> AV
@@ -157,7 +167,9 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model: tone, nhãn need theo loại, nowCardTitle<br/>phòng, checklist, timeline<br/>drawer DOM: hero, nhiệm vụ, nút nhãn need → onTicket<br/>tiêu đề thẻ theo tone, checklist, timeline, số liệu<br/>dữ liệu đổi giữa chừng: need vào/rời, kind đổi, offline<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model, drawer DOM<br/>api: defaultBaseUrl deploy/localhost/[::1]/file:/preview<br/>topbar: settingsFocus, focus ô token<br/>main: điền sẵn địa chỉ, kết nối lưu thắng, không tự lưu/kết nối<br/>dữ liệu đổi giữa chừng: kết nối lưu mất, Demo/Thoát demo, offline<br/>giữ actors và mọi test cũ"]
+  TEST -.-> API
+  TEST -.-> TOP
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
