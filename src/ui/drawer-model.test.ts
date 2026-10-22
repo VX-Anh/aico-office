@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkerAgent, WorkerStatus } from "../api";
-import { recentRows, roomStateLabel, statusView, taskChecklist } from "./drawer-model";
+import type { NeedKind } from "../tickets";
+import { nowCardTitle, recentRows, roomStateLabel, statusView, taskChecklist, type StatusTone } from "./drawer-model";
 
 const now = Date.parse("2026-01-01T10:00:00Z");
 const agent: WorkerAgent = { id: "a", role: "coder", ticket_id: "t", mode: "write", started_at: "2026-01-01T09:50:00Z" };
@@ -16,23 +17,22 @@ describe("statusView", () => {
   it.each([
     ["offline", { ...worker, state: "offline" }, new Set(["t"]), "Mất kết nối"],
     ["limited", { ...worker, state: "limited" }, new Set(["t"]), "Hết hạn mức"],
-    ["need", worker, new Set(["t"]), "Chờ"],
     ["working", worker, new Set<string>(), "Đang làm"],
     ["idle", { ...worker, state: "idle" }, new Set<string>(), "Rảnh"],
   ] as const)("tone %s", (tone, w, needs, label) => {
-    expect(statusView(w as WorkerStatus, agent, needs, now)).toEqual({ tone, label, ago: "10 phút trước" });
+    expect(statusView(w as WorkerStatus, agent, needs, now)).toEqual({ tone, label, ago: "10 phút trước", ticketId: null, needKind: null });
   });
   it("lỗi đứng sau offline/limited nhưng trước need, working, idle", () => {
     const failed = { ...agent, activity: act("2026-01-01T09:59:00Z", { kind: "error" }) } as WorkerAgent;
     for (const [state, needs] of [["working", new Set(["t"])], ["working", new Set<string>()], ["idle", new Set<string>()]] as const) {
-      expect(statusView({ ...worker, state }, failed, needs, now)).toEqual({ tone: "error", label: "Lỗi", ago: "1 phút trước" });
+      expect(statusView({ ...worker, state }, failed, needs, now)).toEqual({ tone: "error", label: "Lỗi", ago: "1 phút trước", ticketId: null, needKind: null });
     }
     expect(statusView({ ...worker, state: "offline" }, failed, new Set(), now).tone).toBe("offline");
     expect(statusView({ ...worker, state: "limited" }, failed, new Set(), now).tone).toBe("limited");
   });
   it("cờ lỗi cũ vẫn đỏ dù activity đã cũ và kind không phải error", () => {
     const old = { ...agent, activity: act("2026-01-01T08:00:00Z", { error: true }) } as WorkerAgent;
-    expect(statusView(worker, old, new Set(), now)).toEqual({ tone: "error", label: "Lỗi", ago: "2 giờ trước" });
+    expect(statusView(worker, old, new Set(), now)).toEqual({ tone: "error", label: "Lỗi", ago: "2 giờ trước", ticketId: null, needKind: null });
   });
   it("ago từ activity.at, không có thì started_at, không có cả hai thì null", () => {
     expect(statusView(worker, { ...agent, activity: act("2026-01-01T09:59:48Z") } as WorkerAgent, new Set(), now).ago).toBe("12 giây trước");
@@ -47,7 +47,7 @@ describe("statusView", () => {
   it("activity sai kiểu bị từ chối, warn một lần, rơi về started_at", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const bad = { ...agent, id: "bad-activity", activity: { kind: "edit", text: 5, at: "2026-01-01T09:59:00Z", error: true } } as unknown as WorkerAgent;
-    expect(statusView(worker, bad, new Set(), now)).toEqual({ tone: "working", label: "Đang làm", ago: "10 phút trước" });
+    expect(statusView(worker, bad, new Set(), now)).toEqual({ tone: "working", label: "Đang làm", ago: "10 phút trước", ticketId: null, needKind: null });
     statusView(worker, bad, new Set(), now);
     expect(warn).toHaveBeenCalledTimes(1);
     const badAt = { ...agent, id: "bad-at", activity: act("hôm qua") } as unknown as WorkerAgent;
@@ -56,13 +56,175 @@ describe("statusView", () => {
   it("worker hoặc agent không phải object: không ném, warn một lần", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const nullWorker = null as unknown as WorkerStatus;
-    expect(statusView(nullWorker, agent, new Set(), now)).toEqual({ tone: "idle", label: "Rảnh", ago: "10 phút trước" });
+    expect(statusView(nullWorker, agent, new Set(), now)).toEqual({ tone: "idle", label: "Rảnh", ago: "10 phút trước", ticketId: null, needKind: null });
     expect(statusView(nullWorker, agent, new Set(), now).tone).toBe("idle");
-    expect(statusView(worker, "x" as unknown as WorkerAgent, new Set(), now)).toEqual({ tone: "working", label: "Đang làm", ago: null });
+    expect(statusView(worker, "x" as unknown as WorkerAgent, new Set(), now)).toEqual({ tone: "working", label: "Đang làm", ago: null, ticketId: null, needKind: null });
     expect(warn.mock.calls.filter(([msg]) => String(msg).includes("worker phải là object"))).toHaveLength(1);
   });
   it("now hỏng không ném", () => {
     expect(statusView(worker, agent, new Set(), Number.NaN).ago).toBe("chưa rõ");
+  });
+});
+
+describe("statusView: tone need", () => {
+  const needs = (kind: unknown, id = "t") => new Map([[id, kind as NeedKind]]);
+  it.each([
+    ["plan", "Chờ bạn duyệt kế hoạch"],
+    ["merge", "Chờ bạn duyệt merge"],
+    ["escalated", "Chờ bạn xử lý (escalated)"],
+  ] as const)("loại %s", (kind, label) => {
+    expect(statusView(worker, agent, needs(kind), now)).toEqual({ tone: "need", label, ago: "10 phút trước", ticketId: "t", needKind: kind });
+  });
+  it("Map thiếu id của agent thì không phải need", () => {
+    expect(statusView(worker, agent, needs("plan", "khác"), now)).toEqual({ tone: "working", label: "Đang làm", ago: "10 phút trước", ticketId: null, needKind: null });
+  });
+  it.each([
+    ["lạ", "duyệt"], ["undefined", undefined], ["null", null], ["số", 3], ["object", { kind: "plan" }], ["toString", "toString"],
+  ])("kind %s ra 'Chờ bạn', không ném, warn một lần", (_, kind) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = { ...agent, ticket_id: `kind-${String(_)}` };
+    const m = needs(kind, a.ticket_id);
+    expect(statusView(worker, a, m, now)).toEqual({ tone: "need", label: "Chờ bạn", ago: "10 phút trước", ticketId: a.ticket_id, needKind: null });
+    statusView(worker, a, m, now);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    { toString: null },
+    { toString: "plan" },
+    [{ toString: null }],
+  ])("kind không chuyển được thành chuỗi vẫn fallback", (kind) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const needs = new Map([["t", kind as unknown as NeedKind]]);
+
+    for (let i = 0; i < 2; i++) {
+      expect(statusView(worker, agent, needs, now)).toMatchObject({
+        tone: "need",
+        label: "Chờ bạn",
+        ticketId: "t",
+        needKind: null,
+      });
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ["toJSON ném", { toJSON() { throw new Error("x"); } }],
+    ["getter ném", Object.defineProperty({}, "kind", { enumerable: true, get() { throw new Error("x"); } })],
+    ["vòng lặp", (() => { const o: Record<string, unknown> = {}; o.self = o; return o; })()],
+    ["BigInt", { n: 1n }],
+    ["symbol", Symbol("plan")],
+    ["hàm", () => "plan"],
+  ])("kind %s: không ném khi ghi cảnh báo, warn một lần", (name, kind) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = { ...agent, ticket_id: `throwy-${name}` };
+    const m = needs(kind, a.ticket_id);
+    for (let i = 0; i < 2; i++) {
+      expect(statusView(worker, a, m, now)).toMatchObject({ tone: "need", label: "Chờ bạn", ticketId: a.ticket_id, needKind: null });
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+  it("kind không chuyển được thành chuỗi vẫn fallback, warn một lần", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const kinds: unknown[] = [
+      { toString: null },
+      Object.create(null),
+      [{ toString: null }],
+    ];
+
+    kinds.forEach((kind, index) => {
+      const ticket_id = `bad-coercion-${index}`;
+      const needs = new Map([[ticket_id, kind as NeedKind]]);
+      const current = { ...agent, ticket_id };
+      const before = warn.mock.calls.length;
+
+      for (let i = 0; i < 2; i++) {
+        expect(statusView(worker, current, needs, now)).toMatchObject({
+          tone: "need",
+          label: "Chờ bạn",
+          ticketId: ticket_id,
+          needKind: null,
+        });
+      }
+      expect(warn.mock.calls.length - before).toBe(1);
+    });
+  });
+  it("truyền Set (cách gọi cũ) thì 'Chờ bạn', vẫn có ticketId, warn một lần", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(statusView(worker, agent, new Set(["t"]), now)).toEqual({ tone: "need", label: "Chờ bạn", ago: "10 phút trước", ticketId: "t", needKind: null });
+    statusView(worker, agent, new Set(["t"]), now);
+    expect(warn.mock.calls.filter(([msg]) => String(msg).includes("là Set"))).toHaveLength(1);
+  });
+  it("danh sách Cần bạn không phải Map/Set: coi như rỗng, không ném", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const bad = ["t"] as unknown as ReadonlySet<string>;
+    expect(statusView(worker, agent, bad, now)).toMatchObject({ tone: "working", ticketId: null, needKind: null });
+  });
+  it("kind đổi plan → merge → escalated → lạ trên cùng ticket", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const seq = ["plan", "merge", "escalated", "lạ-nữa"].map((k) => statusView(worker, agent, needs(k), now));
+    expect(seq.map((v) => [v.label, v.needKind, v.ticketId])).toEqual([
+      ["Chờ bạn duyệt kế hoạch", "plan", "t"],
+      ["Chờ bạn duyệt merge", "merge", "t"],
+      ["Chờ bạn xử lý (escalated)", "escalated", "t"],
+      ["Chờ bạn", null, "t"],
+    ]);
+  });
+  it("vào → rời → vào lại Cần bạn; số mục đổi 0 → 3 → 1", () => {
+    const lists = [
+      new Map<string, NeedKind>(),
+      new Map<string, NeedKind>([["x", "plan"], ["y", "escalated"], ["t", "merge"]]),
+      new Map<string, NeedKind>([["t", "plan"]]),
+      new Map<string, NeedKind>([["x", "merge"]]),
+    ];
+    expect(lists.map((m) => statusView(worker, agent, m, now)).map((v) => [v.tone, v.label, v.ticketId])).toEqual([
+      ["working", "Đang làm", null],
+      ["need", "Chờ bạn duyệt merge", "t"],
+      ["need", "Chờ bạn duyệt kế hoạch", "t"],
+      ["working", "Đang làm", null],
+    ]);
+  });
+  it("ticket_id đổi T-1 → T-2 → null", () => {
+    const m = new Map<string, NeedKind>([["T-1", "plan"], ["T-2", "merge"]]);
+    const ids = ["T-1", "T-2", null].map((ticket_id) => statusView(worker, { ...agent, ticket_id } as WorkerAgent, m, now));
+    expect(ids.map((v) => [v.tone, v.ticketId, v.needKind])).toEqual([["need", "T-1", "plan"], ["need", "T-2", "merge"], ["working", null, null]]);
+  });
+  it("need → offline → limited → need: offline/limited không có ticketId", () => {
+    const m = needs("plan");
+    const seq = (["working", "offline", "limited", "idle"] as const).map((state) => statusView({ ...worker, state }, agent, m, now));
+    expect(seq.map((v) => [v.tone, v.label, v.ticketId, v.needKind])).toEqual([
+      ["need", "Chờ bạn duyệt kế hoạch", "t", "plan"],
+      ["offline", "Mất kết nối", null, null],
+      ["limited", "Hết hạn mức", null, null],
+      ["need", "Chờ bạn duyệt kế hoạch", "t", "plan"],
+    ]);
+  });
+  it("need kèm activity lỗi ra error, không có ticketId", () => {
+    const failed = { ...agent, activity: act("2026-01-01T09:59:00Z", { kind: "error" }) } as WorkerAgent;
+    expect(statusView(worker, failed, needs("merge"), now)).toEqual({ tone: "error", label: "Lỗi", ago: "1 phút trước", ticketId: null, needKind: null });
+  });
+});
+
+describe("nowCardTitle", () => {
+  it.each([
+    ["working", true, "Đang làm"],
+    ["need", true, "Hoạt động gần nhất"],
+    ["idle", true, "Hoạt động gần nhất"],
+    ["offline", true, "Hoạt động gần nhất"],
+    ["limited", true, "Hoạt động gần nhất"],
+    ["error", true, "Lỗi gần nhất"],
+    ["working", false, "Đang làm"],
+    ["need", false, "Đang làm"],
+    ["idle", false, "Đang làm"],
+    ["offline", false, "Đang làm"],
+    ["limited", false, "Đang làm"],
+    ["error", false, "Đang làm"],
+  ] as const)("%s, có hoạt động %s → %s", (tone, has, title) => {
+    expect(nowCardTitle(tone, has)).toBe(title);
+  });
+  it("tone lạ ra 'Đang làm'", () => {
+    expect(nowCardTitle("toString" as StatusTone, true)).toBe("Đang làm");
+  });
+  it("activity có → null → có theo tone hiện tại", () => {
+    expect([true, false, true].map((has) => nowCardTitle("need", has))).toEqual(["Hoạt động gần nhất", "Đang làm", "Hoạt động gần nhất"]);
   });
 });
 

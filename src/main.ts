@@ -257,6 +257,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 const drawer = createDrawer(drawerRoot, needsRoot, {
+  onTicket: showNeeds,
   onClose: closeDrawer,
   onTab(next) {
     if (next === "needs") {

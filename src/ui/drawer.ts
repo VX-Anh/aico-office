@@ -3,7 +3,7 @@ import type { NeedItem } from "../needs-column";
 import { paletteOf, roleStyle } from "../scene/palette";
 import { mergeRequest, previewLink } from "../tickets";
 import { createAvatar } from "./avatar";
-import { recentRows, roomStateLabel, statusView, taskChecklist } from "./drawer-model";
+import { nowCardTitle, recentRows, roomStateLabel, statusView, taskChecklist } from "./drawer-model";
 import { providerLetter, tokenStatsRows } from "./format";
 import type { DrawerView, SelectedAgent } from "./selection";
 import "./drawer.css";
@@ -12,6 +12,7 @@ export interface DrawerAgentInfo extends SelectedAgent {
   needItems?: readonly NeedItem[];
 }
 export interface DrawerOptions {
+  onTicket(id: string): void;
   onClose(): void;
   onTab(tab: "agent" | "needs"): void;
 }
@@ -140,9 +141,19 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
           if (links.children.length) mission.append(links);
         }
 
-        const status = statusView(worker, agent, new Set(needItems.map(item => item.ticket.id)), now);
+        const status = statusView(worker, agent, new Map(needItems.map(item => [item.ticket.id, item.kind])), now);
         const statusRow = el("div", `drawer-status tone-${status.tone}`);
-        statusRow.append(el("span", "drawer-status-dot"), el("span", "drawer-status-label", status.label));
+        const statusTicketId = status.ticketId;
+        let label: HTMLElement;
+        if (status.tone === "need" && statusTicketId !== null) {
+          const button = el("button", "drawer-status-label drawer-status-link", status.label);
+          button.type = "button";
+          button.title = `Mở ${statusTicketId} trong Cần bạn`;
+          button.setAttribute("aria-label", button.title);
+          button.addEventListener("click", () => options.onTicket(statusTicketId));
+          label = button;
+        } else label = el("span", "drawer-status-label", status.label);
+        statusRow.append(el("span", "drawer-status-dot"), label);
         if (status.ago !== null) statusRow.append(el("span", "drawer-status-ago", `· ${status.ago}`));
 
         const activity = data.activity;
@@ -150,7 +161,7 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
         const main = el("div", "drawer-now-main");
         if (activity) main.append(el("span", "drawer-now-icon", activity.icon), el("span", "drawer-now-text", activity.text));
         else main.append(el("span", "drawer-now-text drawer-muted", "Chưa có hoạt động"));
-        card.append(el("div", "drawer-now-title", "Đang làm"), main);
+        card.append(el("div", "drawer-now-title", nowCardTitle(status.tone, !!activity)), main);
         if (activity?.detail) card.append(el("div", "drawer-now-detail", activity.detail));
         agentPanel.append(hero, mission, statusRow, card);
 
