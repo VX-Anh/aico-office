@@ -12,6 +12,10 @@
   /* Viền đậm hơn cho ô nhập, nút và mép đang được trỏ. */
   --line-strong: rgba(160, 176, 210, 0.28);
   --hover: rgba(160, 176, 210, 0.08);
+  --input-bg: rgba(0, 0, 0, 0.22);
+  --accent-soft: rgba(124, 200, 255, 0.12);
+  --room-bg: rgba(160, 176, 210, 0.035);
+  --crit-softer: rgba(255, 107, 107, 0.06);
   --text: #e8ecf5;
   --text-dim: #9aa4b8;
   --accent: #7cc8ff;
@@ -35,6 +39,8 @@
 
   --radius: 10px;
   --radius-sm: 7px;
+  --radius-xs: 8px;
+  --radius-room: 9px;
   --gap: 10px;
   --ease: cubic-bezier(.22, .8, .24, 1);
   --glass: blur(14px) saturate(1.25);
