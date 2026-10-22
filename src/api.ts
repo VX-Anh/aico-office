@@ -67,6 +67,20 @@ export interface ApiConfig {
   token: string;
 }
 
+// Bản deploy gọi API cùng tên miền; bản xem trước không có /api riêng.
+export function defaultBaseUrl(
+  loc: Pick<Location, "protocol" | "hostname" | "origin" | "pathname"> | null | undefined,
+): string | null {
+  if (!loc || (loc.protocol !== "http:" && loc.protocol !== "https:")) return null;
+  const hostname = loc.hostname.toLowerCase();
+  if (
+    hostname === "localhost" || hostname === "127.0.0.1" ||
+    hostname === "[::1]" || hostname === "::1" || hostname.endsWith(".localhost")
+  ) return null;
+  if (loc.pathname === "/preview" || loc.pathname.startsWith("/preview/")) return null;
+  return `${loc.origin.replace(/\/$/, "")}/api`;
+}
+
 const STORAGE_KEY = "aico-office.api";
 
 export function loadConfig(): ApiConfig | null {

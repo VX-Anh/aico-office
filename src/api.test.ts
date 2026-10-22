@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchTicketSnapshot, fetchTickets, type Ticket } from "./api";
+import { defaultBaseUrl, fetchTicketSnapshot, fetchTickets, type Ticket } from "./api";
 
 const CONFIG = { baseUrl: "http://aico.local:8000", token: "tok" };
 
@@ -17,6 +17,45 @@ function stubFetch(body: unknown, status = 200) {
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
+
+describe("defaultBaseUrl", () => {
+  it.each([
+    ["https://office.aico.io.vn/", "https://office.aico.io.vn/api"],
+    ["https://office.aico.io.vn/x?y=1", "https://office.aico.io.vn/api"],
+    ["http://office.aico.io.vn:8000/x#settings", "http://office.aico.io.vn:8000/api"],
+    ["https://office.aico.io.vn/preview-other", "https://office.aico.io.vn/api"],
+  ])("dùng origin của %s", (url, expected) => {
+    expect(defaultBaseUrl(new URL(url))).toBe(expected);
+  });
+
+  it.each([
+    "http://localhost:5173",
+    "http://LOCALHOST:5173",
+    "http://127.0.0.1:5173",
+    "http://[::1]:5173",
+    "http://app.localhost",
+    "https://nested.app.localhost/",
+    "file:///tmp/index.html",
+    "ftp://office.aico.io.vn/",
+    "https://office.aico.io.vn/preview",
+    "https://office.aico.io.vn/preview/T-1/?y=1",
+  ])("không điền sẵn cho %s", (url) => {
+    expect(defaultBaseUrl(new URL(url))).toBeNull();
+  });
+
+  it("chấp nhận location vắng và hostname IPv6 không có ngoặc", () => {
+    expect(defaultBaseUrl(null)).toBeNull();
+    expect(defaultBaseUrl(undefined)).toBeNull();
+    expect(defaultBaseUrl({ protocol: "http:", hostname: "::1", origin: "http://[::1]", pathname: "/" })).toBeNull();
+  });
+
+  it("chỉ dùng location truyền vào", () => {
+    vi.stubGlobal("location", new URL("http://localhost:5173/"));
+    expect(defaultBaseUrl(new URL("https://office.aico.io.vn/"))).toBe("https://office.aico.io.vn/api");
+    vi.stubGlobal("location", new URL("https://office.aico.io.vn/"));
+    expect(defaultBaseUrl(undefined)).toBeNull();
+  });
+});
 
 describe("snapshot ticket đầy đủ", () => {
   it("giữ done trong cùng một GET /tickets", async () => {
