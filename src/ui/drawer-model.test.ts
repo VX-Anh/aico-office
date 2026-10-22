@@ -88,6 +88,31 @@ describe("statusView: tone need", () => {
     statusView(worker, a, m, now);
     expect(warn).toHaveBeenCalledTimes(1);
   });
+  it("kind không chuyển được thành chuỗi vẫn fallback, warn một lần", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const kinds: unknown[] = [
+      { toString: null },
+      Object.create(null),
+      [{ toString: null }],
+    ];
+
+    kinds.forEach((kind, index) => {
+      const ticket_id = `bad-coercion-${index}`;
+      const needs = new Map([[ticket_id, kind as NeedKind]]);
+      const current = { ...agent, ticket_id };
+      const before = warn.mock.calls.length;
+
+      for (let i = 0; i < 2; i++) {
+        expect(statusView(worker, current, needs, now)).toMatchObject({
+          tone: "need",
+          label: "Chờ bạn",
+          ticketId: ticket_id,
+          needKind: null,
+        });
+      }
+      expect(warn.mock.calls.length - before).toBe(1);
+    });
+  });
   it("truyền Set (cách gọi cũ) thì 'Chờ bạn', vẫn có ticketId, warn một lần", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(statusView(worker, agent, new Set(["t"]), now)).toEqual({ tone: "need", label: "Chờ bạn", ago: "10 phút trước", ticketId: "t", needKind: null });

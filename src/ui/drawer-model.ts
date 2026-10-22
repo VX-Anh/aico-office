@@ -80,7 +80,9 @@ function readNeedKind(needs: ReadonlyMap<string, NeedKind> | ReadonlySet<string>
   }
   const kind: unknown = needs.get(ticketId);
   if (isNeedKind(kind)) return kind;
-  warnOnce(`${ticketId}: loại việc Cần bạn lạ (${String(kind)})`);
+  // Không String(kind): object kiểu { toString: null } làm phép chuyển chuỗi ném lỗi.
+  const shown = typeof kind === "string" ? kind : kind === null ? "null" : Array.isArray(kind) ? "array" : typeof kind;
+  warnOnce(`${ticketId}: loại việc Cần bạn lạ (${shown})`);
   return null;
 }
 
