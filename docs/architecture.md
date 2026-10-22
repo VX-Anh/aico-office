@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-b9a40abf). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-d36e23da). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
@@ -30,22 +30,23 @@ flowchart TD
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent"]
+  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>ghi --feed-left/--feed-room"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
   MAIN -->|demo assetBase| TK
 
-  subgraph UI["Khung UI hiện có"]
-    VP["ui/viewport.ts<br/>insets và fitScene"]
-    FM["ui/feed-model.ts"]
+  subgraph UI["Khung UI"]
+    VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
+    FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
     SEL["ui/selection.ts"]
     FMT["ui/format.ts"]
-    TOK["ui/tokens.css"]
+    TOK["ui/tokens.css<br/>--feed-max"]
     TOP["ui/topbar.ts + CSS"]
-    SIDE["ui/sidebar.ts + avatar.ts + CSS"]
+    SIDE["ui/sidebar.ts + CSS"]
+    AV["ui/avatar.ts"]
     DRW["ui/drawer.ts + CSS"]
-    FEED["ui/feed.ts + CSS"]
+    FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>tự cuộn, viên N mới, phím ]"]
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
   end
@@ -55,10 +56,15 @@ flowchart TD
   MAIN --> TOP
   MAIN --> SIDE
   MAIN --> DRW
-  MAIN --> FEED
+  MAIN -->|lines + workers| FEED
+  FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
   MAIN --> TOAST
   TOP --> FMT
   SIDE --> FMT
+  SIDE --> AV
+  FEED --> AV
+  FEED --> FMT
+  FEED --> PAL
   FMT --> USG
   FMT --> ACTV
   FM --> ACTV
@@ -111,7 +117,7 @@ flowchart TD
   BOARD --> USG
   IDX --> ACTV
   IDX --> CHAR
-  SIDE --> CHAR
+  AV --> CHAR
   ART --> CHAR
   CHAR --> PB
   CHAR --> LEG
@@ -129,7 +135,7 @@ flowchart TD
   CACHE -->|drawImage mỗi frame| CANVAS
   IDX -->|đồ đạc, nhân vật, xe| CANVAS
   LIGHT -->|drawImage multiply mỗi frame| CANVAS
-  VP -->|kích thước mới, vùng trống, focus| MAIN
+  VP -->|vùng trống, focus, vị trí feed| MAIN
 
   OVL["src/overlay.ts<br/>chữ DPR: hoạt động, progress<br/>biển phòng, banner và confetti hữu hạn"]
   TIP["src/agent-tooltip.ts + CSS<br/>hit-test và xem nhanh"]
@@ -141,7 +147,7 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
@@ -152,4 +158,7 @@ flowchart TD
   TEST -.-> IDX
   TEST -.-> MAIN
   TEST -.-> ACT
+  TEST -.-> VP
+  TEST -.-> FM
+  TEST -.-> FEED
 ```
