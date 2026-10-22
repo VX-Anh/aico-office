@@ -4,12 +4,13 @@ import { agentKey } from "./ui/selection";
 
 const h = vi.hoisted(() => ({
   realColumn: false,
+  realConnection: false,
   config: null as { baseUrl: string; token: string } | null,
   column: vi.fn(), source: vi.fn(), items: vi.fn(), refresh: vi.fn(async () => {}),
   reset: vi.fn(), update: vi.fn(), focus: vi.fn(), tick: vi.fn(),
   fetchTickets: vi.fn(), needAction: vi.fn(),
   overlayDraw: vi.fn(),
-  fetchWorkers: vi.fn(async (): Promise<import("./api").WorkerStatus[]> => []),
+  fetchWorkers: vi.fn(async (_config: import("./api").ApiConfig): Promise<import("./api").WorkerStatus[]> => []),
   tooltipUpdate: vi.fn(),
   onSnapshot: undefined as ((tickets: unknown[]) => void) | undefined,
   drawScene: vi.fn((_ctx: unknown, _workers: WorkerStatus[]) => [] as Record<string, unknown>[]),
@@ -32,13 +33,17 @@ const h = vi.hoisted(() => ({
   onClose: null as (() => void) | null,
   onTab: null as ((tab: "agent" | "needs") => void) | null,
 }));
-vi.mock("./api", async (original) => ({
-  ...await original<typeof import("./api")>(), loadConfig: () => h.config,
-  demoWorkers: () => [], saveConfig: vi.fn(), fetchWorkers: h.fetchWorkers, fetchTickets: h.fetchTickets,
-  fetchTicketSnapshot: h.fetchTickets, needAction: h.needAction,
-  // Không gọi mạng thật cho ticket escalated: trên Windows tra tên "aico" chậm làm test hết giờ.
-  fetchEscalationReason: async () => "lý do escalate (test)",
-}));
+vi.mock("./api", async (original) => {
+  const actual = await original<typeof import("./api")>();
+  return {
+    ...actual, loadConfig: () => h.realConnection ? actual.loadConfig() : h.config,
+    demoWorkers: () => [], saveConfig: vi.fn((config) => { if (h.realConnection) actual.saveConfig(config); }),
+    fetchWorkers: (config: import("./api").ApiConfig) => h.realConnection ? actual.fetchWorkers(config) : h.fetchWorkers(config), fetchTickets: h.fetchTickets,
+    fetchTicketSnapshot: h.fetchTickets, needAction: h.needAction,
+    // Không gọi mạng thật cho ticket escalated: trên Windows tra tên "aico" chậm làm test hết giờ.
+    fetchEscalationReason: async () => "lý do escalate (test)",
+  };
+});
 vi.mock("./needs-column", async (original) => {
   const actual = await original<typeof import("./needs-column")>();
   return { createNeedsColumn: (...args: Parameters<typeof actual.createNeedsColumn>) =>
@@ -54,8 +59,10 @@ vi.mock("./scene/index", () => ({
   ROLE_STYLES: {}, USAGE: {}, drawScene: h.drawScene, resetActors: vi.fn(), resetSceneCache: vi.fn(),
   roleStyle: () => ({ shirt: "#000", label: "Coder", accessory: "" }), sceneSize: () => ({ width: 100, height: 100 }),
 }));
-vi.mock("./ui/topbar", () => ({
-  createTopbar: () => ({
+vi.mock("./ui/topbar", async (original) => {
+  const actual = await original<typeof import("./ui/topbar")>();
+  return { createTopbar: (...args: Parameters<typeof actual.createTopbar>) => h.realConnection
+    ? actual.createTopbar(...args) : ({
     update(workers: { state: string; agents?: unknown[] }[], needCount: number, now: number, ids?: ReadonlySet<string>) {
       h.topbarUpdate(workers, needCount, now, ids);
       paintTile("#agents-count", String(workers.reduce((sum, worker) => (
@@ -66,8 +73,8 @@ vi.mock("./ui/topbar", () => ({
       needs.disabled = needCount === 0;
     },
     setSettingsOpen() {},
-  }),
-}));
+  }) };
+});
 vi.mock("./ui/sidebar", () => ({
   createSidebar: (_root: unknown, options: { onSelect: (key: string) => void }) => {
     h.onSelect = options.onSelect;
@@ -141,7 +148,9 @@ class Node {
   vars: Record<string, string> = {};
   left = 0;
   top = 0;
-  setAttribute() {}
+  attrs = new Map<string, string>();
+  setAttribute(name: string, value: string) { this.attrs.set(name, value); }
+  getAttribute(name: string) { return this.attrs.get(name) ?? null; }
   insertBefore(child: Node, before: Node | null) {
     const old = this.children.indexOf(child);
     if (old >= 0) this.children.splice(old, 1);
@@ -150,7 +159,8 @@ class Node {
   }
   removeAttribute() {}
   scrollIntoView() {}
-  focus() {}
+  focus() { (document as unknown as { activeElement: Node }).activeElement = this; }
+  value = "";
   textContent = "";
   hidden = false;
   disabled = false;
@@ -167,7 +177,7 @@ class Node {
   isContentEditable = false;
   matches() { return false; }
   closest() { return null as unknown; }
-  elements = { namedItem: () => ({ value: "" }) };
+  elements = { namedItem: (name: string) => getNode(`input[name="${name}"]`) };
   append(...children: Node[]) { this.children.push(...children); }
   replaceChildren(...children: Node[]) { this.children = children; }
   getContext() { return { setTransform() {} }; }
@@ -207,6 +217,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   h.realColumn = false;
+  h.realConnection = false;
   h.config = null;
   h.onSelect = null;
   h.onClose = null;
@@ -232,6 +243,7 @@ beforeEach(() => {
   });
   const root = getNode(":root");
   vi.stubGlobal("HTMLElement", Node);
+  vi.stubGlobal("HTMLButtonElement", Node);
   vi.stubGlobal("document", {
     querySelector: getNode, createElement: () => new Node(),
     createTextNode: () => new Node(), addEventListener: (type: string, fn: (event: unknown) => void) => getNode("document").addEventListener(type, fn), title: "",
@@ -1078,5 +1090,116 @@ describe("ánh sáng, snapshot và banner demo", () => {
       h.refresh.mockImplementation(async () => {});
       now.mockRestore();
     }
+  });
+});
+
+describe("địa chỉ kết nối điền sẵn", () => {
+  const deployed = "https://office.aico.io.vn/api";
+  const saved = { baseUrl: "https://saved.example/api", token: "saved-token" };
+  let storage: { getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn> };
+  let fetcher: ReturnType<typeof vi.fn>;
+  const input = (name: string) => getNode(`input[name="${name}"]`);
+  const clickDemo = () => getNode("#demo").listeners.get("click")!({});
+  const submit = () => getNode("#settings").listeners.get("submit")!({ preventDefault() {} });
+  function gear(): Node {
+    const find = (node: Node): Node | undefined => node.className === "settings-toggle"
+      ? node : node.children.map(find).find(Boolean);
+    return find(getNode("#topbar"))!;
+  }
+  const open = () => gear().listeners.get("click")!({});
+
+  beforeEach(() => {
+    h.realConnection = true;
+    storage = { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() };
+    fetcher = vi.fn(async () => ({ ok: true, json: async () => [] }));
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("fetch", fetcher);
+    vi.stubGlobal("location", new URL("https://office.aico.io.vn/"));
+    vi.stubGlobal("FormData", class { get(name: string) { return input(name).value; } });
+  });
+
+  it("điền value trên deploy, giữ demo và không lưu hay gọi mạng", async () => {
+    await import("./main");
+    expect(input("baseUrl").value).toBe(deployed);
+    expect(getNode("#conn").textContent).toContain("Chế độ demo");
+    clickDemo(); clickDemo();
+    expect(input("baseUrl").value).toBe(deployed);
+    open();
+    expect(document.activeElement).toBe(input("token"));
+    input("baseUrl").value = "";
+    open(); open();
+    expect(document.activeElement).toBe(input("baseUrl"));
+    clickDemo(); clickDemo();
+    expect(input("baseUrl").value).toBe("");
+    expect(getNode("#demo").textContent).toBe("Demo");
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(["http://localhost:5173/", "https://office.aico.io.vn/preview/T-1/", undefined])(
+    "giữ ô trống tại %s", async (url) => {
+      vi.stubGlobal("location", url ? new URL(url) : undefined);
+      await import("./main");
+      expect(input("baseUrl").value).toBe("");
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it("ưu tiên kết nối lưu; Demo/Thoát demo giữ địa chỉ người dùng và không lưu", async () => {
+    storage.getItem.mockReturnValue(JSON.stringify(saved));
+    await import("./main");
+    await connected();
+    expect(input("baseUrl").value).toBe(saved.baseUrl);
+    input("baseUrl").value = "https://edited.example/api";
+    clickDemo();
+    expect(getNode("#demo").textContent).toBe("Thoát demo");
+    expect(getNode("#conn").textContent).toContain("Chế độ demo");
+    clickDemo();
+    await connected();
+    expect(input("baseUrl").value).toBe("https://edited.example/api");
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it("submit token trống bỏ kết nối lưu nhưng giữ địa chỉ đang sửa", async () => {
+    storage.getItem.mockReturnValue(JSON.stringify(saved));
+    await import("./main");
+    await connected();
+    input("baseUrl").value = "https://edited.example/api";
+    fetcher.mockClear();
+    submit();
+    expect(getNode("#conn").textContent).toContain("Chế độ demo");
+    expect(input("baseUrl").value).toBe("https://edited.example/api");
+    expect(storage.removeItem).toHaveBeenCalledWith("aico-office.api");
+    clickDemo();
+    expect(getNode("#demo").textContent).toBe("Demo");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("lưu địa chỉ điền sẵn khi nhập token, poll đúng URL, focus lại địa chỉ và báo lỗi", async () => {
+    await import("./main");
+    input("token").value = "new-token";
+    submit();
+    await connected();
+    expect(storage.setItem).toHaveBeenCalledWith("aico-office.api", JSON.stringify({ baseUrl: deployed, token: "new-token" }));
+    expect(fetcher).toHaveBeenCalledWith(`${deployed}/workers`, expect.objectContaining({
+      headers: { Authorization: "Bearer new-token" },
+    }));
+    open();
+    expect(document.activeElement).toBe(input("baseUrl"));
+    fetcher.mockRejectedValueOnce(new Error("mất mạng"));
+    pollTick();
+    await vi.waitFor(() => expect(getNode("#conn").textContent).toBe("Lỗi: mất mạng"));
+    expect(getNode("#conn").className).toBe("conn bad");
+  });
+
+  it("localStorage bị chặn vẫn điền sẵn và chạy demo", async () => {
+    storage.getItem.mockImplementation(() => { throw new Error("bị chặn"); });
+    await import("./main");
+    expect(input("baseUrl").value).toBe(deployed);
+    expect(getNode("#conn").textContent).toContain("Chế độ demo");
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

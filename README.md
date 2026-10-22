@@ -33,7 +33,9 @@ npm run dev        # http://localhost:5173
 npm test           # vitest: hàm thuần, kịch bản actors, mọi file art/
 ```
 
-Không nhập gì thì chạy **chế độ demo** với dữ liệu giả (kịch bản 48 giây: phòng có 0/1/2 agent, agent đi vào/ra, codex lên 100% rồi `limited`, phòng mất kết nối). Để xem agent thật, nhập địa chỉ aico (mặc định `http://localhost:8000`) và API token (`deploy/secrets/aico_api_token` của aico). Token lưu trong localStorage của trình duyệt.
+Không nhập gì thì chạy **chế độ demo** với dữ liệu giả (kịch bản 48 giây: phòng có 0/1/2 agent, agent đi vào/ra, codex lên 100% rồi `limited`, phòng mất kết nối). Để xem agent thật, nhập địa chỉ aico (ví dụ `http://localhost:8000`) và API token (`deploy/secrets/aico_api_token` của aico). Token lưu trong localStorage của trình duyệt.
+
+Trên tên miền deploy, nếu chưa có kết nối lưu, ô địa chỉ tự điền `<origin>/api` (ví dụ `https://office.aico.io.vn/api`); kết nối đã lưu luôn được ưu tiên. Localhost và bản xem trước `/preview/` để ô trống. Chỉ khi nhập token và gửi form mới lưu và kết nối; địa chỉ điền sẵn vẫn chạy demo.
 
 aico phải cho phép origin của trang này (`AICO_CORS_ORIGINS`, mặc định đã có `http://localhost:5173`).
 
@@ -69,7 +71,7 @@ nhưng vẫn phát chuyển trạng thái done/escalated.
 
 ```text
 src/api.ts                 gọi aico, kiểu dữ liệu, snapshot ticket đầy đủ, dữ liệu demo
-src/api.test.ts            test snapshot còn trạng thái done, fetchTickets vẫn lọc cần người
+src/api.test.ts            test địa chỉ mặc định deploy/localhost/preview, snapshot done, fetchTickets lọc cần người
 src/activity.ts            đọc activity/recent/tasks/stats phòng thủ, chọn màn hình, bong bóng và demo (thuần)
 src/activity.test.ts       test activity, stale, task, chồng bong bóng và dữ liệu đổi giữa chừng
 src/overlay.ts             canvas chữ phủ: biển phòng, banner, bong bóng hoạt động và tiến độ task
@@ -105,6 +107,7 @@ src/ui/selection.test.ts   test agent biến mất, started_at đổi, tab Cần
 src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent, hàng số liệu token
 src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtAgo, tokenStatsRows/Lines
 src/ui/topbar.ts           thanh trên: ô số, hạn mức, popover cài đặt, nút Demo
+src/ui/topbar.test.ts      test settingsFocus và focus popover theo địa chỉ/token
 src/ui/topbar.css          kiểu thanh trên
 src/ui/sidebar.ts          thanh bên: phòng → agent, phím [
 src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
@@ -118,7 +121,7 @@ src/ui/feed.ts             khung feed nổi: dòng lưới, ticker khi thu gọn
 src/ui/feed.css            kiểu feed: thẻ kính góc dưới trái, thanh nổi màn hẹp
 src/ui/feed.test.ts        test DOM cột dòng, title, tone/mờ, ticker, N mới, neo cuộn, bấm dòng, phím ]
 src/main.ts                vòng lặp, poll, vùng trống, vị trí feed, chọn agent, feed, phím P [ ] Esc
-src/main.test.ts           test ghép nối Cần bạn, chọn agent, stats tới UI, vòng đời agent, bấm dòng feed, vị trí feed, đổi nguồn, lỗi và hồi phục poll
+src/main.test.ts           test điền sẵn địa chỉ, lưu kết nối, focus, demo, Cần bạn, chọn agent, stats, feed, đổi nguồn, lỗi và hồi phục poll
 src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
 src/scene/index.test.ts    test cache nền, xe, quầng màn hình và fit nguồn sáng
 src/scene/layout.ts        bố cục phòng, bàn, cửa, phòng nghỉ, sân; giữ chỗ ngồi theo id (hàm thuần)

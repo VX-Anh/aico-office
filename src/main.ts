@@ -1,6 +1,6 @@
 import { withDemoActivity } from "./activity";
 import { hitFigure, createAgentTooltip } from "./agent-tooltip";
-import { type ApiConfig, type Ticket, type WorkerStatus, demoWorkers, fetchEscalationReason, fetchTicketSnapshot, fetchWorkers, loadConfig, needAction, roomAgents, saveConfig } from "./api";
+import { type ApiConfig, type Ticket, type WorkerStatus, defaultBaseUrl, demoWorkers, fetchEscalationReason, fetchTicketSnapshot, fetchWorkers, loadConfig, needAction, roomAgents, saveConfig } from "./api";
 import { isShortcut, nextAttention, tabTitle } from "./attention";
 import { createLatestGate } from "./latest";
 import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
@@ -461,7 +461,8 @@ demoButton.addEventListener("click", () => {
   resetActors();
   void poll();
 });
-if (config) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = config.baseUrl;
+const initialBaseUrl = config?.baseUrl ?? defaultBaseUrl(globalThis.location);
+if (initialBaseUrl !== null) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = initialBaseUrl;
 
 function syncDemoButton(): void {
   const back = !config && savedConfig !== null;
