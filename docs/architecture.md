@@ -1,13 +1,13 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-6834e79b). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-b9a40abf). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data["Dữ liệu và logic thuần hiện có"]
     API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây"]
-    TK["src/tickets.ts<br/>parseTickets, needsYou, actions, MR, demoNeedTickets"]
+    TK["src/tickets.ts<br/>parseTickets, needsYou, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
     ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
     USG["src/usage.ts"]
     TIME["src/time.ts"]
@@ -17,10 +17,15 @@ flowchart TD
   API --> TK
   ACTV --> USG
 
-  COL["src/needs-column.ts + CSS<br/>gate chấp nhận snapshot<br/>lọc items cho panel, giữ xác nhận/ghi chú"]
+  SHOTS["public/demo-shots/ + art/demo-shots/<br/>ảnh pixel demo theo thời điểm/file.png"]
+  SHOTS -.->|url tuyệt đối theo BASE_URL| TK
+
+  COL["src/needs-column.ts + CSS<br/>gate chấp nhận snapshot<br/>lọc items cho panel, giữ xác nhận/ghi chú<br/>hàng ảnh thu nhỏ, ảnh lỗi thành link"]
+  VIEWER["src/shot-viewer.ts + CSS<br/>lightbox trên body: ←/→, Esc, trả focus"]
   API -->|cùng request tickets| COL
   LATEST --> COL
   COL --> TK
+  COL -->|mở ảnh, đóng khi thẻ mất/đổi nguồn| VIEWER
   COL -->|actions| API
   COL -->|snapshot đầy đủ đã chấp nhận| MAIN
   COL -->|NeedItem đã lọc| MAIN
@@ -29,6 +34,7 @@ flowchart TD
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
+  MAIN -->|demo assetBase| TK
 
   subgraph UI["Khung UI hiện có"]
     VP["ui/viewport.ts<br/>insets và fitScene"]
@@ -65,6 +71,8 @@ flowchart TD
   TOK -.-> SIDE
   TOK -.-> DRW
   TOK -.-> FEED
+  TOK -.-> COL
+  TOK -.-> VIEWER
 
   DEMO["scene/demo-events.ts<br/>snapshot định kỳ, cùng bộ phát hiện"]
   EVENTS["scene/room-events.ts<br/>so snapshot, MR mới/done/escalated<br/>nhớ ticket-provider, dedup, TTL 10 giây"]
@@ -133,11 +141,13 @@ flowchart TD
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>giữ actors và mọi test cũ"]
   TEST -.-> OUT
   TEST -.-> LIGHT
   TEST -.-> EVENTS
   TEST -.-> COL
+  TEST -.-> TK
+  TEST -.-> VIEWER
   TEST -.-> OVL
   TEST -.-> IDX
   TEST -.-> MAIN
