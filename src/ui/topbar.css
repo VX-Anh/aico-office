@@ -22,14 +22,11 @@
   flex: 0 0 auto;
 }
 .topbar .brand-logo {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 18px;
+  display: block;
+  width: auto;
+  height: 20px;
+  flex: 0 0 auto;
+  image-rendering: auto;
 }
 .topbar .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .topbar .brand-name { font-size: 17px; line-height: 1.1; white-space: nowrap; }
@@ -197,7 +194,6 @@
   .topbar { gap: 6px; padding: 0 8px; height: 52px; top: 6px; left: 6px; right: 6px; }
   .topbar .brand-text,
   .topbar .tile-agents { display: none; }
-  .topbar .brand-logo { width: 28px; height: 28px; font-size: 15px; }
   .topbar .tile { min-width: 46px; height: 40px; padding: 2px 5px; }
   .topbar .tile-value { font-size: 17px; }
   .topbar .tile-label { font-size: 9.5px; }

@@ -131,8 +131,9 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
 
   const conn = adopt(root, "conn", "span", "conn");
   const brand = el("div", "brand");
-  const logo = el("span", "brand-logo title-pixel", "▣");
-  logo.setAttribute("aria-hidden", "true");
+  const logo = el("img", "brand-logo");
+  logo.setAttribute("alt", "");
+  logo.setAttribute("src", `${import.meta.env.BASE_URL}brand/logo-ax-64.png`);
   const brandText = el("div", "brand-text");
   brandText.append(el("span", "brand-name title-pixel", "AICO Office"), conn);
   brand.append(logo, brandText);
