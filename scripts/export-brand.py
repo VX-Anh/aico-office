@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""Xuất logo AX từ nguồn nền đen; chỉ cần Pillow==11.3.0.
+"""Xuất icon từ logo AX 512; chỉ cần Pillow==11.3.0.
 
 python -m venv .venv
 .venv/bin/python -m pip install Pillow==11.3.0
-.venv/bin/python scripts/export-brand.py
+.venv/bin/python scripts/export-brand.py          # chỉ ba icon
+.venv/bin/python scripts/export-brand.py --logos  # chỉ logo trong suốt
 
 Không đưa Pillow vào dependencies của ứng dụng. Chạy từ thư mục bất kỳ.
 """
 
+import argparse
 from collections import deque
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageFilter, __version__
+from PIL import Image, ImageChops, ImageFilter, ImageDraw, __version__
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "art/brand/logo-ax-source-black.png"
 OUTPUT = ROOT / "public/brand"
-SIZES = (512, 192, 64, 32, 16, 180)
+SIZES = (512, 192, 64, 32, 16)
+BACKGROUND = (14, 16, 22)
+ICONS = ((16, 13, 2), (32, 26, 4), (180, 144, 0))
 
 
 def extract(source):
@@ -105,7 +109,7 @@ def extract(source):
     return square
 
 
-def export():
+def export_logos():
     with Image.open(SOURCE) as source:
         if source.mode != "RGB":
             raise ValueError("Nguồn chính phải là RGB nền đen")
@@ -123,7 +127,7 @@ def export():
         image.putalpha(image.getchannel("A").point(
             lambda value: 0 if value < 8 else 255 if value > 247 else value
         ))
-        name = "apple-touch-icon.png" if size == 180 else f"logo-ax-{size}.png"
+        name = f"logo-ax-{size}.png"
         image.save(OUTPUT / name, optimize=True)
         alpha = image.getchannel("A")
         bounds = alpha.getbbox()
@@ -142,5 +146,72 @@ def export():
               f"{sum(histogram[1:255])}")
 
 
+def icon_mask(size, radius):
+    """Lấy mẫu lớn để mép bo mượt, không tạo ringing ngoài góc."""
+    scale = 8
+    mask = Image.new("L", (size * scale,) * 2, 255 if radius == 0 else 0)
+    if radius:
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (0, 0, size * scale - 1, size * scale - 1),
+            radius=radius * scale, fill=255
+        )
+    mask = mask.resize((size, size), Image.Resampling.BOX)
+    if radius:
+        for point in ((0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)):
+            mask.putpixel(point, 0)
+    return mask
+
+
+def validate_icon(image, size, radius):
+    assert image.mode == "RGBA" and image.size == (size, size)
+    alpha = image.getchannel("A")
+    assert alpha.tobytes() == icon_mask(size, radius).tobytes()
+    if radius:
+        assert alpha.getextrema() == (0, 255)
+        assert all(alpha.getpixel(point) == 0 for point in
+                   ((0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)))
+    else:
+        assert alpha.getextrema() == (255, 255)
+    assert image.getpixel((size // 2, 0)) == (*BACKGROUND, 255)
+    # Màu RGB dưới alpha của góc cũng giữ đúng nền, tránh viền khi ghép.
+    assert image.getpixel((0, 0))[:3] == BACKGROUND
+    print(f"{size}×{size}: nền={BACKGROUND}, alpha={alpha.getextrema()}, bo={radius}")
+
+
+def export_icons():
+    # Không tái xuất logo: giữ nguyên byte các tài sản trong suốt đã duyệt.
+    with Image.open(OUTPUT / "logo-ax-512.png") as source:
+        master = source.convert("RGBA")
+    bounds = master.getchannel("A").getbbox()
+    if bounds is None:
+        raise ValueError("Logo nguồn không có nội dung")
+    master = master.crop(bounds)
+    for size, extent, radius in ICONS:
+        ratio = extent / max(master.size)
+        dimensions = tuple(max(1, round(side * ratio)) for side in master.size)
+        content = master.convert("RGBa").resize(
+            dimensions, Image.Resampling.LANCZOS
+        ).convert("RGBA")
+        offset = tuple((size - side) // 2 for side in dimensions)
+        assert max(dimensions) == extent
+        assert all(abs(start - (size - start - side)) <= 1
+                   for start, side in zip(offset, dimensions))
+        image = Image.new("RGBA", (size, size), (*BACKGROUND, 255))
+        image.alpha_composite(content, offset)
+        image.putalpha(icon_mask(size, radius))
+        validate_icon(image, size, radius)
+        name = "apple-touch-icon.png" if size == 180 else f"favicon-{size}.png"
+        image.save(OUTPUT / name, optimize=True)
+        print(f"{name}: logo={dimensions}, vị trí={offset}")
+
+
 if __name__ == "__main__":
-    export()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--logos", action="store_true",
+                        help="chỉ tái xuất logo trong suốt từ nguồn nền đen")
+    args = parser.parse_args()
+    print(f"Pillow {__version__}")
+    if args.logos:
+        export_logos()
+    else:
+        export_icons()
