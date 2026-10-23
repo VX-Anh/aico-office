@@ -215,6 +215,8 @@ const DEMO_ROLES: { role: string; mode: AgentMode }[] = [
   { role: "coder", mode: "write" },
   { role: "reviewer", mode: "review" },
   { role: "designer", mode: "write" },
+  { role: "ba", mode: "read" },
+  { role: "tester", mode: "review" },
 ];
 
 const DEMO_CYCLE = 48_000;

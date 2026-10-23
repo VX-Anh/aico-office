@@ -4,9 +4,15 @@ import { agentKey } from "./selection";
 import { createSidebar } from "./sidebar";
 import { HIDDEN_ROOMS_KEY } from "./sidebar-model";
 
+// Đếm lần vẽ lại avatar: sidebar gọi createAvatar khi id hoặc vai trò đổi.
+const avatarMock = vi.hoisted(() => ({ calls: 0 }));
+
 vi.mock("./avatar", () => ({
-  avatarIdentity: (agent: { id: string; role: string }) => `${agent.id}/${agent.role}`,
-  createAvatar: () => document.createElement("canvas"),
+  avatarIdentity: (agent: { id: string; role: string | null }) => `${agent.id}/${agent.role}`,
+  createAvatar: () => {
+    avatarMock.calls += 1;
+    return document.createElement("canvas");
+  },
 }));
 
 interface FakeEvent {
@@ -138,6 +144,7 @@ function memoryStorage(initial: Record<string, string> = {}) {
 }
 
 beforeEach(() => {
+  avatarMock.calls = 0;
   doc = { activeElement: null, listeners: [] };
   mediaChange = null;
   vi.stubGlobal("HTMLElement", Node);
@@ -155,7 +162,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const NOW = Date.parse("2026-10-22T10:00:00Z");
 const iso = (secondsAgo: number) => new Date(NOW - secondsAgo * 1000).toISOString();
 
-function agent(id: string, role: string, ticket: string, text: string, started = iso(183)): WorkerAgent {
+function agent(id: string, role: string | null, ticket: string, text: string, started = iso(183)): WorkerAgent {
   return { id, role, ticket_id: ticket, mode: "write", started_at: started, activity: { kind: "edit", text, at: iso(5) } } as WorkerAgent;
 }
 const a1 = agent("a1", "coder", "T-11", "Sửa giao diện");
@@ -595,5 +602,131 @@ describe("class dòng và thanh chỗ", () => {
     expect(v.rows()[0]).not.toBe(row);
     expect(v.none().hidden).toBe(true);
     expect(v.room("codex").find("room-empty").textContent).toBe("Không có agent khớp");
+  });
+});
+
+const NEW_ROLES = {
+  ba: { label: "BA", shirt: "#d9a43a" },
+  tester: { label: "Tester", shirt: "#3bb5c8" },
+  researcher: { label: "Researcher", shirt: "#8c8f3a" },
+} as const;
+const FALLBACK_SHIRT = "#8a8f98";
+
+describe("vai trò BA, Tester, Researcher", () => {
+  const ba = agent("ana-1", "ba", "T-41", "Phân tích yêu cầu");
+  const tester = agent("qa-1", "tester", "T-42", "Chụp ảnh nghiệm thu");
+  const researcher = agent("rs-1", "researcher", "T-43", "Đọc tài liệu");
+
+  it("chú thích có đúng 7 mục theo thứ tự, không có ngoặc rỗng", () => {
+    const v = setup();
+    const items = v.legend.all("legend-item");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Tech lead (cà vạt)",
+      "Coder (tai nghe)",
+      "Reviewer (kính)",
+      "Designer (mũ nồi)",
+      "BA (bảng kẹp hồ sơ)",
+      "Tester (kính lúp)",
+      "Researcher (sổ tay)",
+    ]);
+    expect(items.map((item) => item.find("swatch").style.background)).toEqual([
+      "#4a7fd4", "#4fae60", "#9b6bd6", "#e57fb0",
+      NEW_ROLES.ba.shirt, NEW_ROLES.tester.shirt, NEW_ROLES.researcher.shirt,
+    ]);
+    expect(v.legend.textContent).not.toContain("()");
+  });
+
+  it("dòng agent ba, tester, researcher ghi nhãn mới bằng màu áo mới", () => {
+    const v = setup([claude({ agents: [ba, tester, researcher], slots: 3 })]);
+    const rows = v.rows();
+    expect(rows.map((row) => row.find("agent-role").textContent)).toEqual(["BA", "Tester", "Researcher"]);
+    expect(rows.map((row) => row.find("agent-role").style.color)).toEqual([
+      NEW_ROLES.ba.shirt, NEW_ROLES.tester.shirt, NEW_ROLES.researcher.shirt,
+    ]);
+  });
+
+  it.each([
+    ["ba", "BA"],
+    ["TESTER", "Tester"],
+    ["Research", "Researcher"],
+  ] as const)("tìm %s khớp đúng agent", (query, label) => {
+    const v = setup([claude({ agents: [ba, tester, researcher], slots: 3 }), codex()]);
+    v.type(query);
+    expect(roles(v.rows())).toEqual([label]);
+    expect(v.rowsOf("codex")).toEqual([]);
+    expect(v.room("codex").find("room-empty").textContent).toBe("Không có agent khớp");
+  });
+
+  it.each(Object.entries(NEW_ROLES))("role lạ → %s → lạ rồi null: cùng node, nhãn, màu và avatar đổi", (role, style) => {
+    const person = agent("p1", "foo", "T-9", "Việc");
+    const v = setup([claude({ agents: [person], slots: 1 })]);
+    const row = v.rows()[0];
+    const label = row.find("agent-role");
+    expect(label.textContent).toBe("foo");
+    expect(label.style.color).toBe(FALLBACK_SHIRT);
+    const base = avatarMock.calls;
+
+    const apply = (next: string | null) => {
+      v.update([claude({ agents: [{ ...person, role: next }], slots: 1 })]);
+    };
+
+    // Đang lọc theo ticket: dòng không bị tháo khi chỉ vai trò đổi.
+    v.type("t-9");
+    apply(role);
+    expect(v.rows()[0]).toBe(row);
+    expect(label.textContent).toBe(style.label);
+    expect(label.style.color).toBe(style.shirt);
+    expect(avatarMock.calls).toBe(base + 1);
+    v.update([claude({ agents: [{ ...person, role }], slots: 1 })]);
+    expect(avatarMock.calls).toBe(base + 1);
+
+    apply("zzz");
+    expect(v.rows()[0]).toBe(row);
+    expect(label.textContent).toBe("zzz");
+    expect(label.style.color).toBe(FALLBACK_SHIRT);
+    expect(avatarMock.calls).toBe(base + 2);
+
+    apply(role);
+    apply(null);
+    expect(v.rows()[0]).toBe(row);
+    expect(label.textContent).toBe("?");
+    expect(label.style.color).toBe(FALLBACK_SHIRT);
+    expect(avatarMock.calls).toBe(base + 4);
+    expect(roles(v.rows())).toEqual(["?"]);
+  });
+
+  it.each([
+    ["tester", tester, "Tester"],
+    ["ba", ba, "BA"],
+    ["Research", researcher, "Researcher"],
+  ] as const)("agent khớp %s mất rồi xuất hiện lại khi đang lọc", (query, person, label) => {
+    const v = setup([claude({ agents: [ba, tester, researcher], slots: 3 }), codex()]);
+    v.type(query);
+    expect(roles(v.rows())).toEqual([label]);
+    const row = v.rows()[0];
+    const rest = [ba, tester, researcher].filter((item) => item !== person);
+    v.update([claude({ agents: rest, slots: 3 }), codex()]);
+    expect(v.rooms()).toEqual([]);
+    expect(v.none().textContent).toBe(`Không tìm thấy “${query.trim()}”`);
+    v.update([claude({ agents: [ba, tester, researcher], slots: 3 }), codex()]);
+    expect(roles(v.rows())).toEqual([label]);
+    expect(v.rows()[0]).not.toBe(row);
+    expect(v.rows()[0].find("agent-role").style.color).toBe(NEW_ROLES[person.role as keyof typeof NEW_ROLES].shirt);
+    expect(v.none().hidden).toBe(true);
+    expect(v.room("codex").find("room-empty").textContent).toBe("Không có agent khớp");
+  });
+
+  it.each(Object.entries(NEW_ROLES))("phòng offline giữ dòng mờ đúng nhãn %s", (role, style) => {
+    const person = agent("p1", role, "T-7", "Việc");
+    const v = setup([claude({ agents: [person] }), codex()]);
+    const row = v.rowsOf("claude")[0];
+    for (const state of ["offline", "working", "offline"] as const) {
+      v.update([claude({ state, agents: [person] }), codex()]);
+      expect(v.rowsOf("claude")[0]).toBe(row);
+      expect(row.classList.contains("offline")).toBe(state === "offline");
+      expect(row.find("agent-role").textContent).toBe(style.label);
+      expect(row.find("agent-role").style.color).toBe(style.shirt);
+      expect(row.find("status-dot").dataset.state).toBe(state === "offline" ? "offline" : "working");
+    }
   });
 });

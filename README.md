@@ -13,7 +13,7 @@ Repo này cũng là **repo pilot** của aico: tính năng mới được tạo 
 | Hết hạn mức | Bàn trống, màn hình tắt; nhân vật của phòng nằm ngủ trên sofa phòng nghỉ, chữ Z bay lên; biển dưới đồng hồ phòng đếm ngược giờ mở lại (ví dụ `47M`, `1H05`) | lần chạy gần nhất báo hết hạn mức subscription (chung cả phòng) |
 | Mất kết nối | Phòng tắt đèn, biển tên xám, không có ai (kể cả trong phòng nghỉ) | aico không gọi được worker |
 
-Agent con phân biệt theo vai trò (chú thích ở cuối thanh bên): tech_lead áo xanh dương + cà vạt, coder áo xanh lá + tai nghe, reviewer áo tím + kính, designer áo hồng + mũ nồi; vai trò lạ áo xám. Kiểu tóc và màu tóc của agent con chọn theo `id` nên ổn định giữa các lần vẽ; nhân vật thường trực mang tóc và áo màu provider. Màu code trên màn hình theo `mode` (read xanh lá, write xanh dương, review tím). Chỗ ngồi giữ ổn định theo `id` agent.
+Agent con phân biệt theo vai trò (chú thích ở cuối thanh bên): tech_lead áo xanh dương + cà vạt, coder áo xanh lá + tai nghe, reviewer áo tím + kính, designer áo hồng + mũ nồi, ba áo vàng mù tạt + bảng kẹp hồ sơ, tester áo xanh lơ + kính lúp, researcher áo ô liu + sổ tay; vai trò lạ áo xám. Kiểu tóc và màu tóc của agent con chọn theo `id` nên ổn định giữa các lần vẽ; nhân vật thường trực mang tóc và áo màu provider. Màu code trên màn hình theo `mode` (read xanh lá, write xanh dương, review tím). Chỗ ngồi giữ ổn định theo `id` agent.
 
 Lần vẽ đầu (mở trang, đổi nguồn dữ liệu, phòng online lại) agent đang chạy được đặt thẳng vào ghế, không đi bộ.
 
@@ -115,6 +115,7 @@ src/ui/sidebar.test.ts     test DOM tìm, phím / Esc, chip lọc, thanh chỗ/o
 src/ui/sidebar-model.ts    bỏ dấu, khớp agent với từ khoá, thời gian chạy m:ss/h:mm:ss, thanh chỗ, lưu lọc phòng an toàn (thuần)
 src/ui/sidebar-model.test.ts  test bỏ dấu, khớp theo trường, thời gian hỏng/tương lai, slotFill, localStorage hỏng/lỗi
 src/ui/avatar.ts           avatar nhỏ từ sprite nhân vật
+src/ui/avatar.test.ts      test avatar fallback: nền màu áo, chữ B, T, R
 src/ui/drawer.ts           ngăn chi tiết: tab Agent (hero, nhiệm vụ, trạng thái, Đang làm, task, gần đây, số liệu) / Cần bạn, Esc
 src/ui/drawer.css          kiểu ngăn chi tiết và tấm từ dưới lên
 src/ui/drawer.test.ts      test DOM hero, nhiệm vụ, trạng thái, checklist, timeline, số liệu cache và dữ liệu đổi khi đang mở
@@ -144,7 +145,9 @@ src/scene/usage-board.ts   thanh hạn mức pixel trên tường (5H/WK, phần
 src/scene/characters.ts    sprite nhân vật từ công thức Pixelbolt: chọn tư thế, chồng lớp thân → tóc → phụ kiện, thay màu theo agent
 src/scene/pixelbolt.ts     bộ đọc công thức Pixelbolt tối giản (palette, frames grid/from, animations), cache bitmap
 src/scene/legacy-characters.ts  sprite lưới ký tự cũ, dùng khi công thức thiếu tư thế
+src/scene/legacy-characters.test.ts  test phụ kiện ba, tester, researcher ở đường vẽ dự phòng
 src/scene/palette.ts       màu provider, vai trò (áo, màu phụ kiện) và bảng màu chung
+src/scene/palette.test.ts  test nhãn, màu áo và accent của ba, tester, researcher, fallback role lạ
 src/scene/font.ts          chữ pixel 3x5
 src/scene/font.test.ts     test glyph % và ?
 src/scene/pixel.ts         hàm vẽ pixel, lưới ký tự, cache bitmap
@@ -156,7 +159,7 @@ src/scene/characters.test.ts  gộp ops của frame; kiểm mọi file art/chara
 vitest.config.ts           cấu hình vitest (môi trường Node, chỉ src/**/*.test.ts)
 art/characters/body.pixel.json      thân nhân vật (đủ 7 tư thế)
 art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái, 2 dài, 3 búi
-art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer)
+art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer, ba, tester, researcher)
 art/demo-shots/                     công thức Pixelbolt ảnh review demo (văn phòng giờ 11 và 21)
 public/demo-shots/<thời điểm>/*.png  ảnh review demo xuất từ art/demo-shots/, ticket demo trỏ tới
 public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/

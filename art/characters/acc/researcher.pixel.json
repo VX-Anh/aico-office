@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "name": "acc_researcher",
+  "width": 16,
+  "height": 22,
+  "palette": {
+    "a": "#3f6fbf",
+    "o": "#21181f",
+    "w": "#f4efe4"
+  },
+  "frames": [
+    {
+      "name": "front",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 10,
+          "y": 12,
+          "rows": [
+            "ooooo",
+            "oaaao",
+            "owwao",
+            "oaaao",
+            "owwao",
+            "ooooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "side",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 8,
+          "y": 12,
+          "rows": [
+            "oooo",
+            "oaao",
+            "owao",
+            "oaao",
+            "owao",
+            "oooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "left",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 4,
+          "y": 12,
+          "rows": [
+            "oooo",
+            "oaao",
+            "oawo",
+            "oaao",
+            "oawo",
+            "oooo"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sit",
+      "duration": 160,
+      "ops": [
+        {
+          "op": "grid",
+          "x": 4,
+          "y": 15,
+          "rows": [
+            "oooooo",
+            "oawwwo",
+            "oooooo"
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "walk_down": {
+      "frames": [
+        "front",
+        "front"
+      ]
+    },
+    "walk_left": {
+      "frames": [
+        "left",
+        "left"
+      ]
+    },
+    "walk_right": {
+      "frames": [
+        "side",
+        "side"
+      ]
+    },
+    "sit_side": {
+      "frames": [
+        "sit",
+        "sit"
+      ]
+    }
+  }
+}
