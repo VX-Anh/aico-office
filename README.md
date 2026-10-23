@@ -162,9 +162,10 @@ art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái,
 art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer, ba, tester, researcher)
 art/demo-shots/                     công thức Pixelbolt ảnh review demo (văn phòng giờ 11 và 21)
 art/brand/                          ảnh logo AX chủ sở hữu cung cấp: nguồn nền đen và bản alpha lỗi để tham khảo
-scripts/export-brand.py            tách nền, crop và xuất logo AX bằng Pillow ngoài runtime
-public/brand/logo-ax-{512,192,64,32,16}.png  logo AX trong suốt; bản 64 cho thanh trên, 16/32 cho favicon
-public/brand/apple-touch-icon.png   icon màn hình chính 180×180
+scripts/export-brand.py            xuất icon nền tối; --logos tái xuất logo trong suốt bằng Pillow ngoài runtime
+public/brand/logo-ax-{512,192,64,32,16}.png  logo AX trong suốt giữ nguyên; bản 64 cho thanh trên
+public/brand/favicon-{16,32}.png    favicon nền #0e1016 bo nhẹ, ngoài góc bo trong suốt
+public/brand/apple-touch-icon.png   icon màn hình chính 180×180, nền #0e1016 kín, không bo
 index.html                         khung ứng dụng, favicon 16/32 và apple-touch-icon theo %BASE_URL%
 public/demo-shots/<thời điểm>/*.png  ảnh review demo xuất từ art/demo-shots/, ticket demo trỏ tới
 public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/
@@ -174,7 +175,7 @@ docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (vă
 
 Sơ đồ module: [docs/architecture.md](docs/architecture.md).
 
-## Tái xuất logo AX
+## Tái xuất logo AX và icon
 
 Nguồn chính duy nhất là `art/brand/logo-ax-source-black.png` (1254×1254, RGB).
 Không dùng `logo-ax-source-alpha-raw.png`: ruột trắng bán trong suốt và mép có nhiễu.
@@ -188,28 +189,38 @@ Chạy từ gốc repo trên máy có Python, venv và pip, với môi trường
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install Pillow==11.3.0
-.venv/bin/python scripts/export-brand.py
+.venv/bin/python scripts/export-brand.py          # chỉ ba icon nền tối
+.venv/bin/python scripts/export-brand.py --logos  # chỉ năm logo trong suốt
 ```
 
 Worker không có Pillow/pip thì chạy trên máy có môi trường này hoặc nhờ pha setup
 có mạng của máy build cài Pillow vào venv trước. Pha `aico-remote` chạy lệnh không có
 mạng; chỉ chạy `.venv/bin/python scripts/export-brand.py` khi venv đã được chuẩn bị.
 Không cài Pillow vào dependencies của app; Python không tham gia build hay runtime web.
-Script xuất lại sáu PNG trong `public/brand/`, in phiên bản Pillow, kích thước,
-bounding box và số pixel alpha 0/255/mép, đồng thời kiểm nền ngoài và lề đối xứng.
+Mặc định script chỉ đọc `public/brand/logo-ax-512.png`, crop theo alpha, giữ tỉ lệ
+và căn giữa với sai số lề tối đa 1px. Cạnh dài logo lần lượt 13/26/144px trong
+khung 16/32/180px. Resize LANCZOS với alpha nhân trước rồi ghép nền `#0e1016`;
+favicon bo bán kính 2/4px, lấy mẫu 8 lần và thu bằng BOX để mép mượt, ngoài góc
+bo trong suốt. Apple có alpha 255 toàn ảnh, không bo để iOS tự xử lý. Nhánh icon
+kiểm riêng kích thước, mask alpha và màu nền; không ghi năm `logo-ax-*.png`.
+Chỉ dùng `--logos` khi chủ động tái xuất năm logo trong suốt từ nguồn nền đen
+theo thuật toán mô tả trên; nhánh này kiểm viền ngoài trong suốt, bounding box,
+lề đối xứng và thống kê alpha. Nếu cần tái xuất cả hai nhóm, chạy `--logos` trước
+rồi chạy lệnh mặc định.
 Sau khi xuất, xem ảnh trên nền sáng, tối và caro, đặc biệt bản 16/32 ở kích thước thật
 và phóng lớn; kiểm số liệu alpha không thay thế việc xem nhiễu hoặc quầng bằng mắt.
 
 Thanh trên dùng `${import.meta.env.BASE_URL}brand/logo-ax-64.png`, ảnh cao 20px,
 `alt=""` vì đã có tên bên cạnh, `image-rendering: auto`. HTML dùng `%BASE_URL%`
-cho favicon 16/32 và apple-touch-icon 180. Để thử deploy dưới đường dẫn con:
+cho `favicon-16.png`, `favicon-32.png` và `apple-touch-icon.png` 180.
+Để thử deploy dưới đường dẫn con:
 
 ```bash
-npm run build -- --base=/preview/T-de61a515/
-npm run preview -- --base=/preview/T-de61a515/
+npm run build -- --base=/preview/T-0a0a01eb/
+npm run preview -- --base=/preview/T-0a0a01eb/
 ```
 
-Mở trực tiếp `/preview/T-de61a515/` trên địa chỉ preview được in ra rồi reload;
+Mở trực tiếp `/preview/T-0a0a01eb/` trên địa chỉ preview được in ra rồi reload;
 kiểm các ảnh trong Network trả PNG, không chỉ kiểm HTTP 200 (SPA fallback có thể trả HTML).
 Bản root dùng `npm run build` và `npm run preview`.
 Ảnh bằng chứng được quản lý trên ticket T-de61a515 theo ghi chú duyệt,
@@ -264,6 +275,45 @@ Kiểm nghiệm bàn giao W3 của T-de61a515:
   đúng sơ đồ. Không sửa `docs/plans/` hoặc `docs/architecture.md`;
   phần lưu `art/brand-review/` trong sơ đồ được thay bằng ảnh trên ticket theo
   ghi chú duyệt.
+
+Kiểm nghiệm W3 của T-0a0a01eb (23/10/2026; chưa đủ AC1–AC6):
+
+- Đã chạy `aico-remote 'npm ci --offline && npm run build && npm test && npm run build -- --base=/preview/T-0a0a01eb/'`: exit 0, hai build qua,
+  36 file / 1.119 test qua. Không cài dependency trên worker, không đổi lockfile.
+- Đã chạy qua `aico-remote` đoạn Node ESM dùng `build`/`preview` của Vite,
+  `fetch` và `node:assert/strict`: build lần lượt base `/` và
+  `/preview/T-0a0a01eb/`, phục vụ tại `127.0.0.1:4173`, mỗi base hai lượt
+  tải HTML và ba icon (lượt sau dùng `cache: reload`). Cả bốn lượt qua:
+  HTTP 200, khai báo đúng base, MIME `image/png`, byte bằng file nguồn,
+  IHDR đúng 16/32/180px; logo thanh trên tải đúng byte bản 64px.
+  Đây là kiểm HTTP, chưa phải mở trực tiếp/reload trong trình duyệt.
+- Giải mã tám PNG bằng Python thư viện chuẩn (`struct`, `zlib`), kiểm đủ
+  kích thước và alpha: favicon 16/32 có alpha 0–255, góc trong suốt với RGB
+  `(14,16,22)`; apple 180 có alpha 255 toàn ảnh, góc nền kín. Giữa mép trên
+  ba icon đúng RGBA `(14,16,22,255)`. Chưa thay thế kiểm trực quan AC2.
+- Năm logo trong suốt có byte/checksum SHA-256 trùng `HEAD` của bản sao nhận
+  việc; bản 512: `c4859490cad5eaab72a57a3741e4efcea5f096f08db0cb8046895e3b4c29f67f`,
+  bản 64: `83ac77ad65011ff5d415cd67465f5496dc9d1a70261d282b4c5ad9742d7af109`.
+  Repo chỉ có commit nền đã gồm W1/W2, nên chưa đối chiếu được với revision
+  trước W1 để xác nhận lịch sử giữ nguyên logo.
+- Ba icon đã có trong bản sao đầu vào. W3 chưa tái xuất vì worker thiếu Pillow;
+  không có bàn giao lệnh/công cụ tạo ảnh thực tế của W1 trong repo. Lệnh Pillow
+  phía trên mô tả pipeline hiện tại, không khẳng định đã dùng để tạo ảnh nhận được.
+  Cần W1 xác nhận phiên bản, lệnh và nguồn xuất thực tế trước nghiệm thu.
+- Đối chiếu code: nhánh mặc định logo 512 → ba icon và nhánh `--logos`
+  nguồn nền đen → năm logo; HTML dùng `%BASE_URL%`, topbar vẫn dùng
+  `logo-ax-64.png` theo `import.meta.env.BASE_URL`. `docs/architecture.md`
+  còn sơ đồ ticket cũ (chưa tách nhánh icon, còn `art/brand-review/`);
+  `docs/plans/T-0a0a01eb.md` chưa có. Không sửa tài liệu tự sinh.
+- Chưa xem ảnh ghép nền trắng/tối ở kích thước thật/phóng lớn, chưa xem demo
+  48 giây hoặc favicon thực trên tab sáng bằng hồ sơ sạch: worker có Chromium
+  nhưng không có DISPLAY/Xvfb và công cụ điều khiển trình duyệt trong phiên này.
+  Test topbar hiện có qua nhưng không thay cho quan sát demo hay thanh tab.
+  Chưa có ảnh bằng chứng mới; không có công cụ gắn ảnh ticket trong phiên này,
+  không tạo ảnh trong repo. Cần bổ sung bốn ảnh toàn cửa sổ root/subpath,
+  trực tiếp/reload và ảnh ghép icon trên ticket T-0a0a01eb.
+- Thêm icon vào màn hình chính iOS: **không thử được**, không có thiết bị.
+  Chỉ sửa README, không sửa logic nên không thêm test TypeScript.
 
 ## Ghi công
 
