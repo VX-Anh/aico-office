@@ -239,16 +239,31 @@ Kiểm nghiệm bàn giao W3 của T-de61a515:
   Đã xem ảnh viewport rộng/hẹp; các test topbar còn kiểm agent mất/trở lại,
   hạn mức, bộ đếm và điều khiển. Đây là kiểm tự động và xem ảnh theo mốc,
   chưa phải quan sát trực tiếp toàn bộ animation.
-- TC5 còn mở ở phần trình duyệt: chưa mở/reload bản subpath trong Chromium
-  (đã kiểm HTTP như trên), chưa xác nhận favicon thực trên thanh tab sau xoá cache
-  vì headless không có thanh tab. Icon màn hình chính điện thoại: **không thử được**,
-  không có thiết bị hỗ trợ. Không đánh dấu TC1–TC8 hoàn tất toàn bộ chỉ từ build/test;
-  ảnh viewport không thay cho bằng chứng favicon hoặc icon điện thoại.
-- Đối chiếu code: nguồn nền đen → script Pillow → `public/brand/` chạy ngoài runtime;
-  `BASE_URL` → ảnh thanh trên và icon HTML đúng sơ đồ ticket. File
-  `docs/plans/T-de61a515.md` chưa có trong bản sao; `docs/architecture.md` vẫn ghi
-  T-8d17b253, chưa thể hiện pipeline logo và test topbar mới. Chuyển hệ thống/Tech Lead
-  cập nhật hai tài liệu tự sinh này, không sửa ngoài phạm vi W3.
+- Bổ sung FIX ngày 23/10/2026 cho TC5–TC6: Chromium có giao diện trên Xvfb,
+  mỗi bản build dùng một hồ sơ mới, không có cache favicon cũ. Build từ xa với
+  `--base=/` và `--base=/preview/T-de61a515/`, lấy nguyên bundle và phục vụ bằng
+  HTTP tại `http://127.0.0.1:4173/` và
+  `http://127.0.0.1:4174/preview/T-de61a515/` (thêm `?hour=11` để xem demo).
+  Cả mở trực tiếp và reload ở hai địa chỉ đều HTTP 200, không có lỗi trang.
+  Mỗi lượt ghi nhận trình duyệt tự tải logo 64px và favicon 32px đúng base,
+  HTTP 200, MIME `image/png`; logo giải mã đủ 64px, cao 20px,
+  `image-rendering: auto`. Đọc ba khai báo icon từ DOM và tải/giải mã từng URL:
+  favicon 16/32 và apple-touch-icon 180 đúng kích thước, MIME PNG, byte giống
+  `public/brand/`; không có 404 cho logo/icon, không nhận nhầm HTML fallback.
+  Đã xem ảnh toàn cửa sổ và xác nhận favicon AX thực trên thanh tab.
+  Bốn ảnh `root-direct-tab-favicon.png`, `root-reload-tab-favicon.png`,
+  `subpath-direct-tab-favicon.png`, `subpath-reload-tab-favicon.png` trong
+  `.aico-shots/` được hệ thống thu về ticket, không đưa vào mã nguồn.
+  Icon màn hình chính điện thoại: **không thử được**, không có thiết bị hỗ trợ
+  (được miễn theo ghi chú duyệt); kiểm tải PNG không thay cho kiểm trên thiết bị.
+- FIX đã chạy lại `aico-remote 'npm run build && npm test && npm run build -- --base=/preview/T-de61a515/'`:
+  hai build qua, 36 file / 1.119 test qua. Chỉ bổ sung kiểm chứng và tài liệu,
+  không sửa logic nên không thêm test tái hiện lỗi code.
+- Đối chiếu code và tài liệu tự sinh hiện có: nguồn nền đen → script Pillow →
+  `public/brand/` chạy ngoài runtime; `BASE_URL` → ảnh thanh trên và icon HTML
+  đúng sơ đồ. Không sửa `docs/plans/` hoặc `docs/architecture.md`;
+  phần lưu `art/brand-review/` trong sơ đồ được thay bằng ảnh trên ticket theo
+  ghi chú duyệt.
 
 ## Ghi công
 
