@@ -193,6 +193,28 @@ python3 -m venv .venv
 .venv/bin/python scripts/export-brand.py --logos  # chỉ năm logo trong suốt
 ```
 
+Ba file `favicon-16.png`, `favicon-32.png` và `apple-touch-icon.png` hiện có
+được tạo bằng lệnh thực tế dưới đây, không phải bằng venv (worker không có pip).
+Pillow **11.3.0**, Python 3.11.2, wheel
+`pillow-11.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl`
+lấy từ PyPI (`files.pythonhosted.org`, trang `https://pypi.org/pypi/pillow/11.3.0/json`),
+giải nén ra ngoài repo. Không thêm dependency của app, không sửa lockfile.
+Nguồn icon chỉ là `public/brand/logo-ax-512.png`. Từ gốc repo:
+
+```bash
+mkdir -p /tmp/pyget
+curl -fsSL -o /tmp/pyget/pillow.whl \
+  https://files.pythonhosted.org/packages/f2/2f/d7675ecae6c43e9f12aa8d58b6012683b20b6edfbdac7abcb4e6af7a3784/pillow-11.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+python3 -c 'import zipfile; zipfile.ZipFile("/tmp/pyget/pillow.whl").extractall("/tmp/pyget/pylib")'
+PYTHONPATH=/tmp/pyget/pylib python3 scripts/export-brand.py
+```
+
+Script in `Pillow 11.3.0`, rồi favicon 16 logo 13×10 tại (1, 3), favicon 32
+logo 26×20 tại (3, 6), apple 180 logo 144×112 tại (18, 34). SHA-256 ghi ở mục
+kiểm nghiệm T-0a0a01eb. Năm `logo-ax-*.png` không bị ghi. Bản icon có sẵn lúc
+nhận việc không trùng byte với Pillow 11.3.0 (mép bo và màu logo lệch); FIX
+ghi đè bằng đúng đầu ra lệnh trên.
+
 Worker không có Pillow/pip thì chạy trên máy có môi trường này hoặc nhờ pha setup
 có mạng của máy build cài Pillow vào venv trước. Pha `aico-remote` chạy lệnh không có
 mạng; chỉ chạy `.venv/bin/python scripts/export-brand.py` khi venv đã được chuẩn bị.
@@ -276,44 +298,48 @@ Kiểm nghiệm bàn giao W3 của T-de61a515:
   phần lưu `art/brand-review/` trong sơ đồ được thay bằng ảnh trên ticket theo
   ghi chú duyệt.
 
-Kiểm nghiệm W3 của T-0a0a01eb (23/10/2026; chưa đủ AC1–AC6):
+Kiểm nghiệm FIX của T-0a0a01eb (23/10/2026):
 
-- Đã chạy `aico-remote 'npm ci --offline && npm run build && npm test && npm run build -- --base=/preview/T-0a0a01eb/'`: exit 0, hai build qua,
-  36 file / 1.119 test qua. Không cài dependency trên worker, không đổi lockfile.
-- Đã chạy qua `aico-remote` đoạn Node ESM dùng `build`/`preview` của Vite,
-  `fetch` và `node:assert/strict`: build lần lượt base `/` và
-  `/preview/T-0a0a01eb/`, phục vụ tại `127.0.0.1:4173`, mỗi base hai lượt
-  tải HTML và ba icon (lượt sau dùng `cache: reload`). Cả bốn lượt qua:
-  HTTP 200, khai báo đúng base, MIME `image/png`, byte bằng file nguồn,
-  IHDR đúng 16/32/180px; logo thanh trên tải đúng byte bản 64px.
-  Đây là kiểm HTTP, chưa phải mở trực tiếp/reload trong trình duyệt.
-- Giải mã tám PNG bằng Python thư viện chuẩn (`struct`, `zlib`), kiểm đủ
-  kích thước và alpha: favicon 16/32 có alpha 0–255, góc trong suốt với RGB
-  `(14,16,22)`; apple 180 có alpha 255 toàn ảnh, góc nền kín. Giữa mép trên
-  ba icon đúng RGBA `(14,16,22,255)`. Chưa thay thế kiểm trực quan AC2.
-- Năm logo trong suốt có byte/checksum SHA-256 trùng `HEAD` của bản sao nhận
-  việc; bản 512: `c4859490cad5eaab72a57a3741e4efcea5f096f08db0cb8046895e3b4c29f67f`,
-  bản 64: `83ac77ad65011ff5d415cd67465f5496dc9d1a70261d282b4c5ad9742d7af109`.
-  Repo chỉ có commit nền đã gồm W1/W2, nên chưa đối chiếu được với revision
-  trước W1 để xác nhận lịch sử giữ nguyên logo.
-- Ba icon đã có trong bản sao đầu vào. W3 chưa tái xuất vì worker thiếu Pillow;
-  không có bàn giao lệnh/công cụ tạo ảnh thực tế của W1 trong repo. Lệnh Pillow
-  phía trên mô tả pipeline hiện tại, không khẳng định đã dùng để tạo ảnh nhận được.
-  Cần W1 xác nhận phiên bản, lệnh và nguồn xuất thực tế trước nghiệm thu.
-- Đối chiếu code: nhánh mặc định logo 512 → ba icon và nhánh `--logos`
-  nguồn nền đen → năm logo; HTML dùng `%BASE_URL%`, topbar vẫn dùng
-  `logo-ax-64.png` theo `import.meta.env.BASE_URL`. `docs/architecture.md`
-  còn sơ đồ ticket cũ (chưa tách nhánh icon, còn `art/brand-review/`);
-  `docs/plans/T-0a0a01eb.md` chưa có. Không sửa tài liệu tự sinh.
-- Chưa xem ảnh ghép nền trắng/tối ở kích thước thật/phóng lớn, chưa xem demo
-  48 giây hoặc favicon thực trên tab sáng bằng hồ sơ sạch: worker có Chromium
-  nhưng không có DISPLAY/Xvfb và công cụ điều khiển trình duyệt trong phiên này.
-  Test topbar hiện có qua nhưng không thay cho quan sát demo hay thanh tab.
-  Chưa có ảnh bằng chứng mới; không có công cụ gắn ảnh ticket trong phiên này,
-  không tạo ảnh trong repo. Cần bổ sung bốn ảnh toàn cửa sổ root/subpath,
-  trực tiếp/reload và ảnh ghép icon trên ticket T-0a0a01eb.
+- Tái xuất ba icon bằng Pillow 11.3.0 như mục trên (wheel manylinux ghi rõ,
+  `PYTHONPATH=/tmp/pyget/pylib python3 scripts/export-brand.py`). SHA-256:
+  `favicon-16.png` `a4fb0edfe2dfb165f073af8513fd6750d538d35a810fc0a889f15d73e9ae2111`,
+  `favicon-32.png` `d7c63d6ae80a5c0acaa95031e072b6a6eae8c36bc52a604e87c529c298f8db5e`,
+  `apple-touch-icon.png` `77d6fa5c36fc4d4fa9bf4e3275931a955b52c4dfcf1bdcd9f2d03b41967b2a14`.
+  Logo trong suốt giữ checksum cũ: bản 512
+  `c4859490cad5eaab72a57a3741e4efcea5f096f08db0cb8046895e3b4c29f67f`, bản 64
+  `83ac77ad65011ff5d415cd67465f5496dc9d1a70261d282b4c5ad9742d7af109`.
+- Ghép từng icon lên nền trắng, xám `#f5f5f5`, `#0e1016` và `#1e2028`, xem
+  kích thước thật và phóng nearest-neighbor (16×24, 32×12, 180×3). AX nhận ra
+  được trên cả nền sáng và tối; favicon là ô tối bo góc, ngoài góc trong suốt;
+  apple là ô vuông kín. Không thấy quầng sáng/đen hay răng cưa thô. Ảnh
+  `favicon-16-white-gray-dark.png`, `favicon-32-white-gray-dark.png`,
+  `apple-180-white-gray-dark.png` trong `.aico-shots/`, không đưa vào mã nguồn.
+- `aico-remote 'npm run build && npm test && npm run build -- --base=/preview/T-0a0a01eb/'`:
+  exit 0, hai build qua, 36 file / 1.119 test qua. Không sửa lockfile, không
+  thêm dependency app. Không thêm test TypeScript: góp ý là thiếu bàn giao lệnh
+  xuất ảnh và thiếu kiểm trình duyệt, không phải lỗi logic chuyển trạng thái.
+- Root: build `--base=/` trên máy build, tải bundle về và phục vụ bằng
+  `python3 -m http.server` tại `http://127.0.0.1:4173/` (host preview chỉ gắn
+  dưới `/preview/<tên>/`, nên `/brand/...` của base `/` trả 404 nếu mở nhầm
+  ở đó). Subpath: build `--base=/preview/T-0a0a01eb/` phục vụ tại
+  `http://remote-runner:8500/preview/T-0a0a01eb/`. Mỗi địa chỉ một hồ sơ
+  Chromium 155 mới (không cache favicon), Xvfb, giao diện sáng mặc định.
+  Mở trực tiếp `?hour=11` rồi reload: không pageerror. Ba icon và logo 64
+  trả HTTP 200, `image/png`, đúng 600 / 1.638 / 19.754 / 4.292 byte; không
+  nhận HTML. Logo cao 20px, `image-rendering: auto`. Tab sáng hiện favicon
+  AX nền tối. Ảnh cửa sổ và thanh tab:
+  `root-direct`, `root-reload`, `subpath-direct`, `subpath-reload`
+  (hậu tố `-window.png` và `-tab.png`) trong `.aico-shots/`.
+- Theo dõi demo khoảng 50 giây, lấy mẫu DOM mỗi giây, cả root lẫn subpath.
+  Số agent lần lượt 0, 1, 3, 4 và 5. Claude đi từ 1 → 3 → 4 rồi về 0 và có
+  lại 1 agent. Codex rảnh → đang làm → hết hạn mức. Cursor hết hạn mức →
+  mất kết nối → rảnh, rồi có 1 agent. Chữ demo, href icon và src logo thanh
+  trên không đổi suốt chu kỳ. Ảnh `root-after-watch-window.png` và
+  `subpath-after-watch-window.png` chụp sau khoảng đó.
+- Sơ đồ `docs/architecture.md` đã tách nhánh logo trong suốt và icon nền tối,
+  khớp `scripts/export-brand.py` và `index.html`. Không sửa file tự sinh.
 - Thêm icon vào màn hình chính iOS: **không thử được**, không có thiết bị.
-  Chỉ sửa README, không sửa logic nên không thêm test TypeScript.
+  Đã kiểm apple-touch-icon tải ra PNG 180×180, alpha 255.
 
 ## Ghi công
 
