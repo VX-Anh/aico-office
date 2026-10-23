@@ -139,6 +139,7 @@ export function syncActors(layout: Layout, t: number): Crew {
         active.set(key, a);
       }
       a.agent = agent;
+      a.look = agentLook(agent);
       if (a.phase === "seated") {
         // Ghế dịch theo bố cục: giữ actor ngồi đúng ghế và đồng bộ đích path với hình vẽ.
         a.path = [{ ...room.desks[k].seat }];
