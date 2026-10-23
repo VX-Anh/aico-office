@@ -106,8 +106,8 @@ src/ui/selection.ts        khoá agent, resolveSelection, drawerView (thuần)
 src/ui/selection.test.ts   test agent biến mất, started_at đổi, tab Cần bạn
 src/ui/format.ts           số, thời gian tương đối, giờ, chữ provider, thẻ hạn mức, trạng thái agent, hàng số liệu token
 src/ui/format.test.ts      test usageTile, providerLetter, clock, fmtNumber/fmtAgo, tokenStatsRows/Lines
-src/ui/topbar.ts           thanh trên: ô số, hạn mức, popover cài đặt, nút Demo
-src/ui/topbar.test.ts      test settingsFocus và focus popover theo địa chỉ/token
+src/ui/topbar.ts           thanh trên: logo AX tĩnh theo BASE_URL, ô số, hạn mức, popover cài đặt, nút Demo
+src/ui/topbar.test.ts      test focus, logo root/subpath giữ node khi agent/số đếm/hạn mức/trạng thái đổi
 src/ui/topbar.css          kiểu thanh trên
 src/ui/sidebar.ts          thanh bên: ô tìm (phím / và Esc), chip lọc phòng, khối phòng có thanh chỗ, dòng agent có thời gian chạy, phím [
 src/ui/sidebar.css         kiểu thanh bên và ngăn kéo màn hẹp
@@ -161,6 +161,11 @@ art/characters/body.pixel.json      thân nhân vật (đủ 7 tư thế)
 art/characters/hair/styleN.pixel.json  lớp tóc theo kiểu: 0 ngắn, 1 mái, 2 dài, 3 búi
 art/characters/acc/<role>.pixel.json   lớp phụ kiện theo vai trò (tech_lead, coder, reviewer, designer, ba, tester, researcher)
 art/demo-shots/                     công thức Pixelbolt ảnh review demo (văn phòng giờ 11 và 21)
+art/brand/                          ảnh logo AX chủ sở hữu cung cấp: nguồn nền đen và bản alpha lỗi để tham khảo
+scripts/export-brand.py            tách nền, crop và xuất logo AX bằng Pillow ngoài runtime
+public/brand/logo-ax-{512,192,64,32,16}.png  logo AX trong suốt; bản 64 cho thanh trên, 16/32 cho favicon
+public/brand/apple-touch-icon.png   icon màn hình chính 180×180
+index.html                         khung ứng dụng, favicon 16/32 và apple-touch-icon theo %BASE_URL%
 public/demo-shots/<thời điểm>/*.png  ảnh review demo xuất từ art/demo-shots/, ticket demo trỏ tới
 public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/
 public/assets/CREDITS.md            nguồn và giấy phép của mọi tài sản bên ngoài
@@ -168,6 +173,82 @@ docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (vă
 ```
 
 Sơ đồ module: [docs/architecture.md](docs/architecture.md).
+
+## Tái xuất logo AX
+
+Nguồn chính duy nhất là `art/brand/logo-ax-source-black.png` (1254×1254, RGB).
+Không dùng `logo-ax-source-alpha-raw.png`: ruột trắng bán trong suốt và mép có nhiễu.
+Script giữ các mảng logo lớn, ước lượng alpha riêng ở mép và khử màu nền đen,
+crop rồi đặt giữa khung vuông có lề; resize LANCZOS với alpha nhân trước để tránh quầng.
+Logo là ảnh mượt, không dùng công thức sprite Pixelbolt.
+
+Chạy từ gốc repo trên máy có Python, venv và pip, với môi trường riêng dùng
+**Pillow 11.3.0** (phiên bản được ghim trong script):
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install Pillow==11.3.0
+.venv/bin/python scripts/export-brand.py
+```
+
+Worker không có Pillow/pip thì chạy trên máy có môi trường này hoặc nhờ pha setup
+có mạng của máy build cài Pillow vào venv trước. Pha `aico-remote` chạy lệnh không có
+mạng; chỉ chạy `.venv/bin/python scripts/export-brand.py` khi venv đã được chuẩn bị.
+Không cài Pillow vào dependencies của app; Python không tham gia build hay runtime web.
+Script xuất lại sáu PNG trong `public/brand/`, in phiên bản Pillow, kích thước,
+bounding box và số pixel alpha 0/255/mép, đồng thời kiểm nền ngoài và lề đối xứng.
+Sau khi xuất, xem ảnh trên nền sáng, tối và caro, đặc biệt bản 16/32 ở kích thước thật
+và phóng lớn; kiểm số liệu alpha không thay thế việc xem nhiễu hoặc quầng bằng mắt.
+
+Thanh trên dùng `${import.meta.env.BASE_URL}brand/logo-ax-64.png`, ảnh cao 20px,
+`alt=""` vì đã có tên bên cạnh, `image-rendering: auto`. HTML dùng `%BASE_URL%`
+cho favicon 16/32 và apple-touch-icon 180. Để thử deploy dưới đường dẫn con:
+
+```bash
+npm run build -- --base=/preview/T-de61a515/
+npm run preview -- --base=/preview/T-de61a515/
+```
+
+Mở trực tiếp `/preview/T-de61a515/` trên địa chỉ preview được in ra rồi reload;
+kiểm các ảnh trong Network trả PNG, không chỉ kiểm HTTP 200 (SPA fallback có thể trả HTML).
+Bản root dùng `npm run build` và `npm run preview`.
+Ảnh bằng chứng được quản lý trên ticket T-de61a515 theo ghi chú duyệt,
+không lưu `art/brand-review/` trong repo.
+
+Kiểm nghiệm bàn giao W3 của T-de61a515:
+
+- Trên máy build qua `aico-remote`: `npm ci --offline`, `npm run build`,
+  `npm test` đều qua (36 file, 1.119 test); build với
+  `--base=/preview/T-de61a515/` cũng qua. Không cài dependency trên worker,
+  không thêm dependency runtime.
+- Phục vụ bằng Vite preview với base tương ứng: `/` và
+  `/preview/T-de61a515/` đều qua hai lượt request trực tiếp/tải lại;
+  ba khai báo icon và URL logo trong bundle đúng base, cả sáu PNG trả HTTP 200,
+  đúng MIME và byte giống ảnh nguồn trong `public/brand/`.
+- Kiểm PNG bằng bộ giải mã dùng thư viện chuẩn Python: đủ kích thước,
+  alpha có 0/255, viền ngoài alpha 0, bounding box cân đối trong sai số 1px.
+  Đã xem sáu ảnh trên nền trắng/tối/caro, bản 16/32 ở kích thước thật và
+  bản 16 phóng lớn; không thấy nhiễu rời hoặc quầng rõ. Ruột trắng khó nhìn
+  trên nền trắng là đặc tính màu logo. Chưa chạy lại script xuất ảnh vì
+  worker thiếu Pillow/pip và máy build hiện không có Python/Pillow.
+- Chromium headless dùng bundle root build từ xa, phục vụ trong bộ nhớ:
+  theo dõi demo đủ 48 giây ở 1440/390/899/900px, số agent tăng/giảm/về 0,
+  phòng offline rồi hồi phục; logo giữ node/src, tải bản 64px, cao 20px,
+  computed style `image-rendering: auto`. Tên ẩn dưới 900px; Cài đặt mở,
+  Demo đóng popover, reload tải lại logo; không có pageerror hoặc request logo lỗi.
+  Đã xem ảnh viewport rộng/hẹp; các test topbar còn kiểm agent mất/trở lại,
+  hạn mức, bộ đếm và điều khiển. Đây là kiểm tự động và xem ảnh theo mốc,
+  chưa phải quan sát trực tiếp toàn bộ animation.
+- TC5 còn mở ở phần trình duyệt: chưa mở/reload bản subpath trong Chromium
+  (đã kiểm HTTP như trên), chưa xác nhận favicon thực trên thanh tab sau xoá cache
+  vì headless không có thanh tab. Icon màn hình chính điện thoại: **không thử được**,
+  không có thiết bị hỗ trợ. Không đánh dấu TC1–TC8 hoàn tất toàn bộ chỉ từ build/test;
+  ảnh viewport không thay cho bằng chứng favicon hoặc icon điện thoại.
+- Đối chiếu code: nguồn nền đen → script Pillow → `public/brand/` chạy ngoài runtime;
+  `BASE_URL` → ảnh thanh trên và icon HTML đúng sơ đồ ticket. File
+  `docs/plans/T-de61a515.md` chưa có trong bản sao; `docs/architecture.md` vẫn ghi
+  T-8d17b253, chưa thể hiện pipeline logo và test topbar mới. Chuyển hệ thống/Tech Lead
+  cập nhật hai tài liệu tự sinh này, không sửa ngoài phạm vi W3.
 
 ## Ghi công
 
