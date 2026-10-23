@@ -33,6 +33,9 @@ export const ROLE_STYLES: Record<string, RoleStyle> = {
   coder: { label: "Coder", shirt: "#4fae60", shirtDark: "#3a8a49", accessory: "tai nghe", accent: "#2b2f38" },
   reviewer: { label: "Reviewer", shirt: "#9b6bd6", shirtDark: "#7449b0", accessory: "kính", accent: "#21181f" },
   designer: { label: "Designer", shirt: "#e57fb0", shirtDark: "#b85a8a", accessory: "mũ nồi", accent: "#c0392b" },
+  ba: { label: "BA", shirt: "#d9a43a", shirtDark: "#a87b25", accessory: "bảng kẹp hồ sơ", accent: "#8a5a32" },
+  tester: { label: "Tester", shirt: "#3bb5c8", shirtDark: "#2a8797", accessory: "kính lúp", accent: "#c9a14f" },
+  researcher: { label: "Researcher", shirt: "#b0784a", shirtDark: "#83573a", accessory: "sổ tay", accent: "#3f6fbf" },
 };
 
 export function roleStyle(role: string | null | undefined): RoleStyle {
