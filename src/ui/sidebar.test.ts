@@ -608,7 +608,7 @@ describe("class dòng và thanh chỗ", () => {
 const NEW_ROLES = {
   ba: { label: "BA", shirt: "#d9a43a" },
   tester: { label: "Tester", shirt: "#3bb5c8" },
-  researcher: { label: "Researcher", shirt: "#b0784a" },
+  researcher: { label: "Researcher", shirt: "#8c8f3a" },
 } as const;
 const FALLBACK_SHIRT = "#8a8f98";
 
