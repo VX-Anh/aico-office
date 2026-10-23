@@ -1,13 +1,13 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-01489c4d, T-e74ec7c8). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-8d17b253). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   subgraph Data["Dữ liệu và logic thuần hiện có"]
-    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây<br/>defaultBaseUrl: origin/api trên tên miền thật<br/>null cho localhost, file:, /preview/"]
-    TK["src/tickets.ts<br/>parseTickets, needsYou, NEED_LABEL, actions, MR, preview<br/>latestScreenshots: bộ ảnh mới nhất, tối đa 16<br/>demoNeedTickets kèm ảnh demo"]
+    API["src/api.ts<br/>workers, snapshot tickets đầy đủ, actions<br/>demoWorkers 48 giây, DEMO_ROLES 6 vai trò<br/>(+ ba read, tester review)<br/>roomAgents: current cũ giữ role<br/>defaultBaseUrl: origin/api trên tên miền thật"]
+    TK["src/tickets.ts<br/>parseTickets, needsYou, NEED_LABEL, actions, MR, preview<br/>latestScreenshots, demoNeedTickets kèm ảnh demo"]
     ACTV["src/activity.ts<br/>activity, screenFor, bubbles, progress"]
     USG["src/usage.ts"]
     TIME["src/time.ts"]
@@ -17,47 +17,46 @@ flowchart TD
   API --> TK
   ACTV --> USG
 
-  SHOTS["public/demo-shots/ + art/demo-shots/<br/>ảnh pixel demo theo thời điểm/file.png"]
+  SHOTS["public/demo-shots/ + art/demo-shots/"]
   SHOTS -.->|url tuyệt đối theo BASE_URL| TK
 
-  COL["src/needs-column.ts + CSS<br/>gate chấp nhận snapshot<br/>lọc items cho panel, giữ xác nhận/ghi chú<br/>hàng ảnh thu nhỏ, ảnh lỗi thành link"]
-  VIEWER["src/shot-viewer.ts + CSS<br/>lightbox trên body: ←/→, Esc, trả focus"]
+  COL["src/needs-column.ts + CSS<br/>gate snapshot, lọc items, hàng ảnh"]
+  VIEWER["src/shot-viewer.ts + CSS<br/>lightbox ←/→, Esc"]
   API -->|cùng request tickets| COL
   LATEST --> COL
   COL --> TK
-  COL -->|mở ảnh, đóng khi thẻ mất/đổi nguồn| VIEWER
+  COL -->|mở ảnh| VIEWER
   COL -->|actions| API
-  COL -->|snapshot đầy đủ đã chấp nhận| MAIN
-  COL -->|NeedItem đã lọc| MAIN
+  COL -->|snapshot, NeedItem đã lọc| MAIN
 
   LOC["window.location"]
   LS["localStorage aico-office.api"]
-  FORM["#settings trong index.html<br/>baseUrl, token"]
+  FORM["#settings trong index.html"]
 
-  MAIN["src/main.ts<br/>poll, nguồn, giờ địa phương hoặc hour<br/>reduced motion, vòng animation, chọn agent<br/>showNeeds dùng chung cho feed, toast, drawer<br/>ghi --feed-left/--feed-room<br/>update sidebar mỗi giây và sau poll<br/>điền ô địa chỉ: kết nối lưu, không thì defaultBaseUrl"]
+  MAIN["src/main.ts<br/>poll, nguồn, giờ, reduced motion, vòng animation<br/>chọn agent, showNeeds, update sidebar"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
   MAIN -->|demo assetBase| TK
   LS -->|loadConfig| MAIN
-  MAIN -->|saveConfig chỉ khi submit| LS
+  MAIN -->|saveConfig khi submit| LS
   LOC -->|defaultBaseUrl| MAIN
-  MAIN -->|value baseUrl, không tự kết nối| FORM
+  MAIN -->|value baseUrl| FORM
 
   subgraph UI["Khung UI"]
-    VP["ui/viewport.ts<br/>computeInsets, fitScene<br/>feedBox: left/bề rộng feed theo sidebar, drawer"]
-    FM["ui/feed-model.ts<br/>FeedLine: ticket, tone<br/>dòng hết hạn mức theo chuyển trạng thái phòng"]
+    VP["ui/viewport.ts<br/>computeInsets, fitScene, feedBox"]
+    FM["ui/feed-model.ts"]
     SEL["ui/selection.ts"]
-    FMT["ui/format.ts<br/>agentStatus, providerLetter, tokenStatsRows label/value/cache/level<br/>tokenStatsLines dựng từ rows cho tooltip"]
-    TOK["ui/tokens.css<br/>--feed-max, --input-bg, --accent-soft<br/>--room-bg, --crit-softer, --radius-xs/room"]
-    TOP["ui/topbar.ts + CSS<br/>popover cài đặt chứa #settings<br/>settingsFocus: địa chỉ có + token trống → focus token"]
-    SIDEM["ui/sidebar-model.ts<br/>thuần: normalizeText bỏ dấu, agentMatches<br/>formatElapsed m:ss/h:mm:ss, slotFill<br/>load/saveHiddenRooms an toàn"]
-    SIDE["ui/sidebar.ts + CSS<br/>kiểu Habblaud: ô tìm, phím / và Esc<br/>chip lọc phòng aria-pressed, nhãn đang lọc<br/>khối phòng vạch màu, đếm, thanh chỗ/over<br/>dòng agent: avatar, vai trò, ticket, hoạt động · thời gian chạy<br/>selected/need/offline; thu gọn [, ngăn kéo hẹp"]
-    LSH[("localStorage<br/>hiddenRooms")]
-    AV["ui/avatar.ts"]
-    DRWM["ui/drawer-model.ts<br/>thuần: statusView tone/nhãn/thời gian<br/>+ ticketId, needKind; nhãn 'Chờ bạn …' theo NEED_LABEL<br/>nowCardTitle theo tone<br/>roomStateLabel, taskChecklist, recentRows"]
-    DRW["ui/drawer.ts + CSS<br/>tab Agent kiểu Habblaud: hero avatar 64px/48px<br/>chip phòng, ticket; hộp nhiệm vụ + MR/Xem trước<br/>dòng trạng thái: nhãn need là nút mở Cần bạn<br/>thẻ hoạt động: tiêu đề theo tone<br/>checklist task, timeline Gần đây, bảng số liệu"]
-    FEED["ui/feed.ts + CSS<br/>khung nổi góc dưới trái, ticker khi thu gọn<br/>dòng lưới: giờ, avatar, tên, chip phòng, ticket, icon, nội dung<br/>dòng ticket is-ticket: ô ticket rỗng, title không lặp<br/>màn hẹp: cột tên fit-content, mã ticket đủ<br/>tự cuộn, viên N mới, phím ]"]
+    FMT["ui/format.ts"]
+    TOK["ui/tokens.css"]
+    TOP["ui/topbar.ts + CSS"]
+    SIDEM["ui/sidebar-model.ts<br/>agentMatches theo nhãn + role id"]
+    SIDE["ui/sidebar.ts + CSS<br/>ô tìm, chip lọc, khối phòng, dòng agent<br/>chú thích 7 vai trò từ ROLE_STYLES"]
+    LSH[("localStorage hiddenRooms")]
+    AV["ui/avatar.ts<br/>khoá id+role, fallback màu áo + chữ đầu nhãn"]
+    DRWM["ui/drawer-model.ts"]
+    DRW["ui/drawer.ts + CSS"]
+    FEED["ui/feed.ts + CSS"]
     NEEDS["#needs trong drawer"]
     TOAST["toasts.ts + CSS"]
   end
@@ -67,13 +66,13 @@ flowchart TD
   MAIN --> SEL
   MAIN --> TOP
   MAIN -->|workers, needIds, selectedKey, now| SIDE
-  SIDE -->|onSelect key → selectAgent| MAIN
-  MAIN -->|view, agent + needItems, now| DRW
-  DRW -->|onTicket id → showNeeds| MAIN
+  SIDE -->|onSelect| MAIN
+  MAIN -->|view, agent + needItems| DRW
+  DRW -->|onTicket| MAIN
   MAIN -->|lines + workers| FEED
-  FEED -->|onAgent phòng+id → selectAgent<br/>onTicket → showNeeds| MAIN
+  FEED -->|onAgent, onTicket| MAIN
   MAIN --> TOAST
-  TOAST -->|onOpen → showNeeds| MAIN
+  TOAST -->|onOpen| MAIN
   TOP -->|submit, Demo| MAIN
   TOP --> FMT
   SIDE --> SIDEM
@@ -81,7 +80,7 @@ flowchart TD
   SIDE --> AV
   SIDE --> ACTV
   SIDE --> PAL
-  SIDE <-->|try/catch, lỗi thì chỉ trong phiên| LSH
+  SIDE <--> LSH
   FEED --> AV
   FEED --> FMT
   FEED --> PAL
@@ -96,7 +95,7 @@ flowchart TD
   DRWM --> ACTV
   DRWM --> TIME
   DRWM --> FMT
-  DRWM -->|NEED_LABEL, NeedKind| TK
+  DRWM --> TK
   DRW --> NEEDS
   COL --> NEEDS
   TOK -.-> TOP
@@ -106,29 +105,29 @@ flowchart TD
   TOK -.-> COL
   TOK -.-> VIEWER
 
-  DEMO["scene/demo-events.ts<br/>snapshot định kỳ, cùng bộ phát hiện"]
-  EVENTS["scene/room-events.ts<br/>so snapshot, MR mới/done/escalated<br/>nhớ ticket-provider, dedup, TTL 10 giây"]
+  DEMO["scene/demo-events.ts"]
+  EVENTS["scene/room-events.ts<br/>MR mới/done/escalated, TTL 10 giây"]
   DEMO --> MAIN
-  MAIN -->|snapshot và liên hệ agent.ticket_id| EVENTS
-  EVENTS -->|banner đang sống| MAIN
+  MAIN -->|snapshot| EVENTS
+  EVENTS -->|banner| MAIN
 
-  IDX["scene/index.ts<br/>ghép cảnh, SceneFigure và dữ liệu biển phòng"]
+  IDX["scene/index.ts<br/>ghép cảnh, SceneFigure"]
   MAIN -->|workers, thời gian, reduced motion| IDX
-  LAYOUT["scene/layout.ts<br/>thuần: phòng/bàn/ghế, ngoại cảnh, sceneSize"]
-  OUT["scene/outdoor.ts<br/>seed thuần, cây/đèn/lối đi/đường<br/>vẽ ngoại cảnh và xe"]
-  CACHE["Canvas cache nền tĩnh<br/>khóa hình học, palette, seed"]
-  TILES["scene/tiles.ts<br/>tường, sàn, cửa"]
-  ACT["scene/actors.ts<br/>seated chỉ khi cuối path đúng ghế hiện tại"]
+  LAYOUT["scene/layout.ts<br/>thuần"]
+  OUT["scene/outdoor.ts"]
+  CACHE["Canvas cache nền tĩnh"]
+  TILES["scene/tiles.ts"]
+  ACT["scene/actors.ts<br/>seated chỉ khi cuối path đúng ghế<br/>look làm mới mỗi sync khi role đổi"]
   PATH["scene/pathing.ts<br/>thuần"]
-  FURN["scene/furniture.ts<br/>đồ đạc, đồng hồ, màn hình"]
+  FURN["scene/furniture.ts<br/>màn hình màu code theo mode"]
   BOARD["scene/usage-board.ts"]
-  CHAR["scene/characters.ts"]
+  CHAR["scene/characters.ts<br/>agentLook, lớp thân → tóc → acc/role"]
   PB["scene/pixelbolt.ts"]
-  LEG["scene/legacy-characters.ts"]
-  ART["art/characters/*.pixel.json"]
-  PAL["scene/palette.ts<br/>màu chung, ngoại cảnh, ánh sáng, banner"]
+  LEG["scene/legacy-characters.ts<br/>drawAccessory 7 vai trò<br/>ba/tester/researcher: front, side"]
+  ART["art/characters/*.pixel.json<br/>acc/: tech_lead, coder, reviewer, designer,<br/>ba, tester, researcher"]
+  PAL["scene/palette.ts<br/>ROLE_STYLES 7 vai trò + fallback xám<br/>màu provider, cảnh, ánh sáng, banner"]
   PIX["scene/pixel.ts"]
-  LIGHT["scene/lighting.ts<br/>độ sáng thuần và lightmap canvas cache<br/>bucket 5 phút, hình học, nguồn sáng"]
+  LIGHT["scene/lighting.ts"]
 
   IDX --> LAYOUT
   IDX --> OUT
@@ -138,16 +137,19 @@ flowchart TD
   IDX --> ACT
   ACT --> LAYOUT
   ACT --> PATH
+  ACT -->|agentLook| CHAR
   IDX --> FURN
   IDX --> BOARD
   BOARD --> USG
   IDX --> ACTV
   IDX --> CHAR
   AV --> CHAR
+  AV --> PAL
   ART --> CHAR
   CHAR --> PB
   CHAR --> LEG
   CHAR --> PAL
+  LEG --> PAL
   OUT --> PAL
   LIGHT --> PAL
   FURN --> PAL
@@ -155,44 +157,37 @@ flowchart TD
   OUT --> PIX
   FURN --> PIX
   PB --> PIX
-  IDX -->|phút địa phương, layout, nguồn sáng| LIGHT
+  LEG --> PIX
+  IDX --> LIGHT
 
-  CANVAS["canvas #office<br/>nền cache → phần động → lightmap multiply"]
-  CACHE -->|drawImage mỗi frame| CANVAS
+  CANVAS["canvas #office<br/>nền cache → phần động → lightmap"]
+  CACHE --> CANVAS
   IDX -->|đồ đạc, nhân vật, xe| CANVAS
-  LIGHT -->|drawImage multiply mỗi frame| CANVAS
-  VP -->|vùng trống, focus, vị trí feed| MAIN
+  LIGHT --> CANVAS
+  VP --> MAIN
 
-  OVL["src/overlay.ts<br/>chữ DPR: hoạt động, progress<br/>biển phòng, banner và confetti hữu hạn"]
-  TIP["src/agent-tooltip.ts + CSS<br/>hit-test và xem nhanh<br/>tokenStatsLines"]
-  MAIN -->|figures, biển phòng, banner| OVL
-  MAIN -->|figures và chọn agent| TIP
+  OVL["src/overlay.ts"]
+  TIP["src/agent-tooltip.ts + CSS<br/>vai trò qua roleStyle"]
+  MAIN --> OVL
+  MAIN --> TIP
   OVL --> ACTV
   OVL --> PAL
   TIP --> ACTV
   TIP --> FMT
+  TIP --> PAL
   OVL --> SCREEN["Lớp chữ trên cảnh"]
   CANVAS --> SCREEN
 
-  TEST["Vitest<br/>outdoor, lighting, room-events, demo-events<br/>snapshot gate, overlay, renderer, main, viewport + feedBox<br/>feed-model ticket/tone/hết hạn mức, feed DOM<br/>latestScreenshots, shot-viewer, hàng ảnh thẻ<br/>format: tokenStatsRows + tokenStatsLines cũ<br/>drawer-model, drawer DOM<br/>sidebar-model: bỏ dấu, khớp, m:ss/h:mm:ss, slotFill, localStorage lỗi<br/>sidebar DOM: tìm, phím / Esc, chip lọc, thanh chỗ/over<br/>class selected/need/offline; dữ liệu đổi giữa chừng khi đang lọc<br/>api: defaultBaseUrl deploy/localhost/[::1]/file:/preview<br/>topbar: settingsFocus, focus ô token<br/>main: điền sẵn địa chỉ, kết nối lưu thắng, không tự lưu/kết nối<br/>dữ liệu đổi giữa chừng: kết nối lưu mất, Demo/Thoát demo, offline<br/>giữ actors và mọi test cũ"]
+  TEST["Vitest<br/>palette: nhãn 3 vai trò mới, fallback, màu không trùng, khoá a = accent<br/>legacy-characters: canvas giả, phụ kiện front/side, không ở back<br/>art/characters: 7 file acc 16×22<br/>api: demo 96 giây có ba/read, tester/review, kịch bản giữ nguyên<br/>actors: role đổi giữa chừng, mất rồi xuất hiện lại, offline<br/>sidebar: chú thích 7 mục, tìm ba/tester/research, role đổi khi đang lọc<br/>avatar: fallback màu áo + chữ B/T/R<br/>giữ mọi test cũ"]
   TEST -.-> API
-  TEST -.-> TOP
-  TEST -.-> OUT
-  TEST -.-> LIGHT
-  TEST -.-> EVENTS
-  TEST -.-> COL
-  TEST -.-> TK
-  TEST -.-> VIEWER
-  TEST -.-> OVL
-  TEST -.-> IDX
-  TEST -.-> MAIN
+  TEST -.-> PAL
+  TEST -.-> LEG
+  TEST -.-> ART
   TEST -.-> ACT
-  TEST -.-> VP
-  TEST -.-> FM
-  TEST -.-> FEED
-  TEST -.-> FMT
-  TEST -.-> DRWM
-  TEST -.-> DRW
-  TEST -.-> SIDEM
   TEST -.-> SIDE
+  TEST -.-> AV
+  TEST -.-> MAIN
+  TEST -.-> IDX
+  TEST -.-> DRW
+  TEST -.-> FEED
 ```
