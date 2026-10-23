@@ -2,7 +2,7 @@
 // Ký tự: O viền, H/h tóc, S/s da, E mắt, T/t áo, P quần, p giày, W cốc; "." trong suốt.
 
 import type { Look } from "./characters";
-import { SKIN, SKIN_SHADE } from "./palette";
+import { C, ROLE_STYLES, SKIN, SKIN_SHADE } from "./palette";
 import { type Ctx, OUTLINE, cached, drawGrid, mirrorGrid, rect, shade } from "./pixel";
 
 const W = 16;
@@ -277,6 +277,57 @@ function drawAccessory(ctx: Ctx, role: string | null, view: View, pose: Pose): v
       rect(ctx, x, 1, 10, 2, "#c0392b");
       rect(ctx, x, 3, 10, 1, "#8e2a20");
       rect(ctx, x + 4, 0, 2, 1, "#c0392b");
+      break;
+    }
+    // Ba vai trò sau cầm đồ ở tay trước ngực: sau lưng không thấy, nằm thì chăn che.
+    // Ngồi sofa thì đặt lên đùi hoặc cạnh hông để không che tay cầm cốc.
+    case "ba": {
+      // bảng kẹp hồ sơ
+      const a = ROLE_STYLES.ba.accent;
+      if (pose === "lie") break;
+      if (view === "front") {
+        rect(ctx, 10, BODY_Y + 1, 4, 5, a);
+        rect(ctx, 11, BODY_Y + 2, 2, 3, C.paper);
+        rect(ctx, 11, BODY_Y + 1, 2, 1, OUTLINE);
+      } else if (view === "side" && pose === "sitSide") {
+        rect(ctx, 5, BODY_Y + 4, 4, 2, a);
+        rect(ctx, 6, BODY_Y + 4, 2, 1, C.paper);
+      } else if (view === "side") {
+        rect(ctx, 11, BODY_Y + 1, 2, 5, a);
+        rect(ctx, 11, BODY_Y + 2, 1, 3, C.paper);
+        rect(ctx, 12, BODY_Y + 1, 1, 1, OUTLINE);
+      }
+      break;
+    }
+    case "tester": {
+      // kính lúp: vành accent, mặt kính sáng, cán tối
+      const a = ROLE_STYLES.tester.accent;
+      if (pose === "lie") break;
+      if (view === "front" || (view === "side" && pose !== "sitSide")) {
+        rect(ctx, 11, BODY_Y, 4, 4, a);
+        rect(ctx, 12, BODY_Y + 1, 2, 2, C.steam);
+        rect(ctx, 12, BODY_Y + 4, 1, 1, OUTLINE);
+      } else if (view === "side") {
+        rect(ctx, 1, BODY_Y + 3, 3, 3, a);
+        rect(ctx, 2, BODY_Y + 4, 1, 1, C.steam);
+        rect(ctx, 2, BODY_Y + 6, 1, 1, OUTLINE);
+      }
+      break;
+    }
+    case "researcher": {
+      // sổ tay bìa màu, nhãn giấy
+      const a = ROLE_STYLES.researcher.accent;
+      if (pose === "lie") break;
+      if (view === "front") {
+        rect(ctx, 1, BODY_Y + 2, 4, 4, a);
+        rect(ctx, 2, BODY_Y + 3, 2, 1, C.paper);
+      } else if (view === "side" && pose === "sitSide") {
+        rect(ctx, 5, BODY_Y + 4, 3, 2, a);
+        rect(ctx, 5, BODY_Y + 4, 3, 1, C.paper);
+      } else if (view === "side") {
+        rect(ctx, 5, BODY_Y + 2, 3, 3, a);
+        rect(ctx, 5, BODY_Y + 2, 3, 1, C.paper);
+      }
       break;
     }
   }
