@@ -1,74 +1,78 @@
 # Kiến trúc
 
-Bản đồ do Tech Lead cập nhật (lần gần nhất: T-de61a515). Agent đọc file này
+Bản đồ do Tech Lead cập nhật (lần gần nhất: T-0a0a01eb). Agent đọc file này
 trước khi làm để biết các phần đã có; sửa kiến trúc thì cập nhật sơ đồ.
 
 ```mermaid
 flowchart TD
   SOURCE["art/brand/logo-ax-source-black.png<br/>Nguồn chính, chỉ đọc"]
   RAW["art/brand/logo-ax-source-alpha-raw.png<br/>Chỉ tham khảo"]
-  EXPORT["scripts/export-brand.py<br/>Python + Pillow ngoài runtime<br/>mask, khử nền đen ở mép, crop, resize"]
-  BRAND["public/brand/<br/>PNG 512, 192, 64, 32, 16<br/>apple-touch-icon 180"]
-  BASE["Vite BASE_URL<br/>/ hoặc /preview/T-de61a515/"]
-  HTML["index.html<br/>settings, canvas, vùng UI<br/>favicon và apple-touch-icon"]
-  TAB["Tab trình duyệt / màn hình chính"]
-  SOURCE --> EXPORT --> BRAND
-  BASE -->|%BASE_URL%| HTML
-  BRAND -->|icon PNG| HTML --> TAB
+  EXPORT["scripts/export-brand.py<br/>Pillow ngoài build/runtime"]
+  LOGOS["public/brand/logo-ax-{512,192,64,32,16}.png<br/>Logo trong suốt giữ nguyên"]
+  ICONS["public/brand/favicon-16.png, favicon-32.png<br/>Nền #0e1016, bo nhẹ<br/>apple-touch-icon.png 180: nền kín, không bo"]
+  SOURCE -->|extract, crop, resize như trước| EXPORT
+  EXPORT -->|nhánh logo cũ| LOGOS
+  LOGOS -->|logo-ax-512.png làm nguồn icon| EXPORT
+  EXPORT -->|logo khoảng 80%, ghép nền| ICONS
 
-  API["src/api.ts<br/>workers, snapshot tickets, actions<br/>demoWorkers 48 giây, 6 vai trò demo"]
-  TK["src/tickets.ts<br/>parse, needsYou, actions, MR, preview, screenshots"]
-  LATEST["src/latest.ts<br/>chặn snapshot cũ"]
-  ATT["src/attention.ts<br/>tiêu đề tab, phím tắt, toast"]
+  BASE["Vite BASE_URL<br/>/ hoặc /preview/T-0a0a01eb/"]
+  HTML["index.html<br/>settings, canvas, vùng UI<br/>khai báo icon"]
+  TAB["Tab trình duyệt / màn hình chính"]
+  BASE -->|%BASE_URL%| HTML
+  ICONS -->|PNG| HTML
+  HTML --> TAB
+
+  API["src/api.ts<br/>workers, tickets, actions, demo 48 giây"]
+  TK["src/tickets.ts"]
+  LATEST["src/latest.ts"]
+  ATT["src/attention.ts"]
   ACTV["src/activity.ts"]
   USG["src/usage.ts"]
   TIME["src/time.ts"]
+  CONFIG["window.location + localStorage aico-office.api"]
+  MAIN["src/main.ts<br/>poll, animation, selection, cập nhật UI"]
   API --> TK
-  ACTV --> USG
-
-  MAIN["src/main.ts<br/>poll, nguồn, thời gian, animation<br/>selection và cập nhật UI"]
   API --> MAIN
   LATEST --> MAIN
   ATT --> MAIN
-  CONFIG["window.location + localStorage aico-office.api"]
   CONFIG --> MAIN
   MAIN -->|giá trị form| HTML
   HTML -->|submit| MAIN
+  ACTV --> USG
 
   SHOTS["art/demo-shots/ + public/demo-shots/"]
+  COL["src/needs-column.ts + CSS"]
+  VIEWER["src/shot-viewer.ts + CSS"]
   SHOTS -->|assetBase theo BASE_URL| TK
   MAIN -->|demo assetBase| TK
-  COL["src/needs-column.ts + CSS<br/>snapshot gate, lọc items, ảnh review"]
-  VIEWER["src/shot-viewer.ts + CSS<br/>lightbox, bàn phím"]
   API --> COL
   LATEST --> COL
   COL --> TK
   COL --> VIEWER
   COL -->|actions| API
-  COL -->|snapshot và NeedItem| MAIN
+  COL -->|snapshot, NeedItem| MAIN
 
-  subgraph UI["Khung UI"]
-    TOP["src/ui/topbar.ts + topbar.css<br/>ảnh AX tĩnh, alt rỗng, cao 20px<br/>bộ đếm, hạn mức, Cài đặt, Demo"]
-    VP["ui/viewport.ts<br/>computeInsets, fitScene, feedBox"]
+  subgraph UI["Khung UI hiện có"]
+    TOP["ui/topbar.ts + CSS<br/>AX trong suốt, cao 20px"]
+    VP["ui/viewport.ts"]
     FM["ui/feed-model.ts"]
     SEL["ui/selection.ts"]
     FMT["ui/format.ts"]
     TOK["ui/tokens.css"]
     SIDE["ui/sidebar.ts + CSS"]
-    SIDEM["ui/sidebar-model.ts<br/>lọc nhãn và role"]
+    SIDEM["ui/sidebar-model.ts"]
     HIDDEN["localStorage hiddenRooms"]
-    AV["ui/avatar.ts<br/>khoá id và role, fallback"]
+    AV["ui/avatar.ts"]
     DRW["ui/drawer.ts + CSS"]
     DRWM["ui/drawer-model.ts"]
     FEED["ui/feed.ts + CSS"]
     NEEDS["#needs trong drawer"]
     TOAST["src/toasts.ts + CSS"]
   end
-
   BASE -->|import.meta.env.BASE_URL| TOP
-  BRAND -->|logo-ax-64.png| TOP
+  LOGOS -->|logo-ax-64.png| TOP
   HTML -->|settings form| TOP
-  MAIN -->|workers, bộ đếm, thời gian| TOP
+  MAIN --> TOP
   TOP -->|submit, Demo| MAIN
   TOP --> FMT
   MAIN --> VP
@@ -111,16 +115,16 @@ flowchart TD
   TOK -.-> VIEWER
 
   DEMO["scene/demo-events.ts"]
-  EVENTS["scene/room-events.ts<br/>MR, done, escalated, TTL"]
+  EVENTS["scene/room-events.ts"]
   DEMO --> MAIN
   MAIN -->|snapshot| EVENTS
   EVENTS -->|banner| MAIN
 
   subgraph SCENE["Cảnh pixel hiện có"]
-    IDX["scene/index.ts<br/>ghép cảnh, SceneFigure"]
-    LAYOUT["scene/layout.ts<br/>thuần"]
-    ACT["scene/actors.ts<br/>seated đúng ghế, look theo role"]
-    PATH["scene/pathing.ts<br/>thuần"]
+    IDX["scene/index.ts"]
+    LAYOUT["scene/layout.ts: thuần"]
+    ACT["scene/actors.ts"]
+    PATH["scene/pathing.ts: thuần"]
     OUT["scene/outdoor.ts"]
     CACHE["Cache nền tĩnh"]
     TILES["scene/tiles.ts"]
@@ -129,7 +133,7 @@ flowchart TD
     CHAR["scene/characters.ts"]
     PB["scene/pixelbolt.ts"]
     LEG["scene/legacy-characters.ts"]
-    ART["art/characters/*.pixel.json<br/>thân, tóc, phụ kiện 7 vai trò"]
+    ART["art/characters/*.pixel.json"]
     PAL["scene/palette.ts"]
     PIX["scene/pixel.ts"]
     LIGHT["scene/lighting.ts"]
@@ -168,11 +172,11 @@ flowchart TD
   FURN --> PIX
   PB --> PIX
   LEG --> PIX
-  CANVAS["canvas #office<br/>cache nền, phần động, lightmap"]
+
+  CANVAS["canvas #office"]
   CACHE --> CANVAS
   IDX --> CANVAS
   LIGHT --> CANVAS
-
   OVL["src/overlay.ts"]
   TIP["src/agent-tooltip.ts + CSS"]
   SCREEN["Lớp chữ trên cảnh"]
@@ -186,21 +190,23 @@ flowchart TD
   OVL --> SCREEN
   CANVAS --> SCREEN
 
-  TEST["Vitest hiện có + topbar.test.ts<br/>BASE_URL, ảnh tĩnh qua dữ liệu đổi<br/>giữ các test scene, role, UI và API"]
-  TEST -.-> TOP
+  TEST["Vitest hiện có<br/>API, UI, scene, công thức art"]
   TEST -.-> API
   TEST -.-> MAIN
+  TEST -.-> TOP
   TEST -.-> ACT
   TEST -.-> SIDE
   TEST -.-> DRW
   TEST -.-> FEED
   TEST -.-> ART
-  CHECK["Kiểm build root/subpath và demo<br/>alpha, kích thước, responsive, icon"]
-  CHECK -.-> BRAND
+  CHECK["Kiểm build/test, root/subpath, demo<br/>kích thước, alpha, nền, favicon tab sáng"]
+  CHECK -.-> ICONS
+  CHECK -.-> LOGOS
   CHECK -.-> HTML
   CHECK -.-> TOP
-  CHECK --> EVIDENCE["art/brand-review/<br/>ảnh bằng chứng"]
-  README["README.md<br/>Cấu trúc và hướng dẫn tái xuất"]
+  CHECK --> EVIDENCE["Bằng chứng gắn ticket<br/>không lưu art/brand-review/"]
+  README["README.md<br/>Cấu trúc, tái xuất và kết quả kiểm tra"]
   README -.-> EXPORT
-  README -.-> BRAND
+  README -.-> LOGOS
+  README -.-> ICONS
 ```
