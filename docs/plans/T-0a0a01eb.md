@@ -1,14 +1,15 @@
 # T-0a0a01eb: GUI: favicon và apple-touch-icon có nền tối để thấy được trên tab sáng
 
-Lần code: 1. File do aico tạo, cập nhật mỗi lần code.
+Lần code: 2. File do aico tạo, cập nhật mỗi lần code.
 
 ## Đầu việc
 
 | Id | Việc | Vai trò | Được sửa | Chờ | Kết quả |
 | --- | --- | --- | --- | --- | --- |
-| W1 | Tách pipeline icon nền tối và xuất ba PNG | coder | `scripts/export-brand.py`, `public/brand/favicon-16.png`, `public/brand/favicon-32.png`, `public/brand/apple-touch-icon.png` | - | xong (codex) |
-| W2 | Chuyển khai báo favicon sang tên mới | coder | `index.html` | - | xong (codex) |
-| W3 | Ghép nối, kiểm nghiệm và cập nhật hướng dẫn | coder | `README.md` | W1, W2 | xong (codex) |
+| W1 | Tách pipeline icon nền tối và xuất ba PNG | coder | `scripts/export-brand.py`, `public/brand/favicon-16.png`, `public/brand/favicon-32.png`, `public/brand/apple-touch-icon.png` | - | chưa chạy |
+| W2 | Chuyển khai báo favicon sang tên mới | coder | `index.html` | - | chưa chạy |
+| W3 | Ghép nối, kiểm nghiệm và cập nhật hướng dẫn | coder | `README.md` | W1, W2 | chưa chạy |
+| FIX | Sửa theo góp ý: [review bởi codex] | coder | `**` | - | xong |
 
 ## Kế hoạch
 
