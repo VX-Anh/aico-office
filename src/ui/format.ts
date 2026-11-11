@@ -35,10 +35,23 @@ export function fmtTokenCount(n: number | null | undefined): string {
 export function fmtAgo(iso: string | null | undefined, now: number): string {
   return iso ? relativeTime(iso, now) : "chưa chạy";
 }
-// UTC giữ kết quả độc lập múi giờ của máy chạy; không đọc giờ hệ thống.
-export function clock(iso: string): string {
+const pad2 = (n: number) => String(n).padStart(2, "0");
+// Giờ theo múi giờ của máy xem (người dùng đọc giờ địa phương, không phải UTC).
+// Khác ngày với `now` thì cột hẹp chỉ hiện ngày "dd/MM"; giờ đầy đủ nằm ở clockFull (title).
+export function clock(iso: string, now?: number): string {
   const at = Date.parse(iso);
-  return Number.isFinite(at) ? new Date(at).toISOString().slice(11, 16) : "--:--";
+  if (!Number.isFinite(at)) return "--:--";
+  const d = new Date(at);
+  if (now !== undefined && Number.isFinite(now) && new Date(now).toDateString() !== d.toDateString()) {
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+  }
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+export function clockFull(iso: string): string {
+  const at = Date.parse(iso);
+  if (!Number.isFinite(at)) return "--:--";
+  const d = new Date(at);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 export function providerLetter(name: string): string {
   const lower = name.toLowerCase();

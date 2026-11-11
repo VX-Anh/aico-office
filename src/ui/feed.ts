@@ -2,7 +2,7 @@ import type { WorkerStatus } from "../api";
 import { paletteOf } from "../scene/palette";
 import { avatarIdentity, createAvatar } from "./avatar";
 import type { FeedLine } from "./feed-model";
-import { clock, providerLetter } from "./format";
+import { clock, clockFull, providerLetter } from "./format";
 import "./feed.css";
 
 type DisplayLine = FeedLine & { ticket?: string | null; tone?: "need" | "done" | "error" | null };
@@ -123,7 +123,7 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
           const dup = !!line.ticket && line.ticket === line.name;
           row.className = ["feed-line", line.tone ? `tone-${line.tone}` : "", gone ? "is-gone" : "", dup ? "is-ticket" : ""].filter(Boolean).join(" ");
           row.replaceChildren();
-          const content = [clock(line.at), "", line.name, line.room ? providerLetter(line.room) : "", dup ? "" : line.ticket ?? "", line.icon, line.text];
+          const content = [clock(line.at, Date.now()), "", line.name, line.room ? providerLetter(line.room) : "", dup ? "" : line.ticket ?? "", line.icon, line.text];
           content.forEach((text, i) => {
             const cell = make(i === 0 ? "time" : "span", ["feed-time", "feed-avatar", "feed-name", "feed-room", "feed-ticket", "feed-icon", "feed-text"][i]);
             cell.textContent = text;
@@ -136,7 +136,7 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
             row!.append(cell);
           });
           row.dataset.content = signature;
-          row.title = [clock(line.at), line.name, line.room, dup ? null : line.ticket, line.text].filter(Boolean).join(" · ");
+          row.title = [clockFull(line.at), line.name, line.room, dup ? null : line.ticket, line.text].filter(Boolean).join(" · ");
           row.onclick = () => {
             if (line.agentId) actions.onAgent?.(line.room, line.agentId);
             else if (line.ticket) actions.onTicket?.(line.ticket);

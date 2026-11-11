@@ -73,6 +73,7 @@ vi.mock("./ui/topbar", async (original) => {
       needs.disabled = needCount === 0;
     },
     setSettingsOpen() {},
+    setNeedsLoading() {},
   }) };
 });
 vi.mock("./ui/sidebar", () => ({
@@ -161,6 +162,7 @@ class Node {
   scrollIntoView() {}
   focus() { (document as unknown as { activeElement: Node }).activeElement = this; }
   value = "";
+  placeholder = "";
   textContent = "";
   hidden = false;
   disabled = false;
@@ -272,11 +274,14 @@ function press(key: string, target: unknown = null): void {
   getNode("document").listeners.get("keydown")!(event);
   if (!stopped) h.feedKey?.(event);
 }
+// Poll ngay như khi tab hiện lại (main gọi now() cho cả hai vòng).
 function pollTick(): void {
-  (vi.mocked(setInterval).mock.calls[0][0] as () => void)();
+  getNode("document").listeners.get("visibilitychange")!({});
 }
 async function connected(): Promise<void> {
   await vi.waitFor(() => expect(getNode("#conn").textContent).toContain("Đã nối"));
+  // Chữ "Đã nối" có trước khi lượt poll ghi feed/publish xong; chờ lượt đó kết thúc hẳn.
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("ghép activity giữ nguyên cột Cần bạn", () => {
@@ -401,34 +406,29 @@ describe("ghép activity giữ nguyên cột Cần bạn", () => {
     expect(getNode("#needs-count").classList.contains("hot")).toBe(false);
   });
 
-  it.each([false, true])("request cũ không ghi đè trạng thái lỗi mới (lỗi mới: %s)", async (newError) => {
+  it.each([false, true])("poll khi request ticket cũ chưa xong thì không gửi chồng, xong mới chạy lại (lượt cũ lỗi: %s)", async (oldError) => {
     h.realColumn = true;
     h.config = { baseUrl: "http://aico", token: "test" };
     let resolveOld!: (value: unknown[]) => void;
     let rejectOld!: (error: Error) => void;
     h.fetchTickets.mockReturnValueOnce(new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }));
     await import("./main");
-    // Poll khởi động còn chờ A; interval bắt đầu B cùng nguồn.
-    if (newError) h.fetchTickets.mockRejectedValueOnce(new Error("lỗi mới"));
-    else h.fetchTickets.mockResolvedValueOnce([]);
-    const poll = vi.mocked(setInterval).mock.calls[0][0] as () => void;
-    poll();
-    await vi.waitFor(() => {
-      expect(getNode("#tickets-error").hidden).toBe(!newError);
-      if (newError) expect(getNode("#tickets-error").title).toContain("lỗi mới");
-    });
-    if (newError) resolveOld([]);
-    else rejectOld(new Error("lỗi cũ"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(getNode("#tickets-error").hidden).toBe(!newError);
-    expect(getNode("#tickets-error").title).toBe(newError ? "Lỗi tải ticket: lỗi mới" : "");
-    expect(getNode("#needs").children[1].textContent).toBe(getNode("#tickets-error").title);
+    await vi.waitFor(() => expect(h.fetchTickets).toHaveBeenCalledTimes(1));
     h.fetchTickets.mockResolvedValueOnce([]);
-    poll();
+    pollTick();
+    pollTick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.fetchTickets).toHaveBeenCalledTimes(1);
+    if (oldError) rejectOld(new Error("lỗi cũ"));
+    else resolveOld([]);
+    // Lượt chờ chạy đúng một lần ngay sau khi lượt cũ xong, và kết quả của nó thắng.
+    await vi.waitFor(() => expect(h.fetchTickets).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => {
       expect(getNode("#tickets-error").hidden).toBe(true);
       expect(getNode("#tickets-error").title).toBe("");
     });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.fetchTickets).toHaveBeenCalledTimes(2);
   });
 
 });
@@ -469,7 +469,7 @@ describe("thời gian tương đối", () => {
     ]);
     await import("./main");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const render = vi.mocked(setInterval).mock.calls[1][0] as () => void;
+    const render = vi.mocked(setInterval).mock.calls[0][0] as () => void;
     render();
     expect(h.tick).toHaveBeenLastCalledWith(epoch);
     expect(h.topbarUpdate.mock.calls.at(-1)?.[2]).toBe(epoch);
@@ -982,7 +982,8 @@ describe("ánh sáng, snapshot và banner demo", () => {
     },
   );
 
-  it("worker cũ trả muộn không được thêm ánh xạ ticket", async () => {
+  // Poll không còn chồng nhau, nên kết quả cũ chỉ còn tới muộn khi đổi nguồn giữa chừng (lưu lại cài đặt).
+  it("worker của nguồn cũ trả muộn sau khi đổi nguồn không được thêm ánh xạ ticket", async () => {
     h.config = { baseUrl: "http://aico", token: "test" };
     h.realColumn = true;
     const initial = { id: "T-1", title: "Một", status: "in_progress", project: null, updated_at: null, artifacts: [] };
@@ -994,7 +995,8 @@ describe("ánh sáng, snapshot và banner demo", () => {
     h.fetchWorkers.mockReturnValueOnce(new Promise((resolve) => { release = resolve; }));
     pollTick();
     h.fetchWorkers.mockResolvedValue([]);
-    pollTick();
+    vi.stubGlobal("FormData", class { get(name: string) { return name === "baseUrl" ? "http://aico" : "test"; } });
+    getNode("#settings").listeners.get("submit")!({ preventDefault() {} });
     await new Promise((resolve) => setTimeout(resolve, 0));
     release([room("working", [{ ...agent, ticket_id: "T-1" }])]);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1065,7 +1067,7 @@ describe("ánh sáng, snapshot và banner demo", () => {
       polls += 1;
     });
     const frame = vi.mocked(requestAnimationFrame).mock.calls[0][0] as (t: number) => void;
-    const poll = vi.mocked(setInterval).mock.calls[0][0] as () => void;
+    const poll = pollTick;
     try {
       poll();
       await vi.waitFor(() => expect(polls).toBe(1));
@@ -1162,19 +1164,24 @@ describe("địa chỉ kết nối điền sẵn", () => {
     expect(storage.removeItem).not.toHaveBeenCalled();
   });
 
-  it("submit token trống bỏ kết nối lưu nhưng giữ địa chỉ đang sửa", async () => {
+  it("submit token trống giữ token đã lưu và nối địa chỉ đang sửa; xoá địa chỉ thì về demo", async () => {
     storage.getItem.mockReturnValue(JSON.stringify(saved));
     await import("./main");
     await connected();
+    expect(input("token").placeholder).toContain("Đã lưu token");
     input("baseUrl").value = "https://edited.example/api";
     fetcher.mockClear();
     submit();
+    await connected();
+    expect(storage.setItem).toHaveBeenLastCalledWith("aico-office.api", JSON.stringify({ baseUrl: "https://edited.example/api", token: saved.token }));
+    expect(fetcher).toHaveBeenCalledWith("https://edited.example/api/workers", expect.objectContaining({
+      headers: { Authorization: `Bearer ${saved.token}` },
+    }));
+    input("baseUrl").value = "";
+    submit();
     expect(getNode("#conn").textContent).toContain("Chế độ demo");
-    expect(input("baseUrl").value).toBe("https://edited.example/api");
     expect(storage.removeItem).toHaveBeenCalledWith("aico-office.api");
-    clickDemo();
-    expect(getNode("#demo").textContent).toBe("Demo");
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(input("token").placeholder).toBe("API token");
   });
 
   it("lưu địa chỉ điền sẵn khi nhập token, poll đúng URL, focus lại địa chỉ và báo lỗi", async () => {

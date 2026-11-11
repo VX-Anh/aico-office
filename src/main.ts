@@ -5,6 +5,7 @@ import { isShortcut, nextAttention, tabTitle } from "./attention";
 import { createLatestGate } from "./latest";
 import { createNeedsColumn, type NeedItem, type NeedSource } from "./needs-column";
 import { createOverlay } from "./overlay";
+import { createPoller } from "./poller";
 import { demoEventAssignments, demoEventTickets } from "./scene/demo-events";
 import { type SceneFigure, drawScene, resetActors, resetSceneCache, sceneSize } from "./scene/index";
 import { computeLayout, roomSigns } from "./scene/layout";
@@ -21,7 +22,12 @@ import { createTopbar } from "./ui/topbar";
 import { computeInsets, feedBox, fitScene, type Rect } from "./ui/viewport";
 import "./style.css";
 
-const POLL_MS = 3000;
+// Worker nhẹ (vài kB) nên poll dày; /tickets nặng nên giãn ra. Demo sinh tại chỗ nên giữ nhịp nhanh.
+const WORKERS_MS = 3000;
+const TICKETS_MS = 15_000;
+const DEMO_TICKETS_MS = 3000;
+// Quá ngưỡng này không có dữ liệu mới thì báo "dữ liệu cũ" thay vì "Đã nối".
+const STALE_MS = 15_000;
 const NARROW_QUERY = "(max-width: 899px)";
 // Trùng --gap và minFree mà viewport.test dùng: vùng trống không bị panel che, vẫn còn chỗ vẽ.
 const GAP = 10;
@@ -67,6 +73,9 @@ let banners: RoomBanner[] = [];
 let pendingSnapshot: Ticket[] | null = null;
 let snapshotSeq = 0;
 let appliedSnapshot = 0;
+// Mốc lần cuối nhận được dữ liệu thật; 0 là chưa có lần nào (từ lúc đổi nguồn).
+let workersAt = 0;
+let ticketsAt = 0;
 
 const shell: {
   sidebar?: Sidebar;
@@ -209,6 +218,7 @@ function closeDrawer(): void {
 }
 
 function onNeedItems(items: NeedItem[]): void {
+  ticketsAt = Date.now();
   previousNeedsCount = needItems.length;
   needItems = items;
   absorbFeed();
@@ -313,6 +323,8 @@ function changeSource(): void {
   ticketsError.title = "";
   ticketsError.setAttribute("aria-label", "");
   toasts.reset();
+  workersAt = 0;
+  ticketsAt = 0;
   panel.setSource(ticketSource(config));
   publish();
 }
@@ -417,40 +429,82 @@ async function pollWorkers(): Promise<PollOutcome> {
   }
 }
 
-async function poll(): Promise<void> {
+function applySnapshot(): void {
+  if (snapshotSeq === appliedSnapshot) return;
+  appliedSnapshot = snapshotSeq;
+  if (!pendingSnapshot) return;
+  const now = Date.now();
+  banners = roomEvents.observe({ tickets: pendingSnapshot, assignments: assignmentsAt(now), now });
+  pendingSnapshot = null;
+}
+
+// Hai vòng riêng, mỗi vòng chỉ gửi lượt mới khi lượt cũ xong: /tickets chậm không kéo /workers theo.
+const visible = () => typeof document === "undefined" || document.hidden !== true;
+const workersPoller = createPoller(async () => {
   const epoch = sourceEpoch;
-  // Ticket và worker chạy cùng lúc như trước; kết quả worker cũ bị gate bỏ.
-  const workersTask = pollWorkers();
-  await Promise.allSettled([workersTask, panel.refresh()]);
-  if (epoch !== sourceEpoch) return;
-  if (snapshotSeq !== appliedSnapshot) {
-    appliedSnapshot = snapshotSeq;
-    if (pendingSnapshot) {
-      const now = Date.now();
-      banners = roomEvents.observe({ tickets: pendingSnapshot, assignments: assignmentsAt(now), now });
-      pendingSnapshot = null;
-    }
-  }
-  // Lỗi hoặc kết quả cũ: giữ feed và ngăn. onItems của ticket (nếu có) đã cập nhật riêng.
-  if (await workersTask !== "applied") return;
+  const outcome = await pollWorkers();
+  if (epoch !== sourceEpoch || outcome === "stale") return true;
+  if (outcome === "error") return false;
+  workersAt = Date.now();
   absorbFeed();
   publish();
+  return true;
+}, { baseMs: WORKERS_MS, visible });
+const ticketsPoller = createPoller(async () => {
+  const epoch = sourceEpoch;
+  const before = ticketsAt;
+  await panel.refresh();
+  if (epoch !== sourceEpoch) return true;
+  applySnapshot();
+  return ticketsAt !== before;
+}, { baseMs: () => (config ? TICKETS_MS : DEMO_TICKETS_MS), visible });
+
+function poll(): void {
+  workersPoller.now();
+  ticketsPoller.now();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden !== true) poll();
+});
+
+// Dòng kết nối: "Đã nối" chỉ đúng khi dữ liệu còn mới; nghẽn mạng thì nói rõ đã bao lâu.
+function refreshFreshness(now: number): void {
+  const loading = config !== null && ticketsAt === 0;
+  topbar.setNeedsLoading(loading);
+  if (!config || workersAt === 0 || status.classList.contains("bad")) {
+    topbarRoot.classList.remove("stale");
+    return;
+  }
+  const workersAge = now - workersAt;
+  const ticketsAge = ticketsAt ? now - ticketsAt - TICKETS_MS : 0;
+  const age = Math.max(workersAge, ticketsAge);
+  const stale = workersAge > STALE_MS || ticketsAge > STALE_MS;
+  const text = stale
+    ? `Dữ liệu cũ ${Math.round(age / 1000)} giây`
+    : `Đã nối ${config.baseUrl}`;
+  if (status.textContent !== text) status.textContent = text;
+  status.className = stale ? "conn stale" : "conn ok";
+  status.title = stale ? "Chưa nhận được dữ liệu mới, mạng hoặc aico đang chậm" : "";
+  topbarRoot.classList.toggle("stale", stale);
 }
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const baseUrl = String(data.get("baseUrl") ?? "").trim();
-  const token = String(data.get("token") ?? "").trim();
+  // Ô token để trống thì giữ token đã lưu (ô không hiện token cũ); xoá địa chỉ mới là về demo.
+  const token = String(data.get("token") ?? "").trim() || savedConfig?.token || "";
   config = baseUrl && token ? { baseUrl, token } : null;
   savedConfig = config;
   saveConfig(config);
+  syncTokenHint();
   syncDemoButton();
   // Nguồn thật chưa kịp poll: đừng giữ agent demo trên thanh bên.
   if (config) workers = [];
   changeSource();
   resetActors();
-  void poll();
+  poll();
 });
 demoButton.addEventListener("click", () => {
   config = config ? null : savedConfig;
@@ -459,10 +513,18 @@ demoButton.addEventListener("click", () => {
   syncDemoButton();
   changeSource();
   resetActors();
-  void poll();
+  poll();
 });
 const initialBaseUrl = config?.baseUrl ?? defaultBaseUrl(globalThis.location);
 if (initialBaseUrl !== null) (form.elements.namedItem("baseUrl") as HTMLInputElement).value = initialBaseUrl;
+
+function syncTokenHint(): void {
+  const input = form.elements.namedItem("token") as HTMLInputElement | null;
+  if (input) {
+    input.placeholder = savedConfig ? "Đã lưu token (để trống giữ nguyên)" : "API token";
+  }
+}
+syncTokenHint();
 
 function syncDemoButton(): void {
   const back = !config && savedConfig !== null;
@@ -510,10 +572,13 @@ if (typeof matchMedia === "function") {
 
 relayout();
 publish();
-void poll();
-setInterval(() => void poll(), POLL_MS);
+poll();
 setInterval(() => {
+  const now = Date.now();
+  workersPoller.tick(now);
+  ticketsPoller.tick(now);
   publish();
-  panel.tick(Date.now());
+  refreshFreshness(now);
+  panel.tick(now);
 }, 1000);
 requestAnimationFrame(frame);

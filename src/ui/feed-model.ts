@@ -62,7 +62,10 @@ export function reduceFeed(state: FeedState, workers: readonly WorkerStatus[], n
   const needs = new Map(needItems.map((item) => [item.ticket.id, item]));
   const ticketLine = (item: NeedItem, resolved: boolean) => {
     if (!Number.isFinite(now)) return;
-    const at = new Date(now).toISOString();
+    // Ticket mới cần người: dùng mốc thật của ticket (tồn đọng 11 ngày không được ghi là "vừa xong").
+    // Mốc hỏng hoặc ở tương lai (lệch đồng hồ) thì dùng now. Đã xử lý thì là chuyện vừa xảy ra.
+    const updated = item.ticket.updated_at ? Date.parse(item.ticket.updated_at) : NaN;
+    const at = new Date(!resolved && Number.isFinite(updated) && updated <= now ? updated : now).toISOString();
     add({ key: `ticket:${++sequence}`, at, room: "", agentId: null, name: item.ticket.id,
       icon: resolved ? "✓" : "!", text: `${item.ticket.title}: ${resolved ? "đã xử lý" : NEED_LABEL[item.kind]}`,
       ticket: item.ticket.id, tone: resolved ? "done" : item.kind === "escalated" ? "error" : "need" });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WorkerAgent, WorkerStatus } from "../api";
-import { agentStatus, clock, fmtAgo, fmtNumber, fmtTokenCount, providerLetter, tokenStatsLines, tokenStatsRows, usageTile } from "./format";
+import { agentStatus, clock, clockFull, fmtAgo, fmtNumber, fmtTokenCount, providerLetter, tokenStatsLines, tokenStatsRows, usageTile } from "./format";
 const now = Date.parse("2026-01-01T10:00:00Z");
 const agent: WorkerAgent = { id: "a", role: "coder", ticket_id: "t", mode: "write", started_at: "2026-01-01T00:00:00Z" };
 const worker: WorkerStatus = { name: "claude", state: "working", roles: [], agents: [agent] };
@@ -28,9 +28,16 @@ describe("format", () => {
   it.each([["claude", "C"], ["codex", "X"], ["cursor", "U"], ["CLAUDE Code", "C"], ["Other", "O"], ["", "?"]])("provider %s", (name, letter) => {
     expect(providerLetter(name)).toBe(letter);
   });
-  it("clock UTC và mốc sai", () => {
-    expect(clock("2026-01-01T10:02:00Z")).toBe("10:02");
-    expect(clock("2026-01-01T17:02:00+07:00")).toBe("10:02");
+  it("clock theo giờ máy, khác ngày thì hiện ngày; mốc sai", () => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const d = new Date("2026-01-01T10:02:00Z");
+    const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    expect(clock("2026-01-01T10:02:00Z")).toBe(hm);
+    expect(clock("2026-01-01T17:02:00+07:00")).toBe(hm);
+    expect(clock("2026-01-01T10:02:00Z", d.getTime() + 60_000)).toBe(hm);
+    const later = d.getTime() + 3 * 86_400_000;
+    expect(clock("2026-01-01T10:02:00Z", later)).toBe(`${pad(d.getDate())}/${pad(d.getMonth() + 1)}`);
+    expect(clockFull("2026-01-01T10:02:00Z")).toBe(`${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${hm}`);
     expect(clock("sai")).toBe("--:--");
   });
   it("fmtNumber và fmtAgo giữ định dạng cũ, đọc phòng thủ", () => {

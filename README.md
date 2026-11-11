@@ -93,7 +93,9 @@ src/attention.ts           bộ đếm tiêu đề tab, phím P và trạng thá
 src/attention.test.ts      test tiêu đề, phím tắt và vòng đời toast
 src/toasts.ts              toast ticket mới cần người, mở thẻ và đóng thông báo
 src/toasts.css             kiểu hiển thị toast
-src/latest.ts              chọn kết quả poll mới nhất khi request chồng nhau (hàm thuần)
+src/poller.ts              vòng poll tuần tự: không chồng request, giãn nhịp khi lỗi, dừng khi tab ẩn
+src/poller.test.ts         test không chồng request, backoff, tab ẩn, nhịp đọc lại
+src/latest.ts              chọn kết quả mới nhất khi đổi nguồn hoặc thao tác giữa chừng (hàm thuần)
 src/latest.test.ts         test API chậm hơn chu kỳ poll, thao tác, đổi nguồn
 src/time.ts                chuỗi "N giây/phút/giờ/ngày trước", tương lai → vừa xong (hàm thuần)
 src/time.test.ts           test biên giây/phút/giờ/ngày, tương lai, at hỏng, now NaN/0

@@ -205,3 +205,18 @@
   .topbar .demo-button { height: 30px; padding: 0 7px; font-size: 12px; }
   .topbar .settings-popover { position: fixed; top: 64px; left: 6px; right: 6px; width: auto; }
 }
+
+/* Nghẽn mạng: chữ kết nối đổi màu cảnh báo; màn hẹp ẩn chữ nên chấm cam trên nút cài đặt. */
+.topbar .conn.stale { color: var(--lvl-warn); }
+.topbar .settings-toggle { position: relative; }
+.topbar.stale .settings-toggle::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lvl-warn);
+}
+.topbar .tile-need[aria-busy="true"] .tile-value { color: var(--text-dim); }

@@ -163,3 +163,23 @@ describe("dòng hết hạn mức", () => {
     expect(initial.sequence).toBe(0);
   });
 });
+
+describe("mốc giờ dòng ticket", () => {
+  const withUpdated = (updated_at: string | null): NeedItem => ({ ...item("escalated"), ticket: { ...item("escalated").ticket, updated_at } });
+  it("ticket tồn đọng dùng updated_at thật, không ghi là vừa xảy ra", () => {
+    const now = Date.parse("2026-11-11T16:00:00Z");
+    const old = "2026-10-31T09:00:00.000Z";
+    const state = reduceFeed(createFeedState(), [], [withUpdated(old)], now);
+    expect(state.lines.map((line) => line.at)).toEqual([old]);
+  });
+  it("updated_at hỏng, rỗng hoặc ở tương lai thì dùng now; đã xử lý luôn dùng now", () => {
+    const now = Date.parse("2026-11-11T16:00:00Z");
+    for (const updated of [null, "sai", "2026-11-12T00:00:00Z"]) {
+      expect(reduceFeed(createFeedState(), [], [withUpdated(updated)], now).lines[0].at).toBe(new Date(now).toISOString());
+    }
+    const first = reduceFeed(createFeedState(), [], [withUpdated("2026-10-31T09:00:00Z")], now);
+    const resolved = reduceFeed(first, [], [], now + 5000);
+    expect(resolved.lines.at(-1)?.text).toContain("đã xử lý");
+    expect(resolved.lines.at(-1)?.at).toBe(new Date(now + 5000).toISOString());
+  });
+});

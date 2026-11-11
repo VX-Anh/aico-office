@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AICO Office</title>
+    <meta name="description" content="Văn phòng pixel của aico: agent nào đang làm gì, hạn mức từng phòng và việc đang chờ bạn duyệt." />
+    <meta name="theme-color" content="#0e1016" />
+    <style>
+      /* Trước khi JS chuyển #settings vào popover: ẩn form thô và các panel rỗng, chỉ để nền tối. */
+      html, body { background: #0e1016; }
+      #topbar > #settings { display: none; }
+      #sidebar:empty, #feed:empty { visibility: hidden; }
+    </style>
     <link rel="icon" type="image/png" sizes="16x16" href="%BASE_URL%brand/favicon-16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%brand/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%brand/apple-touch-icon.png" />
