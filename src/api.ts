@@ -101,10 +101,25 @@ export function saveConfig(config: ApiConfig | null): void {
   }
 }
 
+// Mạng nghẽn thì bỏ request treo, để vòng poll báo lỗi và giãn nhịp thay vì chờ vô hạn.
+export const REQUEST_TIMEOUT_MS = 20_000;
+
+async function getWithTimeout(url: string, token: string): Promise<Response> {
+  const signal = typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+    ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    : undefined;
+  try {
+    return await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
+  } catch (exc) {
+    if (exc instanceof Error && (exc.name === "TimeoutError" || exc.name === "AbortError")) {
+      throw new Error(`aico không trả lời sau ${REQUEST_TIMEOUT_MS / 1000} giây`);
+    }
+    throw exc;
+  }
+}
+
 export async function fetchWorkers(config: ApiConfig): Promise<WorkerStatus[]> {
-  const resp = await fetch(`${config.baseUrl.replace(/\/$/, "")}/workers`, {
-    headers: { Authorization: `Bearer ${config.token}` },
-  });
+  const resp = await getWithTimeout(`${config.baseUrl.replace(/\/$/, "")}/workers`, config.token);
   if (resp.status === 401) throw new Error("Sai API token");
   if (!resp.ok) throw new Error(`aico trả ${resp.status}`);
   return (await resp.json()) as WorkerStatus[];
@@ -135,9 +150,7 @@ export interface TicketEvent {
 export type EscalationAction = "retry_push" | "merge" | "close" | "fail";
 
 async function getJson(config: ApiConfig, path: string): Promise<unknown> {
-  const resp = await fetch(apiUrl(config, path), {
-    headers: { Authorization: `Bearer ${config.token}` },
-  });
+  const resp = await getWithTimeout(apiUrl(config, path), config.token);
   if (resp.status === 401) throw new Error("Sai API token");
   if (!resp.ok) throw new Error(`aico trả ${resp.status}`);
   return resp.json();

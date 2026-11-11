@@ -48,3 +48,28 @@ a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01s !important; }
 }
+
+/* Màn cảm ứng: vùng chạm tối thiểu 44px mà không đổi bố cục (mở rộng bằng ::after trong suốt). */
+@media (pointer: coarse) {
+  .topbar .settings-toggle,
+  .topbar .demo-button,
+  .sidebar-toggle,
+  .feed-chevron,
+  .feed-title,
+  .drawer button { position: relative; }
+  .topbar .settings-toggle::after,
+  .topbar .demo-button::after,
+  .sidebar-toggle::after,
+  .feed-chevron::after,
+  .feed-title::after,
+  .drawer button::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .need-card button { min-height: 40px; }
+  .need-actions { gap: 8px; }
+}

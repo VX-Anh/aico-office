@@ -92,7 +92,8 @@ describe("khung hoạt động", () => {
     const row = list.children[0], cells = [...row.children];
     expect(row.tagName).toBe("button");
     expect(cells.map(cell => cell.className)).toEqual(["feed-time", "feed-avatar", "feed-name", "feed-room", "feed-ticket", "feed-icon", "feed-text"]);
-    expect(row.title).toBe(`${cells[0].textContent} · coder · codex · T-1 · Nội dung đầy đủ 1`);
+    expect(row.title).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2} · /);
+    expect(row.title.slice(row.title.indexOf(" · ") + 3)).toBe(`coder · codex · T-1 · Nội dung đầy đủ 1`);
     expect(cells[1].children[0].tagName).toBe("canvas");
     expect(cells[3].textContent).toBe("X");
     feed.render([line("1")], [worker]);
@@ -283,9 +284,11 @@ describe("khung hoạt động", () => {
     feed.render([ticketLine("t"), line("a"), limitLine("l")], [worker]);
     const [ticket, agent, limit] = list.children;
     expectTicket(ticket);
-    expect(ticket.title).toBe(`${ticket.children[0].textContent} · T-1 · Nội dung đầy đủ t`);
+    expect(ticket.title).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2} · /);
+    expect(ticket.title.slice(ticket.title.indexOf(" · ") + 3)).toBe(`T-1 · Nội dung đầy đủ t`);
     expectAgent(agent);
-    expect(agent.title).toBe(`${agent.children[0].textContent} · coder · codex · T-1 · Nội dung đầy đủ a`);
+    expect(agent.title).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2} · /);
+    expect(agent.title.slice(agent.title.indexOf(" · ") + 3)).toBe(`coder · codex · T-1 · Nội dung đầy đủ a`);
     expectLimit(limit);
   });
 

@@ -15,6 +15,8 @@ export interface TopbarOptions {
 export interface Topbar {
   update(workers: readonly WorkerStatus[], needCount: number, now: number, needIds?: ReadonlySet<string>): void;
   setSettingsOpen(open: boolean): void;
+  /** Chưa tải xong ticket lần đầu: ô "cần bạn" hiện "…" thay vì số 0 dễ hiểu nhầm. */
+  setNeedsLoading(loading: boolean): void;
 }
 
 export function settingsFocus(baseUrl: string, token: string): "baseUrl" | "token" {
@@ -170,7 +172,7 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
   popover.setAttribute("role", "dialog");
   popover.setAttribute("aria-label", "Cài đặt kết nối");
   popover.hidden = true;
-  popover.append(el("p", "settings-hint", "Địa chỉ aico và API token. Để trống thì chạy demo."), form);
+  popover.append(el("p", "settings-hint", "Địa chỉ aico và API token. Token để trống thì giữ token đã lưu; xoá địa chỉ thì chạy demo."), form);
   const actions = el("div", "topbar-actions");
   actions.append(gear, demo, popover);
 
@@ -212,6 +214,16 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
   });
 
   const cards = new Map<string, UsageCard>();
+  let needsLoading = false;
+  let lastNeedCount = 0;
+  const renderNeeds = () => {
+    const count = lastNeedCount;
+    setText(needs.value, needsLoading ? "…" : String(count));
+    setAttr(needsButton, "aria-label", needsLoading ? "Cần bạn: đang tải" : `Cần bạn: ${count}`);
+    setAttr(needsButton, "aria-busy", String(needsLoading));
+    needsButton.classList.toggle("hot", !needsLoading && count > 0);
+    if (needsButton instanceof HTMLButtonElement) needsButton.disabled = needsLoading || count === 0;
+  };
 
   return {
     update(workers, needCount, now, needIds = new Set()) {
@@ -227,11 +239,8 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
       setAttr(agents.root, "title", `${total} agent đang chạy`);
       setText(working.value, String(busy));
       setAttr(working.root, "title", `${busy} agent đang làm`);
-      const count = Math.max(0, Math.floor(needCount));
-      setText(needs.value, String(count));
-      setAttr(needsButton, "aria-label", `Cần bạn: ${count}`);
-      needsButton.classList.toggle("hot", count > 0);
-      if (needsButton instanceof HTMLButtonElement) needsButton.disabled = count === 0;
+      lastNeedCount = Math.max(0, Math.floor(needCount));
+      renderNeeds();
 
       const names = new Set<string>();
       workers.forEach((worker, i) => {
@@ -258,5 +267,10 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
       }
     },
     setSettingsOpen: setOpen,
+    setNeedsLoading(loading) {
+      if (needsLoading === loading) return;
+      needsLoading = loading;
+      renderNeeds();
+    },
   };
 }
