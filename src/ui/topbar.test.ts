@@ -193,3 +193,15 @@ describe("logo AX tĩnh", () => {
     }
   });
 });
+
+describe("selector ổn định", () => {
+  it("thẻ hạn mức mang data-room theo tên phòng, giữ khi dữ liệu đổi", () => {
+    const { root, topbar } = setup();
+    const at = Date.parse("2026-01-01T00:00:00Z");
+    topbar.update([worker(["a"]), { ...worker([], "idle"), name: "claude" }], 0, at);
+    const cards = () => root.querySelector(".usage-cards")!.children;
+    expect(cards().map(card => card.dataset.room)).toEqual(["codex", "claude"]);
+    topbar.update([{ ...worker([], "limited", 100), name: "claude" }, worker(["a", "b"])], 0, at);
+    expect(cards().map(card => [card.dataset.room, card.dataset.state])).toEqual([["claude", "limited"], ["codex", "working"]]);
+  });
+});

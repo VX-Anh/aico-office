@@ -19,6 +19,10 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
     node.className = name;
     return node;
   };
+  const setData = (node: HTMLElement, name: string, value: string | null | undefined) => {
+    if (value) node.dataset[name] = value;
+    else delete node.dataset[name];
+  };
   const header = make("div", "feed-header");
   const toggle = make("button", "feed-title") as HTMLButtonElement;
   toggle.type = "button";
@@ -111,6 +115,8 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
         if (!row) {
           row = make("button", "feed-line");
           (row as HTMLButtonElement).type = "button";
+          // Khoá dòng không đổi trong đời node: kiểm UI bám .feed-line[data-key] thay vì chữ.
+          row.dataset.key = line.key;
           rows.set(line.key, row);
         }
         const worker = workers.find(worker => worker.name === line.room);
@@ -136,6 +142,9 @@ export function createFeed(root: HTMLElement, actions: FeedActions = {}) {
             row!.append(cell);
           });
           row.dataset.content = signature;
+          setData(row, "ticket", line.ticket);
+          setData(row, "room", line.room);
+          setData(row, "agent", line.agentId ? `${line.room}/${line.agentId}` : null);
           row.title = [clockFull(line.at), line.name, line.room, dup ? null : line.ticket, line.text].filter(Boolean).join(" · ");
           row.onclick = () => {
             if (line.agentId) actions.onAgent?.(line.room, line.agentId);

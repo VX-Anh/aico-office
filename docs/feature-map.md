@@ -68,25 +68,52 @@ của agent (Chrome DevTools/CDP hoặc Playwright cài ngoài repo) trỏ vào 
 5. Đặt tên ảnh `<rộng>x<cao>-hour-<giờ>[-<khu vực>].png` (cùng kiểu với `public/demo-shots/`) và ghi
    vào tóm tắt: URL, viewport, giây demo, thao tác đã làm.
 
-## Selector còn thiếu ổn định
+## Selector ổn định (`data-*`)
 
-Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này không sửa code UI.
+Kiểm UI bám vào các thuộc tính dưới đây thay vì chữ hay thứ tự. Giá trị lấy thẳng từ dữ liệu (tên
+phòng, id agent, mã ticket, tên hành động gửi lên aico), không dịch, không đổi theo ngôn ngữ giao
+diện. Tên phòng, id có ký tự lạ thì bọc bằng `CSS.escape` hoặc dùng dấu nháy trong selector.
+
+| Chỗ | Selector | Giá trị | File |
+| --- | --- | --- | --- |
+| Thẻ hạn mức | `.usage-card[data-room]` | tên phòng (`claude`, `codex`, `cursor`) | `src/ui/topbar.ts` |
+| Khối phòng trên thanh bên | `.room[data-room]` | tên phòng | `src/ui/sidebar.ts` |
+| Chip phòng | `.room-chip[data-room]` | tên phòng | `src/ui/sidebar.ts` |
+| Dòng agent | `.agent-row[data-agent]`, `[data-ticket]` | `<phòng>/<id agent>`; mã ticket đang giữ (không có ticket thì không có thuộc tính) | `src/ui/sidebar.ts` |
+| Tab Agent đang xem ai | `#drawer-agent-panel[data-agent]` | `<phòng>/<id agent>`; chưa chọn ai thì không có | `src/ui/drawer.ts` |
+| Mục trong tab Agent | `.drawer-section[data-section]` | `tasks`, `recent`, `stats` | `src/ui/drawer.ts` |
+| Thẻ cần bạn | `.need-card[data-ticket][data-kind]` | mã ticket (`data-ticket-id` cũ vẫn còn, cùng giá trị); `plan`, `merge`, `escalated` | `src/needs-column.ts` |
+| Tiêu đề, ô ghi chú trong thẻ | `[data-field="title"]`, `[data-field="comment"]` | cố định | `src/needs-column.ts` |
+| Nút thao tác | `.need-actions [data-action]` | plan: `approved`, `revise`, `rejected`; merge: `approved`, `changes_requested`, `rejected`; escalated: `retry_push`, `merge`, `close`, `fail` | `src/needs-column.ts` |
+| Khối xác nhận | `.need-confirm[data-confirming]`, bên trong `[data-action="confirm"]`, `[data-action="cancel"]` | `data-confirming` là hành động đang chờ xác nhận, chỉ có khi khối đang hiện | `src/needs-column.ts` |
+| Liên kết trong thẻ | `.need-links [data-link]` | `mr`, `preview` (liên kết không có URL thì `hidden`) | `src/needs-column.ts` |
+| Ảnh thu nhỏ | `.need-shots [data-shot]` | chỉ số từ `0` theo thứ tự hiển thị; ảnh lỗi thành liên kết vẫn giữ `data-shot` | `src/needs-column.ts` |
+| Toast | `.toast[data-ticket][data-kind]`, nút `[data-action="open"]`, `[data-action="dismiss"]` | mã ticket (có cả `data-ticket-id`); loại như thẻ cần bạn | `src/toasts.ts` |
+| Dòng feed | `.feed-line[data-key]`, `[data-ticket]`, `[data-agent]`, `[data-room]` | xem ghi chú dưới | `src/ui/feed.ts` |
+
+- `<phòng>/<id agent>`: demo là `claude/claude-<chu kỳ>-<k>`; id demo vẫn đổi mỗi chu kỳ 48 giây
+  (dữ liệu demo, không phải selector). Muốn bám chắc trong demo thì dùng
+  `.agent-row[data-ticket="T-demo<i><k>"]` hoặc `.room[data-room="claude"] .agent-row`.
+- `.agent-row[data-key]` vẫn còn (JSON `[phòng, id, started_at]`, khoá nội bộ để chọn agent); đừng
+  bám vào nó khi kiểm.
+- `.feed-line[data-key]`: dòng agent là JSON `[phòng, id agent, at, chữ]` (đoán trước được từ dữ
+  liệu); dòng ticket là `ticket:<n>` và dòng hết hạn mức là `limit:<n>`, `n` đếm trong phiên nên chỉ
+  ổn định từ lúc dòng xuất hiện tới khi tải lại. Dòng ticket bám `[data-ticket]` (không có
+  `data-agent`, `data-room`); dòng agent có `data-agent`, `data-room`, và `data-ticket` nếu agent
+  đang giữ ticket; dòng hết hạn mức chỉ có `data-room`. `data-content` là chữ ký nội bộ, không bám.
+- Ví dụ: `.need-card[data-ticket="T-demo-review"] .need-actions [data-action="approved"]`,
+  `.need-card[data-ticket="T-demo-review"] .need-shots [data-shot="0"]`,
+  `.usage-card[data-room="codex"] .usage-row[data-level="crit"]`.
+- Test kiểm các thuộc tính này: mục "selector ổn định" trong `src/ui/topbar.test.ts`,
+  `src/ui/sidebar.test.ts`, `src/ui/drawer.test.ts`, `src/ui/feed.test.ts`,
+  `src/needs-column.test.ts`, `src/toasts.test.ts`. Đổi tên hay bỏ thuộc tính thì sửa cả test và
+  bảng này.
+
+### Còn thiếu
 
 | Chỗ | Hiện phải bám vào | Thiếu |
 | --- | --- | --- |
 | Nhân vật, phòng, biển tên, banner trên canvas | toạ độ pixel trên `#office` | không có DOM; chỉ kiểm bằng ảnh |
-| Thẻ hạn mức `.usage-card` | thứ tự, chữ `.prov-letter`, `title` "Phòng <tên>" | `data-room` |
-| Khối phòng `.room` trên thanh bên | chữ `.room-name` | `data-room` (chỉ có `data-state`) |
-| Chip phòng `.room-chip` | chữ `.room-chip-name`, `title` | `data-room` |
-| Dòng agent `.agent-row[data-key]` | `data-key` là JSON `[phòng, id, started_at]`, đổi mỗi chu kỳ demo | khoá đoán trước được; bám `.agent-ticket` |
-| Mục trong tab Agent `.drawer-section` | chữ `.drawer-section-title` (Task, Gần đây, Số liệu) | `data-section` |
-| Nút thao tác trong `.need-actions` | chữ nút ("Duyệt kế hoạch", "Từ chối"…) | `data-action` |
-| Nút trong `.need-confirm` | chữ "Xác nhận" / "Huỷ" | class hoặc `data-*` |
-| Liên kết trong `.need-links` | chữ "Xem MR ↗" / "Xem trước ↗" | class hoặc `data-*` |
-| Ảnh thu nhỏ trong `.need-shots` | thứ tự nút, `title` | class, chỉ số |
-| Toast `.toast` | chữ "<mã> cần bạn: …"; nút theo chữ "Xử lý", `aria-label` "Đóng thông báo" | `data-ticket-id`, class nút |
-| Dòng feed `.feed-line` | chữ trong `.feed-name`, `.feed-text`; `data-content` là chữ ký JSON nội bộ | `data-key`, `data-ticket` |
-| Tiêu đề thẻ cần bạn | `h3` trong `.need-card` | class |
 
 ## Khu vực
 
@@ -97,7 +124,7 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
   biển tên phòng, banner), `src/ui/viewport.ts` (đặt cảnh vào vùng trống).
 - **Tới**: hiện ngay khi mở trang.
 - **Selector**: `#stage`, `#office` (canvas chính), `.activity-overlay` (canvas chữ, `aria-hidden`).
-  Nội dung bên trong: thiếu selector ổn định (xem bảng trên).
+  Nội dung bên trong: không có DOM (xem "Còn thiếu" ở trên).
 - **Dữ liệu**: demo đủ mọi trạng thái phòng theo bảng 48 giây.
 - **Kiểm khi sửa**: cảnh nằm gọn trong vùng trống, không bị panel che nhân vật đang chọn; chữ có
   dấu tiếng Việt sắc nét; ngày (`?hour=11`) và đêm (`?hour=21:30`); mobile: cảnh vẫn thấy khi ngăn
@@ -110,8 +137,8 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **Tới**: rê chuột (desktop) hoặc chạm (mobile) vào nhân vật đang làm → tooltip; bấm/chạm nhân vật
   → mở ngăn chi tiết tab Agent.
 - **Selector**: `.agent-tooltip` (ẩn bằng `hidden`), bên trong `.agent-tooltip-title`,
-  `.agent-tooltip-heading`, `.agent-tooltip-cache`. Vị trí nhân vật: thiếu selector ổn định; muốn mở
-  tab Agent chắc chắn thì bấm `.agent-row` trên thanh bên.
+  `.agent-tooltip-heading`, `.agent-tooltip-cache`. Vị trí nhân vật: không có DOM; muốn mở tab Agent
+  chắc chắn thì bấm `.agent-row[data-agent]` trên thanh bên.
 - **Dữ liệu**: demo, cần `s` có agent (8–40 cho claude).
 - **Kiểm khi sửa**: tooltip không tràn màn hình (rộng tối đa 340px, mobile trừ lề 16px); biến mất
   khi agent rời bàn; trên cảm ứng chạm ra ngoài thì đóng.
@@ -124,7 +151,7 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **Selector**: `#topbar`; kết nối `#conn` (class `demo` / `ok` / `bad` / `stale`); ô số
   `#agents-count`, `.tile-working`, `#needs-count` (class `hot` khi có việc; `disabled` khi 0); số
   trong ô `.tile-value`; lỗi tải ticket `#tickets-error`; thẻ hạn mức `.usage-cards` >
-  `.usage-card[data-state]` > `.usage-row[data-level]`, `.usage-pct`, `.usage-reset`,
+  `.usage-card[data-room][data-state]` > `.usage-row[data-level]`, `.usage-pct`, `.usage-reset`,
   `.usage-plan`, `.usage-compact`; nút `#demo`.
 - **Dữ liệu**: demo. Ba mức màu hạn mức thấy ở codex `s` 0–36; "Gói Pro" ở cursor (không có ở pha
   mất kết nối 24–36); usage cũ ở claude `s` 40–48.
@@ -153,9 +180,9 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
   tròn: bấm `.sidebar-toggle` để mở ngăn kéo; bấm `.sidebar-scrim`, Esc hoặc chọn agent để đóng.
   Phím `/` mở và focus ô tìm; Esc trong ô tìm xoá chữ.
 - **Selector**: `#sidebar` (class `collapsed`, `narrow`), `.sidebar-toggle`, `.sidebar-input`,
-  `.sidebar-chips` > `.room-chip[aria-pressed]`, `.sidebar-filtering`, `.sidebar-rooms` >
-  `.room[data-state]` (`.room-name`, `.room-count`, `.room-state`, `.room-alert`, `.room-slots`,
-  `.room-empty`), `.agent-row[data-key]` (class `selected`, `need`, `offline`; bên trong
+  `.sidebar-chips` > `.room-chip[data-room][aria-pressed]`, `.sidebar-filtering`, `.sidebar-rooms` >
+  `.room[data-room][data-state]` (`.room-name`, `.room-count`, `.room-state`, `.room-alert`, `.room-slots`,
+  `.room-empty`), `.agent-row[data-agent][data-ticket]` (class `selected`, `need`, `offline`; bên trong
   `.agent-role`, `.agent-ticket`, `.agent-activity`, `.agent-elapsed`, `.status-dot[data-state]`),
   `.sidebar-empty`, `.sidebar-legend`, `.sidebar-scrim`.
 - **Dữ liệu**: demo. `+1` vượt chỗ ở `s` 32–40; `.room-alert` của codex ở `s` 0–28; dòng `need` khi
@@ -184,11 +211,12 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **File**: `src/ui/drawer.ts`, `src/ui/drawer-model.ts`, `src/ui/format.ts`, `src/activity.ts`.
 - **Tới**: bấm `.agent-row` trên thanh bên, bấm nhân vật trên canvas, hoặc bấm dòng feed của agent
   còn đang chạy.
-- **Selector**: trong `#drawer-agent-panel`: `.drawer-hero` (`.drawer-role`, `.drawer-agent-id`,
+- **Selector**: trong `#drawer-agent-panel[data-agent]`: `.drawer-hero` (`.drawer-role`, `.drawer-agent-id`,
   `.drawer-room-name`, `.drawer-room-state`, `.drawer-ticket-id`), `.drawer-mission`
   (`.drawer-mission-title`, `.drawer-link`), `.drawer-status` (class `tone-*`; `.drawer-status-link`
-  khi cần người), `.drawer-now` (class `is-error`), `.drawer-section` (`.drawer-progress`,
-  `.drawer-checklist`, `.drawer-timeline`, `.drawer-stats`, `.drawer-cache`). Chưa chọn ai:
+  khi cần người), `.drawer-now` (class `is-error`), `.drawer-section[data-section="tasks"]`
+  (`.drawer-progress`, `.drawer-checklist`), `[data-section="recent"]` (`.drawer-timeline`),
+  `[data-section="stats"]` (`.drawer-stats`, `.drawer-cache`). Chưa chọn ai:
   `.drawer-muted` "Chọn một agent để xem chi tiết."
 - **Dữ liệu**: demo; chọn agent trong `s` 8–40. Agent biến mất (hết pha) thì tab tự đóng, nên thao
   tác và chụp trong cùng một pha.
@@ -202,11 +230,12 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **Tới**: bấm `#needs-count`, phím `P` (đi lần lượt các thẻ), nút "Xử lý" trên toast, tab
   `#drawer-needs-panel-tab`, hoặc dòng feed của ticket.
 - **Selector**: `#needs` (class `needs-column`), `.needs-error`, `.needs-list`,
-  `.need-card[data-ticket-id][data-kind="plan"|"merge"|"escalated"]` (class `flash` khi được nhảy
-  tới; `aria-busy`), `.need-head`, `.need-kind`, `.need-waited`, `.need-reason`, `.need-links`,
-  `.need-shots`, `textarea[aria-label="Ghi chú <mã>"]`, `.need-actions`, `.need-confirm`,
-  `.need-message`. Nút thao tác, nút xác nhận, liên kết: thiếu selector ổn định (bảng trên). Ví dụ
-  bám được: `.need-card[data-ticket-id="T-demo-review"] .need-actions button`.
+  `.need-card[data-ticket][data-kind="plan"|"merge"|"escalated"]` (class `flash` khi được nhảy
+  tới; `aria-busy`), `.need-head`, `.need-kind`, `.need-waited`, `[data-field="title"]`,
+  `.need-reason`, `.need-links [data-link="mr"|"preview"]`, `.need-shots [data-shot]`,
+  `textarea[data-field="comment"]`, `.need-actions [data-action]`, `.need-confirm[data-confirming]`
+  với `[data-action="confirm"|"cancel"]`, `.need-message`. Giá trị `data-action` theo từng loại thẻ:
+  bảng "Selector ổn định".
 - **Dữ liệu**: demo có đủ ba loại. Thao tác thật cần token và gửi `POST` tới aico: **không bấm duyệt,
   merge, từ chối trên kết nối thật khi chỉ kiểm giao diện**.
 - **Kiểm khi sửa**: thao tác không hoàn tác (từ chối, merge, đóng, đánh dấu lỗi, duyệt merge) hiện
@@ -217,7 +246,7 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 ### 9. Xem ảnh review
 
 - **File**: `src/shot-viewer.ts`, `src/shot-viewer.css`, `latestScreenshots` trong `src/tickets.ts`.
-- **Tới**: trong thẻ `T-demo-review`, bấm một ảnh trong `.need-shots`. ←/→ chuyển ảnh, Esc hoặc bấm
+- **Tới**: trong thẻ `T-demo-review`, bấm một ảnh trong `.need-shots` (`[data-shot="0"]` là ảnh đầu). ←/→ chuyển ảnh, Esc hoặc bấm
   nền để đóng.
 - **Selector**: `.shot-viewer` (`role="dialog"`, `hidden`), `.shot-viewer-stage`, `.shot-viewer-img`,
   `.shot-viewer-name`, `.shot-viewer-pos`, `.shot-viewer-prev`, `.shot-viewer-next`,
@@ -233,7 +262,8 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **Tới**: desktop mở sẵn ở đáy; mobile thu gọn sẵn. Phím `]`, bấm `.feed-title` hoặc
   `.feed-chevron` để thu/mở; hoặc `?feed=open` / `?feed=collapsed`.
 - **Selector**: `#feed` (class `is-collapsed`), `.feed-title`, `.feed-chevron`, `.feed-ticker`
-  (dòng mới nhất khi thu gọn), `.feed-new` ("N mới"), `.feed-lines`, `.feed-line` (class `tone-need`,
+  (dòng mới nhất khi thu gọn), `.feed-new` ("N mới"), `.feed-lines`,
+  `.feed-line[data-key]` (thêm `data-ticket`, `data-agent`, `data-room` khi có; class `tone-need`,
   `tone-done`, `tone-error`, `is-gone`, `is-ticket`; ô `.feed-time`, `.feed-name`, `.feed-room`,
   `.feed-ticket`, `.feed-icon`, `.feed-text`), `.feed-empty`.
 - **Dữ liệu**: demo; feed rỗng ngay sau khi tải, chờ vài giây cho có dòng (đổi nguồn thì xoá feed).
@@ -247,10 +277,10 @@ Ghi lại để ticket sau bổ sung `data-*`; việc lập bản đồ này kh�
 - **File**: `src/toasts.ts`, `src/toasts.css`, `src/attention.ts`.
 - **Tới**: tự hiện khi có ticket cần người **mới xuất hiện sau lượt tải đầu** (tối đa 3). Lượt đầu
   sau khi tải trang hoặc đổi nguồn chỉ ghi nhớ, không hiện toast (`reconcileToasts`).
-- **Selector**: `#toasts` (class `toast-stack`), `.toast`, `.toast-actions`. Nút: thiếu selector ổn
-  định (bảng trên). Tiêu đề tab trình duyệt đổi theo số ticket (`tabTitle` trong `src/attention.ts`).
+- **Selector**: `#toasts` (class `toast-stack`), `.toast[data-ticket][data-kind]`, `.toast-actions`
+  với `[data-action="open"]` ("Xử lý") và `[data-action="dismiss"]` ("×"). Tiêu đề tab trình duyệt đổi theo số ticket (`tabTitle` trong `src/attention.ts`).
 - **Dữ liệu**: **demo không dựng được toast** (4 thẻ demo có từ lượt đầu, thao tác chỉ làm thẻ rời
-  danh sách). Kiểm logic bằng `src/attention.test.ts`; kiểm hình cần kết nối thật có ticket mới
+  danh sách). Kiểm logic bằng `src/attention.test.ts`, DOM bằng `src/toasts.test.ts`; kiểm hình cần kết nối thật có ticket mới
   chuyển sang chờ duyệt, hoặc ghi rõ trong tóm tắt là chưa xem được toast trên trình duyệt.
 - **Kiểm khi sửa**: "Xử lý" mở tab Cần bạn đúng thẻ; "×" đóng và poll sau không hiện lại; toast
   không che thanh trên hay nút thao tác; mobile: toast trải hết bề ngang vùng trống.

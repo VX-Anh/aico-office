@@ -537,3 +537,14 @@ describe("nhãn Cần bạn và tiêu đề theo dữ liệu mới", () => {
     }
   });
 });
+
+describe("selector ổn định", () => {
+  it("mục trong tab Agent có data-section; panel mang data-agent của agent đang xem", () => {
+    const { show, panel } = openDrawer();
+    show(info());
+    expect(panel.all("drawer-section").map(node => node.dataset.section)).toEqual(["tasks", "recent", "stats"]);
+    expect(panel.dataset.agent).toBe("codex/coder-1");
+    show(null);
+    expect("agent" in panel.dataset).toBe(false);
+  });
+});

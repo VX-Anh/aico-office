@@ -92,6 +92,7 @@ src/shot-viewer.test.ts    test mở, chuyển ảnh ở biên, Esc không lan, 
 src/attention.ts           bộ đếm tiêu đề tab, phím P và trạng thái toast (thuần)
 src/attention.test.ts      test tiêu đề, phím tắt và vòng đời toast
 src/toasts.ts              toast ticket mới cần người, mở thẻ và đóng thông báo
+src/toasts.test.ts         test DOM giả: data-* của toast, nút mở và đóng
 src/toasts.css             kiểu hiển thị toast
 src/poller.ts              vòng poll tuần tự: không chồng request, giãn nhịp khi lỗi, dừng khi tab ẩn
 src/poller.test.ts         test không chồng request, backoff, tab ẩn, nhịp đọc lại
