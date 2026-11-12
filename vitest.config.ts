@@ -5,5 +5,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // repo-rules.test.ts đọc chữ của CSS qua ?raw; mặc định vitest thay mọi file CSS bằng chuỗi rỗng.
+    css: true,
   },
 });

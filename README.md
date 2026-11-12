@@ -127,6 +127,8 @@ src/ui/drawer-model.test.ts test từng tone, lỗi cũ, thời gian tương lai
 src/ui/feed.ts             khung feed nổi: dòng lưới, ticker khi thu gọn, viên N mới, bấm dòng, phím ]
 src/ui/feed.css            kiểu feed: thẻ kính góc dưới trái, thanh nổi màn hẹp
 src/ui/feed.test.ts        test DOM cột dòng, title, tone/mờ, ticker, N mới, neo cuộn, bấm dòng, phím ]
+src/style.css              khung trang: nền, #stage, canvas, bố cục chung ngoài các panel
+src/repo-rules.test.ts     luật tất định từ review: class/id khớp CSS–DOM, bảng Cấu trúc khớp file, mã màu đúng chỗ
 src/main.ts                vòng lặp, poll, vùng trống, vị trí feed, chọn agent, feed, phím P [ ] Esc
 src/main.test.ts           test điền sẵn địa chỉ, lưu kết nối, focus, demo, Cần bạn, chọn agent, stats, feed, đổi nguồn, lỗi và hồi phục poll
 src/scene/index.ts         ghép cảnh: cache nền, xe, lightmap, màn hình theo việc; drawScene trả SceneFigure[], sceneSize
