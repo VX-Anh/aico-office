@@ -14,7 +14,9 @@ npm run dev         # http://localhost:5173, không nhập token thì chạy ch�
 ```
 
 `npm run build` và `npm test` phải cùng qua trước khi xong việc. Thay đổi về hình ảnh thì tự xem
-bằng chế độ demo (kịch bản 48 giây có đủ trạng thái phòng).
+bằng chế độ demo (kịch bản 48 giây có đủ trạng thái phòng). Ticket UI: xem
+[docs/feature-map.md](docs/feature-map.md) để biết cách tới từng khu vực, selector, kích thước màn
+hình phải kiểm và cách chụp.
 
 ## Quy tắc
 

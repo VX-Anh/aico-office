@@ -173,6 +173,7 @@ public/demo-shots/<thời điểm>/*.png  ảnh review demo xuất từ art/demo
 public/assets/habblaud/             ảnh từ Habblaud (MIT): tranh, poster, logo, minh hoạ; phục vụ ở /assets/habblaud/
 public/assets/CREDITS.md            nguồn và giấy phép của mọi tài sản bên ngoài
 docs/references/habblaud.md         ghi chép tham khảo dự án Habblaud (văn phòng pixel cho agent) và đề xuất áp dụng
+docs/feature-map.md                 bản đồ tính năng UI cho agent: cách tới, selector, dữ liệu demo, kích thước phải kiểm, cách chụp
 ```
 
 Sơ đồ module: [docs/architecture.md](docs/architecture.md).
