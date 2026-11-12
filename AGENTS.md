@@ -9,7 +9,7 @@ Mô tả sản phẩm và bảng cấu trúc file: [README.md](README.md). Sơ �
 ```bash
 npm ci              # cài đúng theo package-lock.json
 npm run build       # tsc --noEmit + vite build
-npm test            # vitest run: hàm thuần, kịch bản actors, công thức và mọi file art/
+npm test            # vitest run: hàm thuần, kịch bản actors, công thức, mọi file art/ và luật repo
 npm run dev         # http://localhost:5173, không nhập token thì chạy chế độ demo
 ```
 

@@ -150,7 +150,6 @@
   font-size: 12px;
   text-shadow: 0 1px 0 var(--bg);
 }
-.room-title { display: contents; }
 .room-name { grid-column: 2; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-ui); font-size: 13.5px; font-weight: 650; text-transform: capitalize; }
 .room-state { grid-column: 1 / -1; grid-row: 2; font-size: 11px; color: var(--text-dim); }
 .room-count { grid-column: 3; grid-row: 1; padding: 2px 5px; border-radius: 4px; background: var(--hover); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
