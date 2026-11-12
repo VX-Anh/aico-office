@@ -357,3 +357,26 @@ describe("khung hoạt động", () => {
     expect(setup().title.attributes.get("aria-expanded")).toBe("false");
   });
 });
+
+describe("selector ổn định", () => {
+  const data = (row: FeedNode) => { const { content: _content, ...rest } = row.dataset; return rest; };
+
+  it("dòng agent có data-key, data-agent, data-room, data-ticket; dòng ticket chỉ có data-ticket", () => {
+    const { feed, list } = setup();
+    const ticket = { ...line("ticket:1"), room: "", agentId: null, name: "T-9", ticket: "T-9", tone: "need" as const };
+    feed.render([line("1"), ticket], [worker]);
+    expect(list.children.map(data)).toEqual([
+      { key: "1", agent: "codex/a", room: "codex", ticket: "T-1" },
+      { key: "ticket:1", ticket: "T-9" },
+    ]);
+  });
+
+  it("nội dung dòng đổi thì data-* đổi theo, khoá giữ nguyên", () => {
+    const { feed, list } = setup();
+    feed.render([line("1")], [worker]);
+    const row = list.children[0];
+    feed.render([{ ...line("1"), ticket: null }], [worker]);
+    expect(list.children[0]).toBe(row);
+    expect(data(row)).toEqual({ key: "1", agent: "codex/a", room: "codex" });
+  });
+});

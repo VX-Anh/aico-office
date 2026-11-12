@@ -79,14 +79,18 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
       needsTab.textContent = `Cần bạn (${view.needsCount ?? info?.needItems?.length ?? needsRoot.querySelectorAll(".need-card").length})`;
       // Dựng lại cả tab mỗi lần: dữ liệu đổi giữa chừng (mất ticket, đổi agent) không sót nút cũ.
       agentPanel.replaceChildren();
+      if (info) agentPanel.dataset.agent = `${info.worker.name}/${info.agent.id}`;
+      else delete agentPanel.dataset.agent;
       const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
         const node = document.createElement(tag);
         node.className = className;
         if (text !== undefined) node.textContent = text;
         return node;
       };
-      const section = (title: string, count: string | null) => {
+      const section = (key: "tasks" | "recent" | "stats", title: string, count: string | null) => {
         const block = el("section", "drawer-section");
+        // Khoá không phụ thuộc chữ tiêu đề.
+        block.dataset.section = key;
         const heading = el("h3", "drawer-section-head");
         heading.append(el("span", "drawer-section-title", title));
         if (count !== null) heading.append(el("span", "drawer-section-count", count));
@@ -166,7 +170,7 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
         agentPanel.append(hero, mission, statusRow, card);
 
         const checklist = taskChecklist(agent);
-        const tasks = section("Task", checklist ? `${checklist.done}/${checklist.total}` : null);
+        const tasks = section("tasks", "Task", checklist ? `${checklist.done}/${checklist.total}` : null);
         if (!checklist) tasks.append(el("div", "drawer-muted", "Chưa có task"));
         else {
           const bar = el("div", "drawer-progress");
@@ -191,7 +195,7 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
         }
 
         const rows = recentRows(agent, info.key, now);
-        const recent = section("Gần đây", String(rows.length));
+        const recent = section("recent", "Gần đây", String(rows.length));
         if (!rows.length) recent.append(el("div", "drawer-muted", "Chưa có hoạt động"));
         else {
           const list = el("ol", "drawer-timeline");
@@ -207,7 +211,7 @@ export function createDrawer(root: HTMLElement, needsRoot: HTMLElement, options:
           recent.append(list);
         }
 
-        const stats = section("Số liệu", null);
+        const stats = section("stats", "Số liệu", null);
         const table = el("dl", "drawer-stats");
         for (const row of tokenStatsRows(data.stats)) {
           const item = el("div", "drawer-stat");

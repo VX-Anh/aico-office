@@ -730,3 +730,30 @@ describe("vai trò BA, Tester, Researcher", () => {
     }
   });
 });
+
+describe("selector ổn định", () => {
+  it("phòng và chip có data-room; dòng agent có data-agent, data-ticket không phụ thuộc started_at", () => {
+    const v = setup();
+    expect(v.rooms().map((r) => r.dataset.room)).toEqual(["claude", "codex"]);
+    expect(v.chips().map((c) => c.dataset.room)).toEqual(["claude", "codex"]);
+    expect(v.rows().map((r) => [r.dataset.agent, r.dataset.ticket])).toEqual([
+      ["claude/a1", "T-11"], ["claude/a2", "T-22"], ["codex/b1", "T-33"],
+    ]);
+    // Agent chạy lại (started_at mới): data-key đổi, data-agent giữ nguyên.
+    const before = v.rows()[0].dataset.key;
+    v.update([claude({ agents: [{ ...a1, started_at: iso(1) }, a2] }), codex()]);
+    expect(v.rows()[0].dataset.key).not.toBe(before);
+    expect(v.rows()[0].dataset.agent).toBe("claude/a1");
+  });
+
+  it("data-ticket theo ticket hiện tại của agent, bỏ khi agent không còn ticket", () => {
+    const v = setup();
+    const row = v.rows()[0];
+    v.update([claude({ agents: [{ ...a1, ticket_id: "T-99" }, a2] }), codex()]);
+    expect(v.rows()[0]).toBe(row);
+    expect(row.dataset.ticket).toBe("T-99");
+    v.update([claude({ agents: [{ ...a1, ticket_id: null } as unknown as WorkerAgent, a2] }), codex()]);
+    expect("ticket" in row.dataset).toBe(false);
+    expect(row.dataset.agent).toBe("claude/a1");
+  });
+});

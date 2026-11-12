@@ -125,10 +125,12 @@ function createRoom(): RoomBlock {
   return { root, head, letter, name, state, count, alert, slots, slotsFill, slotsText, list, empty, rows: new Map() };
 }
 
-function createRow(agent: WorkerAgent, onSelect: (key: string) => void, key: string): AgentRow {
+function createRow(agent: WorkerAgent, onSelect: (key: string) => void, key: string, agentRef: string): AgentRow {
   const root = el("button", "agent-row");
   root.type = "button";
   root.dataset.key = key;
+  // data-key đổi theo started_at; data-agent ("<phòng>/<id>") đoán trước được để kiểm UI bám vào.
+  root.dataset.agent = agentRef;
   const avatar = createAvatar(agent);
   const main = el("span", "agent-main");
   const top = el("span", "agent-top");
@@ -160,6 +162,8 @@ function renderRow(row: AgentRow, worker: WorkerStatus, agent: WorkerAgent, need
   setText(row.role, style.label);
   if (row.role.style.color !== style.shirt) row.role.style.color = style.shirt;
   setText(row.ticket, agent.ticket_id ?? "?");
+  if (typeof agent.ticket_id === "string" && agent.ticket_id) row.root.dataset.ticket = agent.ticket_id;
+  else delete row.root.dataset.ticket;
   const activity = readAgentActivity(agent, `${worker.name}/${agent.id}`).activity;
   const text = activity ? `${activity.icon} ${activity.text}` : agent.mode ? `chế độ ${agent.mode}` : "—";
   setText(row.activity, text);
@@ -222,7 +226,7 @@ function renderRoom(room: RoomBlock, worker: WorkerStatus, needIds: ReadonlySet<
     keys.add(key);
     let row = room.rows.get(key);
     if (!row) {
-      row = createRow(agent, onSelect, key);
+      row = createRow(agent, onSelect, key, `${worker.name}/${agent.id}`);
       room.rows.set(key, row);
     }
     if (renderRow(row, worker, agent, needIds, key === selectedKey, now, query)) nodes.push(row.root);
@@ -246,6 +250,7 @@ interface RoomChip {
 function createChip(name: string, onToggle: (name: string) => void): RoomChip {
   const root = el("button", "room-chip");
   root.type = "button";
+  root.dataset.room = name;
   const letter = el("span", "room-chip-letter room-letter title-pixel");
   const label = el("span", "room-chip-name");
   root.append(letter, label);
@@ -453,6 +458,7 @@ export function createSidebar(root: HTMLElement, options: SidebarOptions): Sideb
       let block = blocks.get(worker.name);
       if (!block) {
         block = createRoom();
+        block.root.dataset.room = worker.name;
         blocks.set(worker.name, block);
       }
       if (off) continue;

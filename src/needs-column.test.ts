@@ -484,3 +484,44 @@ describe("hàng ảnh review trong thẻ", () => {
     expect(viewerRoot().hidden).toBe(true);
   });
 });
+
+describe("selector ổn định", () => {
+  const byData = (root: Node, name: string, value: string) => find(root, (n) => n.dataset[name] === value);
+
+  it("thẻ có data-ticket; tiêu đề, ghi chú, liên kết và nút thao tác bám được bằng data-*", async () => {
+    const { root } = await setup([item("T-plan", "plan"), item("T-esc", "escalated")]);
+    const plan = card(root, "T-plan");
+    expect([plan.dataset.ticket, plan.dataset.ticketId, plan.dataset.kind]).toEqual(["T-plan", "T-plan", "plan"]);
+    expect(byData(plan, "field", "title").tag).toBe("h3");
+    expect(byData(plan, "field", "comment").tag).toBe("textarea");
+    expect(byClass(plan, "need-links").children.map((a) => a.dataset.link)).toEqual(["mr", "preview"]);
+    expect(byClass(plan, "need-actions").children.map((b) => [b.dataset.action, b.textContent])).toEqual([
+      ["approved", "Duyệt kế hoạch"], ["revise", "Yêu cầu sửa"], ["rejected", "Từ chối"],
+    ]);
+    expect(byClass(card(root, "T-esc"), "need-actions").children.map((b) => b.dataset.action))
+      .toEqual(["retry_push", "merge", "close", "fail"]);
+  });
+
+  it("khối xác nhận: nút confirm/cancel và data-confirming theo hành động đang chờ", async () => {
+    const { root, act } = await setup();
+    const target = card(root);
+    const box = byClass(target, "need-confirm");
+    const approve = byData(byClass(target, "need-actions"), "action", "approved");
+    expect(box.children.slice(1).map((b) => b.dataset.action)).toEqual(["confirm", "cancel"]);
+    expect("confirming" in box.dataset).toBe(false);
+    approve.click();
+    expect(box.dataset.confirming).toBe("approved");
+    byData(box, "action", "cancel").click();
+    expect("confirming" in box.dataset).toBe(false);
+    expect(act).not.toHaveBeenCalled();
+    approve.click();
+    byData(box, "action", "confirm").click();
+    await vi.waitFor(() => expect(act).toHaveBeenCalledOnce());
+    expect(act.mock.calls[0][1]).toBe("approved");
+  });
+
+  it("ảnh thu nhỏ có data-shot theo chỉ số", async () => {
+    const { root } = await setupShots();
+    expect(thumbs(root).map((c) => c.dataset.shot)).toEqual(["0", "1", "2"]);
+  });
+});

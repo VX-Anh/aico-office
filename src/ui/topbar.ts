@@ -248,6 +248,8 @@ export function createTopbar(root: HTMLElement, options: TopbarOptions = {}): To
         let card = cards.get(worker.name);
         if (!card) {
           card = usageCard();
+          // Selector ổn định cho kiểm UI: .usage-card[data-room="<tên phòng>"].
+          card.root.dataset.room = worker.name;
           cards.set(worker.name, card);
         }
         // Dữ liệu usage hỏng không được làm đứng thanh trên: lỗi thì hiện "?".

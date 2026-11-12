@@ -43,6 +43,9 @@ export function createToasts(
     let current = entry;
     const article = node("article");
     article.className = "toast";
+    // Khoá toast là id|kind nên hai giá trị này không đổi trong đời node.
+    article.dataset.ticket = article.dataset.ticketId = entry.id;
+    article.dataset.kind = entry.kind;
     const message = node("p");
     const actions = node("div");
     actions.className = "toast-actions";
@@ -50,6 +53,8 @@ export function createToasts(
     const close = node("button", "×");
     open.type = "button";
     close.type = "button";
+    open.dataset.action = "open";
+    close.dataset.action = "dismiss";
     close.setAttribute("aria-label", "Đóng thông báo");
     open.addEventListener("click", () => { handlers.onOpen(current.id); });
     close.addEventListener("click", () => {

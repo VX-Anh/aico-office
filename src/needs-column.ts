@@ -133,6 +133,8 @@ export function createNeedsColumn(
     const article = node("article");
     article.className = "need-card";
     article.dataset.ticketId = id;
+    // data-ticket: cùng tên thuộc tính với toast, dòng feed, dòng agent; data-ticket-id giữ cho code cũ.
+    article.dataset.ticket = id;
     article.dataset.kind = kind;
     const head = node("div");
     head.className = "need-head";
@@ -143,12 +145,15 @@ export function createNeedsColumn(
     waited.className = "need-waited";
     head.append(code, badge, waited);
     const title = node("h3");
+    title.dataset.field = "title";
     const reason = node("p");
     reason.className = "need-reason";
     const links = node("div");
     links.className = "need-links";
     const mr = link("Xem MR ↗");
     const preview = link("Xem trước ↗");
+    mr.dataset.link = "mr";
+    preview.dataset.link = "preview";
     links.append(mr, preview);
     const shotRow = node("div");
     shotRow.className = "need-shots";
@@ -156,6 +161,7 @@ export function createNeedsColumn(
     const comment = node("textarea");
     comment.rows = 2;
     comment.placeholder = "Ghi chú";
+    comment.dataset.field = "comment";
     comment.setAttribute("aria-label", `Ghi chú ${id}`);
     const actions = node("div");
     actions.className = "need-actions";
@@ -165,6 +171,8 @@ export function createNeedsColumn(
     const yes = node("button", "Xác nhận");
     const cancel = node("button", "Huỷ");
     yes.type = cancel.type = "button";
+    yes.dataset.action = "confirm";
+    cancel.dataset.action = "cancel";
     confirmation.append(question, yes, cancel);
     const message = node("p");
     message.className = "need-message";
@@ -187,6 +195,7 @@ export function createNeedsColumn(
       shotRow.replaceChildren(...shots.map((shot, i) => {
         const cell = node("button");
         cell.type = "button";
+        cell.dataset.shot = String(i);
         cell.setAttribute("title", shot.label);
         const img = node("img");
         img.setAttribute("loading", "lazy");
@@ -197,6 +206,7 @@ export function createNeedsColumn(
         img.addEventListener("error", () => {
           const fallback = link(`${shot.label} ↗`);
           fallback.href = shot.url;
+          fallback.dataset.shot = String(i);
           cell.replaceWith(fallback);
         });
         img.setAttribute("src", shot.url);
@@ -234,6 +244,9 @@ export function createNeedsColumn(
       for (const [action, button] of buttons) button.disabled = busy || !available.get(action);
       comment.readOnly = busy;
       confirmation.hidden = confirming === null;
+      // Hành động đang chờ xác nhận, để kiểm UI biết nút Xác nhận sẽ gửi gì.
+      if (confirming) confirmation.dataset.confirming = confirming;
+      else delete confirmation.dataset.confirming;
       question.textContent = confirming
         ? kind === "merge" && confirming === "approved"
           ? `Merge PR vào main: ${id}?`
@@ -288,6 +301,7 @@ export function createNeedsColumn(
     for (const { action } of actionsFor(kind, first.reason, first.ticket)) {
       const button = node("button", actionLabel(kind, action));
       button.type = "button";
+      button.dataset.action = action;
       button.addEventListener("click", () => {
         if (needComment(action)) return;
         if (needsConfirmation(kind, action)) {
